@@ -15,40 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Restore app source and verify integrity
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import base64, hashlib, json, lzma
-          from pathlib import Path
-
-          encoded = ''.join((Path('bootstrap') / f'source.part{i}.b64').read_text().strip() for i in (1, 2, 3))
-          compressed = base64.b64decode(encoded, validate=True)
-          expected = 'e5e7ff98f5181b0efd423659b30933a22c76c69ed96b5d4e10d60794cb4d6381'
-          actual = hashlib.sha256(compressed).hexdigest()
-          if actual != expected:
-              raise RuntimeError(f'Source archive checksum mismatch: {actual}')
-          data = json.loads(lzma.decompress(compressed).decode('utf-8'))
-          for name, contents in data.items():
-              path = Path(name)
-              if path.is_absolute() or '..' in path.parts or name.startswith('.git/'):
-                  raise ValueError(f'Unsafe source path: {name}')
-              path.parent.mkdir(parents=True, exist_ok=True)
-              path.write_text(contents, encoding='utf-8')
-          print(f'Restored {len(data)} source files')
-          PY
-
-      - name: Publish restored source files to repository
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app build.gradle.kts gradle.properties settings.gradle.kts gradle/wrapper/gradle-wrapper.properties .gitignore
-          if ! git diff --cached --quiet; then
-            git commit -m "Publish Jessi Android source files"
-            git push origin HEAD:main || echo "Unable to push source to branch; continuing build"
-          fi
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
