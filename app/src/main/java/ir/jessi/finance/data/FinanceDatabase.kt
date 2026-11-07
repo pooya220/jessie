@@ -77,7 +77,7 @@ interface FinanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertBudget(row: Budget): Long
     @Update suspend fun updateBudget(row: Budget)
     @Query("DELETE FROM budgets WHERE id=:id") suspend fun deleteBudget(id: Long)
-    @Transaction suspend fun applyDebtPayment(row: Debt, amount: Long, accountId: Long) {
+    @androidx.room.Transaction suspend fun applyDebtPayment(row: Debt, amount: Long, accountId: Long) {
         require(amount > 0 && amount <= row.totalToman - row.paidToman)
         updateDebt(row.copy(paidToman = row.paidToman + amount))
         insertTransaction(Transaction(
@@ -89,7 +89,7 @@ interface FinanceDao {
     }
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertReview(row: SmsReview): Long
     @Query("DELETE FROM sms_reviews WHERE id=:id") suspend fun deleteReview(id: Long)
-    @Transaction suspend fun transfer(fromId: Long, toId: Long, amount: Long, note: String) {
+    @androidx.room.Transaction suspend fun transfer(fromId: Long, toId: Long, amount: Long, note: String) {
         require(fromId != toId && amount > 0)
         val group = java.util.UUID.randomUUID().toString()
         val time = System.currentTimeMillis()
