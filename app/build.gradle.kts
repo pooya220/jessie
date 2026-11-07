@@ -16,23 +16,8 @@ android {
         versionName = "0.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-    signingConfigs {
-        create("stable") {
-            // Credentials are supplied by GitHub Actions secrets. No private key is in this repository.
-            val stableKeystore = System.getenv("JESSI_SIGNING_STORE_FILE")
-            if (!stableKeystore.isNullOrBlank()) {
-                storeFile = file(stableKeystore)
-                storePassword = System.getenv("JESSI_SIGNING_STORE_PASSWORD")
-                keyAlias = System.getenv("JESSI_SIGNING_KEY_ALIAS")
-                keyPassword = System.getenv("JESSI_SIGNING_KEY_PASSWORD")
-            }
-        }
-    }
     buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("stable")
-        }
+        release { isMinifyEnabled = false }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

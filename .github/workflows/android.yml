@@ -1,4 +1,4 @@
-name: Jessie Official Android Release
+name: Build Jessi APK
 
 on:
   push:
@@ -24,82 +24,31 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Install Android SDK platform
+      - name: Install Android SDK 35
         shell: bash
         run: |
-          set -euo pipefail
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -path "*/bin/sdkmanager" -type f | head -1)
+          echo "SDK manager: $SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Build Android debug APK
+        run: gradle --no-daemon --stacktrace --info :app:assembleDebug
 
       - name: Run unit tests
         run: gradle --no-daemon :app:testDebugUnitTest
 
-      - name: Check permanent signing setup
-        id: signing
-        env:
-          SIGNING_BUNDLE: ${{ secrets.JESSI_SIGNING_BUNDLE }}
-        shell: bash
-        run: |
-          if [[ -z "$SIGNING_BUNDLE" ]]; then
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "### One-time signing setup required" >> "$GITHUB_STEP_SUMMARY"
-            echo "Add the JESSI_SIGNING_BUNDLE repository secret before the first official APK can be published." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: Jessi-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
 
-      - name: Restore permanent signing key privately
-        if: steps.signing.outputs.ready == 'true'
-        env:
-          SIGNING_BUNDLE: ${{ secrets.JESSI_SIGNING_BUNDLE }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import os, json, base64
-          bundle = json.loads(os.environ["SIGNING_BUNDLE"])
-          raw = base64.b64decode(bundle["keystore_b64"], validate=True)
-          if len(raw) < 1024 or len(raw) > 64_000:
-              raise ValueError("Invalid signing keystore data")
-          path = os.path.join(os.environ["RUNNER_TEMP"], "jessi-release-signing.p12")
-          with open(path, "wb") as f:
-              f.write(raw)
-          os.chmod(path, 0o600)
-          values = {
-              "JESSI_SIGNING_STORE_FILE": path,
-              "JESSI_SIGNING_STORE_PASSWORD": bundle["store_password"],
-              "JESSI_SIGNING_KEY_ALIAS": bundle["key_alias"],
-              "JESSI_SIGNING_KEY_PASSWORD": bundle["key_password"],
-          }
-          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
-              for key, value in values.items():
-                  if "\n" in value or "\r" in value:
-                      raise ValueError("Invalid signing value")
-                  env.write(f"{key}={value}\n")
-          PY
-
-      - name: Build the only public APK (signed release)
-        if: steps.signing.outputs.ready == 'true'
-        run: gradle --no-daemon :app:assembleRelease
-
-      - name: Verify permanent signer and package signature
-        if: steps.signing.outputs.ready == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK=app/build/outputs/apk/release/app-release.apk
-          test -s "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
-          CERT_SHA=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/.*Signer #1 certificate SHA-256 digest: //p' | head -1 | tr '[:upper:]' '[:lower:]')
-          EXPECTED=0c8b4868394b2b1a5e8e3c29c95b9e4556bfbcfa4a1966f4260a880cb8fdb6d5
-          if [[ "$CERT_SHA" != "$EXPECTED" ]]; then
-            echo "::error::APK signing certificate changed unexpectedly!"
-            exit 1
-          fi
-
-      - name: Publish one official GitHub Release
-        if: steps.signing.outputs.ready == 'true'
+      - name: Publish direct-download APK
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -109,14 +58,12 @@ jobs:
           test -n "$VERSION"
           TAG="v${VERSION}"
           FILE="Jessi-v${VERSION}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$FILE"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists. It will not be silently overwritten."
-            exit 0
+            echo "Release $TAG already exists; skipping duplicate publication."
+          else
+            gh release create "$TAG" "$FILE" \
+              --target "$GITHUB_SHA" \
+              --title "جسی ${VERSION}" \
+              --notes "فایل APK جسی. هشدار: کلید Debug در هر بیلد ممکن است عوض شود و نصب روی نسخه قبلی می‌تواند با خطای Conflict مواجه شود. اگر داده مالی مهم داری، نسخه قبلی را بدون تهیه پشتیبان حذف نکن."
           fi
-          cp app/build/outputs/apk/release/app-release.apk "$FILE"
-          gh release create "$TAG" "$FILE" \
-            --target "$GITHUB_SHA" \
-            --title "جسی نسخه ${VERSION}" \
-            --notes "نسخه رسمی جسی با امضای ثابت برای آپدیت‌های بعدی روی همین برنامه. هر نسخه جدید باید versionCode بزرگ‌تر و همان امضای ثابت را داشته باشد."
-          echo "### Published $TAG" >> "$GITHUB_STEP_SUMMARY"
-          echo "The APK uses the official ir.jessi.finance package and permanent signing certificate." >> "$GITHUB_STEP_SUMMARY"
