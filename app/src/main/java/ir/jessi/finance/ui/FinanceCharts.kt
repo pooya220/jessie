@@ -29,6 +29,7 @@ fun FinancialTrendChart(periods: List<FinancePeriod>, selectedIndex: Int, transa
     val dark = MaterialTheme.colorScheme.background.red < .1f
     val incomeColor = if (dark) darkPositive else lightPositive
     val expenseColor = if (dark) darkNegative else lightNegative
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .6f)
     val shown = periods.drop(selectedIndex).take(6).reversed()
     val incomes = shown.map { p -> transactions.filter { p.contains(it.createdAt) && it.kind == "IN" }.sumOf { it.amountToman } }
     val expenses = shown.map { p -> transactions.filter { p.contains(it.createdAt) && it.kind == "OUT" }.sumOf { it.amountToman } }
@@ -52,7 +53,7 @@ fun FinancialTrendChart(periods: List<FinancePeriod>, selectedIndex: Int, transa
                     val inHeight = plotHeight * (incomes[i].toFloat() / maximum)
                     val outHeight = plotHeight * (expenses[i].toFloat() / maximum)
                     val radius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
-                    drawRoundRect(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .6f),
+                    drawRoundRect(trackColor,
                         topLeft = Offset(baseX, 0f), size = Size(bar, plotHeight), cornerRadius = radius)
                     drawRoundRect(incomeColor, topLeft = Offset(baseX, plotHeight - inHeight),
                         size = Size(bar, inHeight), cornerRadius = radius)
