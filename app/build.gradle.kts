@@ -12,18 +12,27 @@ android {
         applicationId = "ir.jessi.finance"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.3.1"
+        versionCode = 5
+        versionName = "0.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-    buildTypes {
-        // Side-by-side diagnostic build: does not replace the existing ir.jessi.finance
-        // installation, which was signed with a different ephemeral debug key.
-        debug {
-            applicationIdSuffix = ".preview"
-            versionNameSuffix = "-preview"
+    signingConfigs {
+        create("stable") {
+            // Credentials are supplied by GitHub Actions secrets. No private key is in this repository.
+            val stableKeystore = System.getenv("JESSI_SIGNING_STORE_FILE")
+            if (!stableKeystore.isNullOrBlank()) {
+                storeFile = file(stableKeystore)
+                storePassword = System.getenv("JESSI_SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("JESSI_SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("JESSI_SIGNING_KEY_PASSWORD")
+            }
         }
-        release { isMinifyEnabled = false }
+    }
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("stable")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
