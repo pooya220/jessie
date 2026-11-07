@@ -12,11 +12,17 @@ android {
         applicationId = "ir.jessi.finance"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.3.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
+        // Side-by-side diagnostic build: does not replace the existing ir.jessi.finance
+        // installation, which was signed with a different ephemeral debug key.
+        debug {
+            applicationIdSuffix = ".preview"
+            versionNameSuffix = "-preview"
+        }
         release { isMinifyEnabled = false }
     }
     compileOptions {

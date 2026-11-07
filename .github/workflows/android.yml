@@ -42,7 +42,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: Jessie-Android-APK
+          name: Jessie-Android-Preview-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
@@ -57,7 +57,7 @@ jobs:
           VERSION=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)
           test -n "$VERSION"
           TAG="v${VERSION}-beta"
-          FILE="Jessie-v${VERSION}-debug.apk"
+          FILE="Jessie-v${VERSION}-preview.apk"
           cp app/build/outputs/apk/debug/app-debug.apk "$FILE"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$FILE" --clobber
@@ -65,6 +65,6 @@ jobs:
             gh release create "$TAG" "$FILE" \
               --target "$GITHUB_SHA" \
               --title "جسی v${VERSION} (نسخه آزمایشی)" \
-              --notes "فایل APK آزمایشی جسی برای نصب مستقیم روی اندروید. هشدار: نسخه Debug با امضای موقت است. بدون تهیه نسخه پشتیبان، برنامه قبلی دارای داده مالی را حذف نکنید." \
+              --notes "نسخه آزمایشی جداگانه با شناسه ir.jessi.finance.preview که کنار برنامه اصلی نصب می‌شود. اطلاعات نسخه قبلی منتقل نمی‌شود؛ برنامه قبلی را حذف نکنید. امضای Debug این نسخه برای ارتقای آینده پایدار نیست." \
               --prerelease
           fi
