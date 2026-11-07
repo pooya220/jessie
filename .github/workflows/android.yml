@@ -67,7 +67,7 @@ jobs:
           "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
 
       - name: Build Android debug APK
-        run: gradle --no-daemon :app:assembleDebug
+        run: gradle --no-daemon --stacktrace --info :app:assembleDebug
 
       - name: Run unit tests
         run: gradle --no-daemon :app:testDebugUnitTest
