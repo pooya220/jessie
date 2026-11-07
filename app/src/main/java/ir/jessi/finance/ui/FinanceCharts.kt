@@ -77,62 +77,73 @@ fun FinancialTrendChart(periods: List<FinancePeriod>, selectedIndex: Int, transa
 
 @Composable
 fun SpendingCategoryChart(transactions: List<Transaction>) {
-    val totals = transactions.filter { it.kind == "OUT" }
+    val spent = transactions.filter { it.kind == "OUT" }
         .groupBy { it.category }
-        .mapValues { (_, txs) -> txs.sumOf { it.amountToman } }
+        .mapValues { (_, items) -> items.sumOf { it.amountToman } }
         .toList().sortedByDescending { it.second }
-    val biggest = totals.take(4)
-    val rest = totals.drop(4).sumOf { it.second }
-    val rows = if (rest > 0L) biggest + ("سایر موارد" to rest) else biggest
+    val top = spent.take(4)
+    val rest = spent.drop(4).sumOf { it.second }
+    val rows = if (rest > 0L) top + ("سایر" to rest) else top
     val total = rows.sumOf { it.second }
-    val chartColors = listOf(
-        Color(0xFF16BD91), Color(0xFF32A8FF), Color(0xFFFFC15C),
-        Color(0xFFF271B6), Color(0xFFA979FF)
-    )
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("تفکیک هزینه‌ها", fontSize = 15.sp, fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface)
-        if (rows.isEmpty()) {
-            Text("هنوز هزینه‌ای در این دوره ثبت نشده.", fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Box(Modifier.size(132.dp), contentAlignment = Alignment.Center) {
-                    Canvas(Modifier.fillMaxSize().padding(9.dp)) {
-                        val stroke = Stroke(width = 23.dp.toPx(), cap = StrokeCap.Butt)
-                        drawArc(Color(0xFFD5E0E9).copy(alpha = .24f), -90f, 360f, false, style = stroke)
+    val dark = MaterialTheme.colorScheme.background.red < .1f
+    val colors = if (dark)
+        listOf(Color(0xFF22C8FF), Color(0xFF5C7BFF), Color(0xFFFFCC62),
+            Color(0xFFF253C9), Color(0xFFAA58FF))
+    else listOf(Color(0xFF08AB67), Color(0xFF27A9F1), Color(0xFFFFBE4A),
+        Color(0xFFF16FC3), Color(0xFFB478FD))
+    val track = MaterialTheme.colorScheme.outline.copy(alpha = .3f)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("تفکیک هزینه‌ها", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // In RTL the first column is on the right, matching the reference legend.
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                if (rows.isEmpty()) {
+                    Text("هنوز هزینه‌ای در این دوره ثبت نشده.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                } else {
+                    rows.forEachIndexed { index, (label, amount) ->
+                        Row(
+                            Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Box(Modifier.size(8.dp).background(colors[index], RoundedCornerShape(3.dp)))
+                            Text(label, Modifier.weight(1f), fontSize = 11.sp,
+                                maxLines = 1, color = MaterialTheme.colorScheme.onSurface)
+                            Text(digitsFa((100 * amount / total.coerceAtLeast(1L)).toString()) + "٪",
+                                fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+            }
+            Box(Modifier.size(138.dp), contentAlignment = Alignment.Center) {
+                Canvas(Modifier.fillMaxSize().padding(9.dp)) {
+                    val ring = Stroke(width = 22.dp.toPx(), cap = StrokeCap.Butt)
+                    drawArc(track, -90f, 360f, false, style = ring)
+                    if (total > 0L) {
                         var angle = -90f
-                        rows.forEachIndexed { i, row ->
-                            val sweep = 360f * row.second.toFloat() / total.coerceAtLeast(1L)
-                            drawArc(chartColors[i], angle + 1.2f, (sweep - 2.4f).coerceAtLeast(0f),
-                                false, style = stroke)
+                        rows.forEachIndexed { i, item ->
+                            val sweep = 360f * item.second.toFloat() / total
+                            drawArc(colors[i], angle + 1f, (sweep - 2f).coerceAtLeast(0f),
+                                false, style = ring)
                             angle += sweep
                         }
                     }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("مجموع", fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(digitsFa((total / 1_000_000.0).let {
-                            String.format(java.util.Locale.US, "%.1f", it)
-                        }) + " م", fontSize = 17.sp, fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onSurface)
-                        Text("تومان", fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
                 }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    rows.forEachIndexed { i, (name, value) ->
-                        Row(verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Box(Modifier.size(8.dp).background(chartColors[i], RoundedCornerShape(3.dp)))
-                            Text(name, Modifier.weight(1f), fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
-                            Text(digitsFa(((100 * value) / total.coerceAtLeast(1L)).toString()) + "٪",
-                                fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        if (total == 0L) "۰" else digitsFa(
+                            java.text.NumberFormat.getIntegerInstance(java.util.Locale.US).format(total)
+                        ),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = if (total > 999_999_999L) 11.sp else 13.sp,
+                        maxLines = 1, color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text("تومان", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
