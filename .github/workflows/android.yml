@@ -99,16 +99,7 @@ jobs:
           arch: x86_64
           profile: pixel_5
           disable-animations: true
-          script: |
-            set -e
-            adb install -r app/build/outputs/apk/signed/Jessi.apk
-            adb shell pm path ir.jessi.finance | grep 'package:'
-            adb shell am start -n ir.jessi.finance/.MainActivity
-            sleep 6
-            if adb logcat -d -s AndroidRuntime:E | grep -E 'FATAL EXCEPTION|Process: ir.jessi.finance'; then
-              echo "App crashed after installation!" >&2
-              exit 1
-            fi
+          script: bash scripts/test_android_install.sh
 
       - name: Release the verified APK only
         if: steps.signed.outputs.ready == 'true'
