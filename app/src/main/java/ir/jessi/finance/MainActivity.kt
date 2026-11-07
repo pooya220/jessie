@@ -15,6 +15,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Eco
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
+import java.util.Locale
+import java.text.NumberFormat
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -115,8 +122,8 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Tab(val label: String, val icon: String) {
-    HOME("داشبورد", "⌂"), DEBTS("بدهی و قرض", "⇆"),
-    BUDGETS("سقف پرداخت", "◉"), TXS("تراکنش‌ها", "≋"), ACCOUNTS("حساب‌ها", "▣")
+    HOME("خانه", "⌂"), DEBTS("اقساط", "⇆"),
+    BUDGETS("بودجه", "◉"), TXS("تراکنش‌ها", "≋"), ACCOUNTS("حساب‌ها", "▣")
 }
 private sealed interface Editor {
     data class AccountForm(val value: Account? = null) : Editor
@@ -164,54 +171,76 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
         containerColor = background,
         topBar = {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    shape = RoundedCornerShape(15.dp),
-                    color = if (darkMode) Color(0xFF332158) else Color(0xFFE2F8EC)
+                Box(
+                    Modifier.size(40.dp).background(
+                        if (darkMode) Color(0xFF2E1C5E) else Color(0xFFDAF6E7),
+                        RoundedCornerShape(14.dp)
+                    ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(if (darkMode) "◈" else "❀",
-                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
-                        fontSize = 25.sp, color = mint, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Filled.Eco, contentDescription = "نشان جسی",
+                        tint = if (darkMode) Color(0xFFC46EFF) else Color(0xFF0CB86C),
+                        modifier = Modifier.size(26.dp))
                 }
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(9.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("جسی", fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("مدیریت مالی شخصی", color = muted, fontSize = 11.sp)
+                    Text("جسی", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("مدیریت مالی شخصی", color = muted, fontSize = 10.sp)
                 }
-                Surface(
-                    onClick = onToggleTheme,
-                    shape = RoundedCornerShape(30.dp),
-                    color = secondary,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                // Two actual controls, matching the sun/moon switch in the reference.
+                Row(
+                    Modifier.background(secondary, RoundedCornerShape(50.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .55f), RoundedCornerShape(50.dp))
+                        .padding(3.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        Modifier.padding(horizontal = 11.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    Surface(
+                        onClick = { if (darkMode) onToggleTheme() },
+                        shape = RoundedCornerShape(50.dp),
+                        color = if (!darkMode) Color(0xFF00A960) else Color.Transparent
                     ) {
-                        Text(if (darkMode) "☾" else "☀", color = mint, fontSize = 21.sp)
-                        Text(if (darkMode) "دارک" else "لایت",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Outlined.LightMode, contentDescription = "فعال کردن لایت مود",
+                            tint = if (darkMode) muted else Color.White,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp).size(20.dp))
+                    }
+                    Surface(
+                        onClick = { if (!darkMode) onToggleTheme() },
+                        shape = RoundedCornerShape(50.dp),
+                        color = if (darkMode) Color(0xFF7B3CDE) else Color.Transparent
+                    ) {
+                        Icon(Icons.Outlined.DarkMode, contentDescription = "فعال کردن دارک مود",
+                            tint = if (darkMode) Color.White else muted,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp).size(20.dp))
                     }
                 }
             }
         },
         bottomBar = {
-            NavigationBar(containerColor = surface, tonalElevation = 0.dp) {
+            NavigationBar(
+                containerColor = surface,
+                tonalElevation = 0.dp,
+                modifier = Modifier.height(75.dp)
+            ) {
                 Tab.entries.forEach { item ->
+                    val navigationIcon: ImageVector = when (item) {
+                        Tab.HOME -> Icons.Outlined.Home
+                        Tab.DEBTS -> Icons.Outlined.CreditCard
+                        Tab.BUDGETS -> Icons.Outlined.PieChartOutline
+                        Tab.TXS -> Icons.Outlined.ReceiptLong
+                        Tab.ACCOUNTS -> Icons.Outlined.AccountBalanceWallet
+                    }
                     NavigationBarItem(
                         selected = tab == item,
                         onClick = { tabName = item.name },
-                        icon = { Text(item.icon, fontSize = 18.sp) },
-                        label = { Text(item.label, fontSize = 9.sp, maxLines = 1) },
+                        icon = { Icon(navigationIcon, contentDescription = item.label, modifier = Modifier.size(22.dp)) },
+                        label = { Text(item.label, fontSize = 10.sp, maxLines = 1) },
                         alwaysShowLabel = true,
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = mint, selectedTextColor = mint,
-                            indicatorColor = secondary, unselectedIconColor = muted,
-                            unselectedTextColor = muted
+                            indicatorColor = secondary, unselectedIconColor = muted, unselectedTextColor = muted
                         )
                     )
                 }
@@ -313,18 +342,22 @@ private fun FinanceSummaryChip(title: String, value: Long, income: Boolean, modi
 }
 
 @Composable
-private fun DashboardAction(iconText: String, title: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun DashboardAction(
+    icon: ImageVector, title: String, modifier: Modifier = Modifier, onClick: () -> Unit
+) {
+    val dark = LocalJessiDark.current
     Surface(
-        onClick = onClick, modifier = modifier,
-        color = surface, shape = RoundedCornerShape(17.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .55f))
+        onClick = onClick, modifier = modifier.height(71.dp),
+        color = if (dark) Color(0xFF201B4C) else Color(0xFFF1F8F7),
+        shape = RoundedCornerShape(15.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .46f))
     ) {
         Column(
-            Modifier.padding(vertical = 12.dp, horizontal = 3.dp),
+            Modifier.padding(vertical = 9.dp, horizontal = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            Text(iconText, fontSize = 23.sp, color = mint, fontWeight = FontWeight.Bold)
+            Icon(icon, contentDescription = title, tint = mint, modifier = Modifier.size(23.dp))
             Text(title, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold, maxLines = 1)
         }
@@ -337,30 +370,71 @@ private fun PeriodSwitcher(
     salaryAvailable: Boolean, onModeChange: (String) -> Unit,
     onPrevious: () -> Unit, onNext: () -> Unit
 ) {
-    Tile(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("دوره مالی", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            FilterChip(selected = mode == FinancePeriodEngine.MONTHLY,
-                onClick = { onModeChange(FinancePeriodEngine.MONTHLY) }, label = { Text("ماه شمسی", fontSize = 11.sp) })
-            FilterChip(selected = mode == FinancePeriodEngine.SALARY,
-                onClick = { onModeChange(FinancePeriodEngine.SALARY) }, label = { Text("از حقوق", fontSize = 11.sp) })
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(onClick = onPrevious, enabled = selectedIndex < count - 1) { Text("› قبلی") }
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(period.label, color = mint, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                Text(if (selectedIndex == 0) "دوره جاری" else "دوره گذشته",
-                    fontSize = 10.sp, color = muted)
+    val dark = LocalJessiDark.current
+    val panel = if (dark) Color(0xFF252252) else Color(0xFFEBF5F3)
+    var expanded by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            modifier = Modifier.weight(.61f).height(51.dp),
+            color = panel, shape = RoundedCornerShape(15.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .4f))
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onPrevious, enabled = selectedIndex < count - 1,
+                    modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Outlined.ChevronRight, contentDescription = "دوره قبل",
+                        tint = if (selectedIndex < count-1) mint else muted, modifier = Modifier.size(21.dp))
+                }
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("دوره مالی", fontSize = 10.sp, color = muted)
+                    Text(period.label, color = mint, fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                IconButton(onClick = onNext, enabled = selectedIndex > 0,
+                    modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Outlined.ChevronLeft, contentDescription = "دوره بعد",
+                        tint = if (selectedIndex > 0) mint else muted, modifier = Modifier.size(21.dp))
+                }
             }
-            TextButton(onClick = onNext, enabled = selectedIndex > 0) { Text("بعدی ‹") }
         }
-        if (mode == FinancePeriodEngine.SALARY && !salaryAvailable) {
-            Text("هنوز واریز تأییدشده‌ای با دسته «حقوق» نیست؛ فعلاً دوره‌ها ماهانه نمایش داده می‌شن.",
-                color = muted, fontSize = 11.sp)
-        } else if (mode == FinancePeriodEngine.SALARY) {
-            Text("با تأیید هر واریز به دسته «حقوق»، دوره جدید به‌صورت خودکار شروع می‌شه.",
-                color = muted, fontSize = 11.sp)
+        Box(Modifier.weight(.39f)) {
+            Surface(
+                onClick = { expanded = true },
+                modifier = Modifier.fillMaxWidth().height(51.dp),
+                shape = RoundedCornerShape(15.dp),
+                color = panel,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .4f))
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(if (mode == FinancePeriodEngine.SALARY) "از حقوق" else "ماه شمسی",
+                        fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    Icon(Icons.Outlined.ExpandMore, contentDescription = null,
+                        tint = muted, modifier = Modifier.size(19.dp))
+                }
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                DropdownMenuItem(
+                    text = { Text("ماه شمسی") },
+                    onClick = { onModeChange(FinancePeriodEngine.MONTHLY); expanded = false }
+                )
+                DropdownMenuItem(
+                    text = { Text("از هر حقوق جدید") },
+                    onClick = { onModeChange(FinancePeriodEngine.SALARY); expanded = false }
+                )
+            }
         }
+    }
+    if (mode == FinancePeriodEngine.SALARY && !salaryAvailable) {
+        Text("بعد از تأیید اولین واریز حقوق، دوره‌های حقوقی فعال می‌شن.",
+            fontSize = 11.sp, color = muted)
     }
 }
 
