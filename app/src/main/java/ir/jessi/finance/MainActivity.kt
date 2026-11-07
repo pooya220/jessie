@@ -323,7 +323,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
 }
 
 @Composable
-private fun FinanceSummaryChip(title: String, value: Long, income: Boolean, modifier: Modifier = Modifier) {
+private fun FinanceSummaryChip(title: String, value: Long, income: Boolean, modifier: Modifier = Modifier, hidden: Boolean = false) {
     val color = if (income) Color(0xFF00C68E) else Color(0xFFFF689C)
     val chipColor = if (LocalJessiDark.current) color.copy(alpha = .14f)
         else if (income) Color(0xFFDDF8EA) else Color(0xFFFFE7EE)
@@ -334,7 +334,7 @@ private fun FinanceSummaryChip(title: String, value: Long, income: Boolean, modi
         Text((if (income) "↗ " else "↘ ") + title, fontSize = 11.sp,
             fontWeight = FontWeight.Bold, color = if (LocalJessiDark.current) color
                 else if (income) Color(0xFF007D56) else Color(0xFFC82C56))
-        Text(toman(value), fontSize = 14.sp, fontWeight = FontWeight.ExtraBold,
+        Text(if (hidden) "••••••" else toman(value), fontSize = 14.sp, fontWeight = FontWeight.ExtraBold,
             color = if (LocalJessiDark.current) color
                 else if (income) Color(0xFF007D56) else Color(0xFFC82C56),
             maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -372,6 +372,12 @@ private fun PeriodSwitcher(
 ) {
     val dark = LocalJessiDark.current
     val panel = if (dark) Color(0xFF252252) else Color(0xFFEBF5F3)
+    val jalaliDate = Jalali.of(period.start)
+    val monthNames = listOf("فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+        "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند")
+    val title = if (mode == FinancePeriodEngine.MONTHLY)
+        monthNames.getOrElse(jalaliDate.month - 1) { "ماه" } + " " + digitsFa(jalaliDate.year.toString())
+    else period.label
     var expanded by remember { mutableStateOf(false) }
     Row(
         Modifier.fillMaxWidth(),
@@ -391,7 +397,7 @@ private fun PeriodSwitcher(
                 }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("دوره مالی", fontSize = 10.sp, color = muted)
-                    Text(period.label, color = mint, fontWeight = FontWeight.Bold,
+                    Text(title, color = mint, fontWeight = FontWeight.Bold,
                         fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 IconButton(onClick = onNext, enabled = selectedIndex > 0,
@@ -537,10 +543,10 @@ private fun Dashboard(
             Text("تومان", fontSize = 12.sp, color = muted)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            FinanceSummaryChip("درآمد", if (balanceVisible) income else 0L,
-                income = true, modifier = Modifier.weight(1f))
-            FinanceSummaryChip("هزینه", if (balanceVisible) expense else 0L,
-                income = false, modifier = Modifier.weight(1f))
+            FinanceSummaryChip("درآمد", income, income = true,
+                modifier = Modifier.weight(1f), hidden = !balanceVisible)
+            FinanceSummaryChip("هزینه", expense, income = false,
+                modifier = Modifier.weight(1f), hidden = !balanceVisible)
         }
     }
 
