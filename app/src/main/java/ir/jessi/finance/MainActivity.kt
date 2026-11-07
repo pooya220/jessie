@@ -20,6 +20,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.draw.clip
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
@@ -33,12 +37,30 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ir.jessi.finance.data.*
 import ir.jessi.finance.ui.*
 
-private val background = Color(0xFF0E1718)
-private val surface = Color(0xFF1A292A)
-private val secondary = Color(0xFF263A3B)
-private val mint = Color(0xFF8DE5BE)
-private val muted = Color(0xFFAFBDB8)
-private val danger = Color(0xFFFF9B9B)
+
+private val background: Color @Composable get() = MaterialTheme.colorScheme.background
+private val surface: Color @Composable get() = MaterialTheme.colorScheme.surface
+private val secondary: Color @Composable get() = MaterialTheme.colorScheme.surfaceVariant
+private val mint: Color @Composable get() = MaterialTheme.colorScheme.primary
+private val muted: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+private val danger: Color @Composable get() = MaterialTheme.colorScheme.error
+
+private val lightColors = lightColorScheme(
+    primary = Color(0xFF008A62), onPrimary = Color.White,
+    secondary = Color(0xFF087D91), background = Color(0xFFF6FAFB),
+    surface = Color.White, surfaceVariant = Color(0xFFECF3F5),
+    onSurface = Color(0xFF17272E), onSurfaceVariant = Color(0xFF617582),
+    error = Color(0xFFDC4261), outline = Color(0xFFDCE8EC)
+)
+private val darkColors = darkColorScheme(
+    primary = Color(0xFFBA8AFF), onPrimary = Color(0xFF16102F),
+    secondary = Color(0xFF40C9FF), background = Color(0xFF080F26),
+    surface = Color(0xFF131B3C), surfaceVariant = Color(0xFF202952),
+    onSurface = Color(0xFFF5F4FF), onSurfaceVariant = Color(0xFFADB9D7),
+    error = Color(0xFFFF749E), outline = Color(0xFF37446B)
+)
+private val LocalJessiDark = compositionLocalOf { true }
+
 
 class MainActivity : ComponentActivity() {
     private val notificationReviewId = mutableLongStateOf(-1L)
@@ -47,19 +69,34 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         notificationReviewId.longValue = intent.getLongExtra(SmsReviewNotifications.EXTRA_REVIEW_ID, -1L)
-        window.statusBarColor = android.graphics.Color.rgb(14,23,24)
-        window.navigationBarColor = android.graphics.Color.rgb(14,23,24)
         setContent {
-            val colors = darkColorScheme(
-                primary = mint, onPrimary = background, background = background,
-                surface = surface, onSurface = Color(0xFFF2FAF6),
-                surfaceVariant = secondary, onSurfaceVariant = muted,
-                error = danger
-            )
-            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                MaterialTheme(colorScheme = colors) {
-                    JessiHome(openReviewId = notificationReviewId.longValue, nowEpoch = nowEpoch.longValue,
-                        onReviewOpened = { notificationReviewId.longValue = -1L })
+            val themePrefs = remember { getSharedPreferences("jessi_ui_theme", MODE_PRIVATE) }
+            var darkMode by rememberSaveable { mutableStateOf(themePrefs.getBoolean("is_dark", true)) }
+            SideEffect {
+                window.statusBarColor = if (darkMode) android.graphics.Color.rgb(8, 15, 38)
+                    else android.graphics.Color.rgb(246, 250, 251)
+                window.navigationBarColor = if (darkMode) android.graphics.Color.rgb(8, 15, 38)
+                    else android.graphics.Color.rgb(246, 250, 251)
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !darkMode
+                    isAppearanceLightNavigationBars = !darkMode
+                }
+            }
+            CompositionLocalProvider(
+                LocalLayoutDirection provides LayoutDirection.Rtl,
+                LocalJessiDark provides darkMode
+            ) {
+                MaterialTheme(colorScheme = if (darkMode) darkColors else lightColors) {
+                    JessiHome(
+                        openReviewId = notificationReviewId.longValue,
+                        nowEpoch = nowEpoch.longValue,
+                        darkMode = darkMode,
+                        onToggleTheme = {
+                            darkMode = !darkMode
+                            themePrefs.edit().putBoolean("is_dark", darkMode).apply()
+                        },
+                        onReviewOpened = { notificationReviewId.longValue = -1L }
+                    )
                 }
             }
         }
@@ -92,7 +129,7 @@ private sealed interface Editor {
 }
 
 @Composable
-private fun JessiHome(openReviewId: Long, nowEpoch: Long, onReviewOpened: () -> Unit, vm: FinanceViewModel = viewModel()) {
+private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onToggleTheme: () -> Unit, onReviewOpened: () -> Unit, vm: FinanceViewModel = viewModel()) {
     val accounts by vm.accounts.collectAsState()
     val txs by vm.transactions.collectAsState()
     val debts by vm.debts.collectAsState()
@@ -126,25 +163,56 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, onReviewOpened: () -> 
     Scaffold(
         containerColor = background,
         topBar = {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("●", color = mint, fontSize = 26.sp)
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(15.dp),
+                    color = if (darkMode) Color(0xFF332158) else Color(0xFFE2F8EC)
+                ) {
+                    Text(if (darkMode) "◈" else "❀",
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
+                        fontSize = 25.sp, color = mint, fontWeight = FontWeight.Bold)
+                }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("جسی", fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("جسی", fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
                     Text("مدیریت مالی شخصی", color = muted, fontSize = 11.sp)
                 }
-                Text(Jalali.of(System.currentTimeMillis()).toString(), color = muted, fontSize = 12.sp)
+                Surface(
+                    onClick = onToggleTheme,
+                    shape = RoundedCornerShape(30.dp),
+                    color = secondary,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 11.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(if (darkMode) "☾" else "☀", color = mint, fontSize = 21.sp)
+                        Text(if (darkMode) "دارک" else "لایت",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         },
         bottomBar = {
-            NavigationBar(containerColor = surface) {
+            NavigationBar(containerColor = surface, tonalElevation = 0.dp) {
                 Tab.entries.forEach { item ->
                     NavigationBarItem(
                         selected = tab == item,
                         onClick = { tabName = item.name },
                         icon = { Text(item.icon, fontSize = 18.sp) },
                         label = { Text(item.label, fontSize = 9.sp, maxLines = 1) },
-                        alwaysShowLabel = true
+                        alwaysShowLabel = true,
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = mint, selectedTextColor = mint,
+                            indicatorColor = secondary, unselectedIconColor = muted,
+                            unselectedTextColor = muted
+                        )
                     )
                 }
             }
@@ -160,7 +228,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, onReviewOpened: () -> 
                         Tab.HOME -> null
                     }
                 }, containerColor = mint) {
-                    Text("+", fontSize = 29.sp, color = background)
+                    Text("+", fontSize = 29.sp, color = MaterialTheme.colorScheme.onPrimary)
                 }
             }
         }
@@ -226,6 +294,44 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, onReviewOpened: () -> 
 }
 
 @Composable
+private fun FinanceSummaryChip(title: String, value: Long, income: Boolean, modifier: Modifier = Modifier) {
+    val color = if (income) Color(0xFF00C68E) else Color(0xFFFF689C)
+    val chipColor = if (LocalJessiDark.current) color.copy(alpha = .14f)
+        else if (income) Color(0xFFDDF8EA) else Color(0xFFFFE7EE)
+    Column(
+        modifier.clip(RoundedCornerShape(16.dp)).background(chipColor).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text((if (income) "↗ " else "↘ ") + title, fontSize = 11.sp,
+            fontWeight = FontWeight.Bold, color = if (LocalJessiDark.current) color
+                else if (income) Color(0xFF007D56) else Color(0xFFC82C56))
+        Text(toman(value), fontSize = 14.sp, fontWeight = FontWeight.ExtraBold,
+            color = if (LocalJessiDark.current) color
+                else if (income) Color(0xFF007D56) else Color(0xFFC82C56),
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun DashboardAction(iconText: String, title: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick, modifier = modifier,
+        color = surface, shape = RoundedCornerShape(17.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .55f))
+    ) {
+        Column(
+            Modifier.padding(vertical = 12.dp, horizontal = 3.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(iconText, fontSize = 23.sp, color = mint, fontWeight = FontWeight.Bold)
+            Text(title, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold, maxLines = 1)
+        }
+    }
+}
+
+@Composable
 private fun PeriodSwitcher(
     mode: String, period: FinancePeriod, selectedIndex: Int, count: Int,
     salaryAvailable: Boolean, onModeChange: (String) -> Unit,
@@ -268,23 +374,31 @@ private fun SectionTitle(title: String, subtitle: String? = null) {
 
 @Composable
 private fun Tile(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier = modifier, color = surface, shape = RoundedCornerShape(18.dp)) {
+    Surface(
+        modifier = modifier, color = surface, shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (LocalJessiDark.current) .45f else .55f)),
+        shadowElevation = if (LocalJessiDark.current) 0.dp else 2.dp
+    ) {
         Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
     }
 }
 
 @Composable
 private fun Tag(text: String, good: Boolean = false) {
-    Surface(color = if (good) Color(0xFF225246) else secondary, shape = RoundedCornerShape(30.dp)) {
-        Text(text, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), color = if (good) mint else muted, fontSize = 11.sp)
+    Surface(
+        color = if (good) mint.copy(alpha = .13f) else secondary,
+        shape = RoundedCornerShape(30.dp)
+    ) {
+        Text(text, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            color = if (good) mint else muted, fontSize = 11.sp)
     }
 }
 
 @Composable
-private fun MoneyLine(label: String, value: Long, color: Color = Color.White, modifier: Modifier = Modifier) {
+private fun MoneyLine(label: String, value: Long, color: Color = Color.Unspecified, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, color = muted, fontSize = 12.sp)
-        Text(toman(value), color = color, fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(toman(value), color = if (color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else color, fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -302,25 +416,71 @@ private fun Dashboard(
     val current = txs.filter { currentPeriod.contains(it.createdAt) }
     val income = current.filter { it.kind == "IN" }.sumOf { it.amountToman }
     val expense = current.filter { it.kind == "OUT" }.sumOf { it.amountToman }
-    SectionTitle("نمای کلی", "دارایی و جریان پول در دوره انتخابی")
-    Tile(Modifier.fillMaxWidth()) {
-        Text("موجودی کل حساب‌ها", color = muted, fontSize = 12.sp)
-        Text(toman(total), fontSize = 27.sp, fontWeight = FontWeight.ExtraBold, color = mint)
-        Text("بر اساس موجودی اولیه و تراکنش‌های ثبت‌شده", color = muted, fontSize = 11.sp)
+    // Visual hierarchy matches the selected design: balance hero, colorful spending
+    // donut, six-period trend, quick actions, installments, recent activity.
+    val darkMode = LocalJessiDark.current
+    val heroGradient = if (darkMode)
+        Brush.linearGradient(listOf(Color(0xFF164078), Color(0xFF28215C), Color(0xFF4E2377)))
+    else Brush.linearGradient(listOf(Color(0xFFE8F8F2), Color(0xFFEDF8FF), Color(0xFFF7F4FF)))
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+            .background(heroGradient)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .35f)), RoundedCornerShape(24.dp))
+            .padding(19.dp),
+        verticalArrangement = Arrangement.spacedBy(13.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("موجودی کل حساب‌ها", color = muted, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text("▣", color = mint, fontSize = 22.sp)
+        }
+        Text(toman(total), fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.onSurface)
+        Text("بر اساس حساب‌ها و تراکنش‌های ثبت‌شده", color = muted, fontSize = 11.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            FinanceSummaryChip(
+                title = "درآمد دوره", value = income, income = true,
+                modifier = Modifier.weight(1f)
+            )
+            FinanceSummaryChip(
+                title = "هزینه دوره", value = expense, income = false,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Tile(Modifier.weight(1f)) { MoneyLine("دریافتی دوره", income, mint) }
-        Tile(Modifier.weight(1f)) { MoneyLine("هزینه دوره", expense, danger) }
+    Tile(Modifier.fillMaxWidth()) { SpendingCategoryChart(current) }
+    Tile(Modifier.fillMaxWidth()) { FinancialTrendChart(periods, selectedPeriodIndex, txs) }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        DashboardAction("＋", "تراکنش", Modifier.weight(1f), onNewTx)
+        DashboardAction("▦", "اقساط", Modifier.weight(1f)) { onSelectTab(Tab.DEBTS) }
+        DashboardAction("▣", "حساب‌ها", Modifier.weight(1f)) { onSelectTab(Tab.ACCOUNTS) }
+        DashboardAction("◫", "بودجه", Modifier.weight(1f)) { onSelectTab(Tab.BUDGETS) }
     }
-    Tile(Modifier.fillMaxWidth()) {
-        FinancialTrendChart(periods, selectedPeriodIndex, txs)
+    val upcomingDebt = debts.filter { it.direction == "I_OWE" && it.installmentMonths > 0 }
+        .mapNotNull { debt ->
+            Installments.nextDate(debt)?.let { date ->
+                JalaliDates.toEpoch(date)?.let { due -> Triple(debt, date, due) }
+            }
+        }.minByOrNull { it.third }
+    if (upcomingDebt != null) {
+        val (debt, date, _) = upcomingDebt
+        Tile(Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("قسط بعدی", fontWeight = FontWeight.Bold)
+                    Text(debt.person, color = muted, fontSize = 12.sp)
+                }
+                Tag("باقی‌مانده " + digitsFa(Installments.remainingCount(debt).toString()) + " قسط", true)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(toman(Installments.nextAmount(debt)), fontSize = 17.sp, color = mint, fontWeight = FontWeight.Bold)
+                    Text("سررسید " + JalaliDates.format(date), color = muted, fontSize = 12.sp)
+                }
+                TextButton(onClick = { onSelectTab(Tab.DEBTS) }) { Text("مدیریت") }
+            }
+        }
     }
-    Tile(Modifier.fillMaxWidth()) {
-        SpendingCategoryChart(current)
-    }
-    Tile(Modifier.fillMaxWidth()) {
-        InstallmentForecastChart(debts, nowEpoch)
-    }
+    Tile(Modifier.fillMaxWidth()) { InstallmentForecastChart(debts, nowEpoch) }
     val installmentDue = debts.sumOf { Installments.dueInPeriod(it, currentPeriod.start, currentPeriod.endExclusive) }
     if (installmentDue > 0L) {
         Tile(Modifier.fillMaxWidth()) {
@@ -393,7 +553,7 @@ private fun Dashboard(
     Row(verticalAlignment = Alignment.CenterVertically) {
         SectionTitle("تراکنش‌های اخیر")
         Spacer(Modifier.weight(1f))
-        TextButton(onClick = onNewTx) { Text("+ ثبت دستی") }
+        TextButton(onClick = { onSelectTab(Tab.TXS) }) { Text("مشاهده همه") }
     }
     if (current.isEmpty()) EmptyNote("هنوز تراکنشی در این دوره ثبت نشده.")
     else current.filter { it.kind != "TRANSFER_IN" }.take(5).forEach { TransactionTile(it, accounts, txs, null, null) }
