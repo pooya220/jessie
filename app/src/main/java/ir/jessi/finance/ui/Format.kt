@@ -42,4 +42,6 @@ fun accountBalance(accountId: Long, initial: Long, transactions: List<Transactio
         balance + (if (tx.kind in setOf("IN", "TRANSFER_IN", "DEBT_IN")) tx.amountToman else -tx.amountToman)
     }
 
+val incomeCategories = listOf("درآمد", "حقوق", "هدیه", "بازگشت وجه", "سایر")
+
 val categories = listOf("خوراک", "سوخت", "خرید", "قبوض", "تفریح", "دانشگاه", "سلامت", "حمل‌ونقل", "حقوق", "سایر")

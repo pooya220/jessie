@@ -42,6 +42,7 @@ private val danger = Color(0xFFFF9B9B)
 
 class MainActivity : ComponentActivity() {
     private val notificationReviewId = mutableLongStateOf(-1L)
+    private val nowEpoch = mutableLongStateOf(System.currentTimeMillis())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,10 +58,16 @@ class MainActivity : ComponentActivity() {
             )
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 MaterialTheme(colorScheme = colors) {
-                    JessiHome(openReviewId = notificationReviewId.longValue, onReviewOpened = { notificationReviewId.longValue = -1L })
+                    JessiHome(openReviewId = notificationReviewId.longValue, nowEpoch = nowEpoch.longValue,
+                        onReviewOpened = { notificationReviewId.longValue = -1L })
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        nowEpoch.longValue = System.currentTimeMillis()
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -85,13 +92,20 @@ private sealed interface Editor {
 }
 
 @Composable
-private fun JessiHome(openReviewId: Long, onReviewOpened: () -> Unit, vm: FinanceViewModel = viewModel()) {
+private fun JessiHome(openReviewId: Long, nowEpoch: Long, onReviewOpened: () -> Unit, vm: FinanceViewModel = viewModel()) {
     val accounts by vm.accounts.collectAsState()
     val txs by vm.transactions.collectAsState()
     val debts by vm.debts.collectAsState()
     val budgets by vm.budgets.collectAsState()
     val reviews by vm.reviews.collectAsState()
     val context = LocalContext.current
+    val settings = remember(context) { context.getSharedPreferences("jessi_finance_settings", android.content.Context.MODE_PRIVATE) }
+    var periodMode by remember { mutableStateOf(settings.getString("period_mode", FinancePeriodEngine.MONTHLY) ?: FinancePeriodEngine.MONTHLY) }
+    var periodOffset by rememberSaveable { mutableIntStateOf(0) }
+    val periods = remember(txs, periodMode, nowEpoch) { FinancePeriodEngine.periods(txs, periodMode, nowEpoch) }
+    val selectedIndex = periodOffset.coerceIn(0, (periods.size - 1).coerceAtLeast(0))
+    val chosenPeriod = periods[selectedIndex]
+    val periodTransactions = remember(txs, chosenPeriod) { txs.filter { chosenPeriod.contains(it.createdAt) } }
     var smsPermitted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { smsPermitted = it }
     var notificationsPermitted by remember { mutableStateOf(Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) }
@@ -152,9 +166,23 @@ private fun JessiHome(openReviewId: Long, onReviewOpened: () -> Unit, vm: Financ
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            PeriodSwitcher(
+                mode = periodMode, period = chosenPeriod, selectedIndex = selectedIndex,
+                count = periods.size,
+                salaryAvailable = txs.any { it.kind == "IN" && it.category == "حقوق" },
+                onModeChange = {
+                    periodMode = it
+                    periodOffset = 0
+                    settings.edit().putString("period_mode", it).apply()
+                },
+                onPrevious = { periodOffset = (selectedIndex + 1).coerceAtMost(periods.lastIndex) },
+                onNext = { periodOffset = (selectedIndex - 1).coerceAtLeast(0) }
+            )
             when (tab) {
                 Tab.HOME -> Dashboard(
                     accounts, txs, debts, budgets, reviews,
+                    currentPeriod = chosenPeriod, periods = periods, selectedPeriodIndex = selectedIndex,
+                    nowEpoch = nowEpoch,
                     smsPermitted = smsPermitted,
                     requestPermission = { permissionLauncher.launch(Manifest.permission.RECEIVE_SMS) },
                     notificationsPermitted = notificationsPermitted,
@@ -167,16 +195,16 @@ private fun JessiHome(openReviewId: Long, onReviewOpened: () -> Unit, vm: Financ
                     onEdit = { editor = Editor.AccountForm(it) },
                     onDelete = { row -> editor = Editor.Delete("حساب «${row.title}» حذف شود؟ تنها حساب بدون تراکنش قابل حذف است.") { vm.deleteAccount(row.id) } }
                 )
-                Tab.TXS -> TransactionsPage(txs, accounts,
+                Tab.TXS -> TransactionsPage(periodTransactions, accounts,
                     onEdit = { editor = Editor.TxForm(it) },
                     onDelete = { row -> editor = Editor.Delete("این تراکنش حذف شود؟") { vm.deleteTransaction(row) } }
                 )
-                Tab.DEBTS -> DebtsPage(debts,
+                Tab.DEBTS -> DebtsPage(debts, chosenPeriod, nowEpoch,
                     onEdit = { editor = Editor.DebtForm(it) },
                     onPay = { editor = Editor.Repay(it) },
                     onDelete = { row -> editor = Editor.Delete("این بدهی یا طلب حذف شود؟") { vm.deleteDebt(row.id) } }
                 )
-                Tab.BUDGETS -> BudgetsPage(budgets, txs,
+                Tab.BUDGETS -> BudgetsPage(budgets, periodTransactions,
                     onEdit = { editor = Editor.BudgetForm(it) },
                     onDelete = { row -> editor = Editor.Delete("سقف «${row.category}» حذف شود؟") { vm.deleteBudget(row.id) } }
                 )
@@ -194,6 +222,39 @@ private fun JessiHome(openReviewId: Long, onReviewOpened: () -> Unit, vm: Financ
         is Editor.Review -> ReviewDialog(e.value, accounts, dismiss = { editor = null }, onAccept = { id, category, note -> vm.acceptReview(e.value, id, category, note); editor = null }, onReject = { vm.dismissReview(e.value.id); editor = null })
         is Editor.Delete -> AlertDialog(onDismissRequest = { editor = null }, title = { Text("تأیید حذف") }, text = { Text(e.title) }, confirmButton = { TextButton(onClick = { e.action(); editor = null }) { Text("حذف", color = danger) } }, dismissButton = { TextButton(onClick = { editor = null }) { Text("انصراف") } })
         null -> Unit
+    }
+}
+
+@Composable
+private fun PeriodSwitcher(
+    mode: String, period: FinancePeriod, selectedIndex: Int, count: Int,
+    salaryAvailable: Boolean, onModeChange: (String) -> Unit,
+    onPrevious: () -> Unit, onNext: () -> Unit
+) {
+    Tile(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("دوره مالی", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            FilterChip(selected = mode == FinancePeriodEngine.MONTHLY,
+                onClick = { onModeChange(FinancePeriodEngine.MONTHLY) }, label = { Text("ماه شمسی", fontSize = 11.sp) })
+            FilterChip(selected = mode == FinancePeriodEngine.SALARY,
+                onClick = { onModeChange(FinancePeriodEngine.SALARY) }, label = { Text("از حقوق", fontSize = 11.sp) })
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = onPrevious, enabled = selectedIndex < count - 1) { Text("› قبلی") }
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(period.label, color = mint, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(if (selectedIndex == 0) "دوره جاری" else "دوره گذشته",
+                    fontSize = 10.sp, color = muted)
+            }
+            TextButton(onClick = onNext, enabled = selectedIndex > 0) { Text("بعدی ‹") }
+        }
+        if (mode == FinancePeriodEngine.SALARY && !salaryAvailable) {
+            Text("هنوز واریز تأییدشده‌ای با دسته «حقوق» نیست؛ فعلاً دوره‌ها ماهانه نمایش داده می‌شن.",
+                color = muted, fontSize = 11.sp)
+        } else if (mode == FinancePeriodEngine.SALARY) {
+            Text("با تأیید هر واریز به دسته «حقوق»، دوره جدید به‌صورت خودکار شروع می‌شه.",
+                color = muted, fontSize = 11.sp)
+        }
     }
 }
 
@@ -232,23 +293,41 @@ private fun isThisMonth(epoch: Long): Boolean = Jalali.of(epoch).monthKey == Jal
 @Composable
 private fun Dashboard(
     accounts: List<Account>, txs: List<Transaction>, debts: List<Debt>, budgets: List<Budget>, reviews: List<SmsReview>,
+    currentPeriod: FinancePeriod, periods: List<FinancePeriod>, selectedPeriodIndex: Int, nowEpoch: Long,
     smsPermitted: Boolean, requestPermission: () -> Unit,
     notificationsPermitted: Boolean, requestNotificationPermission: () -> Unit,
     onReview: (SmsReview) -> Unit, onNewTx: () -> Unit, onSelectTab: (Tab) -> Unit
 ) {
     val total = accounts.sumOf { accountBalance(it.id, it.openingToman, txs) }
-    val current = txs.filter { isThisMonth(it.createdAt) }
+    val current = txs.filter { currentPeriod.contains(it.createdAt) }
     val income = current.filter { it.kind == "IN" }.sumOf { it.amountToman }
     val expense = current.filter { it.kind == "OUT" }.sumOf { it.amountToman }
-    SectionTitle("نمای کلی", "دارایی و جریان پول این ماه")
+    SectionTitle("نمای کلی", "دارایی و جریان پول در دوره انتخابی")
     Tile(Modifier.fillMaxWidth()) {
         Text("موجودی کل حساب‌ها", color = muted, fontSize = 12.sp)
         Text(toman(total), fontSize = 27.sp, fontWeight = FontWeight.ExtraBold, color = mint)
         Text("بر اساس موجودی اولیه و تراکنش‌های ثبت‌شده", color = muted, fontSize = 11.sp)
     }
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Tile(Modifier.weight(1f)) { MoneyLine("دریافتی ماه", income, mint) }
-        Tile(Modifier.weight(1f)) { MoneyLine("هزینه ماه", expense, danger) }
+        Tile(Modifier.weight(1f)) { MoneyLine("دریافتی دوره", income, mint) }
+        Tile(Modifier.weight(1f)) { MoneyLine("هزینه دوره", expense, danger) }
+    }
+    Tile(Modifier.fillMaxWidth()) {
+        FinancialTrendChart(periods, selectedPeriodIndex, txs)
+    }
+    Tile(Modifier.fillMaxWidth()) {
+        SpendingCategoryChart(current)
+    }
+    Tile(Modifier.fillMaxWidth()) {
+        InstallmentForecastChart(debts, nowEpoch)
+    }
+    val installmentDue = debts.sumOf { Installments.dueInPeriod(it, currentPeriod.start, currentPeriod.endExclusive) }
+    if (installmentDue > 0L) {
+        Tile(Modifier.fillMaxWidth()) {
+            Text("اقساط سررسیدشده در این دوره", fontWeight = FontWeight.Bold)
+            MoneyLine("مبلغ برنامه‌ریزی‌شده", installmentDue, danger)
+            TextButton(onClick = { onSelectTab(Tab.DEBTS) }) { Text("مدیریت اقساط") }
+        }
     }
     if (!smsPermitted) {
         Tile(Modifier.fillMaxWidth()) {
@@ -299,7 +378,7 @@ private fun Dashboard(
     }
     if (budgets.isNotEmpty()) {
         Tile(Modifier.fillMaxWidth()) {
-            Text("سقف هزینه‌های ماه", fontWeight = FontWeight.Bold)
+            Text("سقف هزینه‌های دوره", fontWeight = FontWeight.Bold)
             budgets.take(4).forEach { budget ->
                 val spent = current.filter { it.kind == "OUT" && it.category == budget.category }.sumOf { it.amountToman }
                 val fraction = (spent.toFloat() / budget.monthlyLimitToman.coerceAtLeast(1)).coerceIn(0f, 1f)
@@ -316,8 +395,8 @@ private fun Dashboard(
         Spacer(Modifier.weight(1f))
         TextButton(onClick = onNewTx) { Text("+ ثبت دستی") }
     }
-    if (txs.isEmpty()) EmptyNote("هنوز تراکنشی ثبت نشده. از بخش حساب‌ها، اولین حساب رو بساز.")
-    else txs.filter { it.kind != "TRANSFER_IN" }.take(5).forEach { TransactionTile(it, accounts, txs, null, null) }
+    if (current.isEmpty()) EmptyNote("هنوز تراکنشی در این دوره ثبت نشده.")
+    else current.filter { it.kind != "TRANSFER_IN" }.take(5).forEach { TransactionTile(it, accounts, txs, null, null) }
 }
 
 @Composable
@@ -378,8 +457,8 @@ private fun TransactionTile(row: Transaction, accounts: List<Account>, txs: List
 }
 
 @Composable
-private fun DebtsPage(debts: List<Debt>, onEdit: (Debt) -> Unit, onPay: (Debt) -> Unit, onDelete: (Debt) -> Unit) {
-    SectionTitle("بدهی و قرض", "پول‌هایی که بدهکاری یا از دیگران طلب داری")
+private fun DebtsPage(debts: List<Debt>, period: FinancePeriod, nowEpoch: Long, onEdit: (Debt) -> Unit, onPay: (Debt) -> Unit, onDelete: (Debt) -> Unit) {
+    SectionTitle("بدهی و اقساط", "مانده‌ها بین دوره‌ها باقی می‌مونن؛ سررسیدها بر اساس دوره انتخابی مشخص می‌شن")
     if (debts.isEmpty()) EmptyNote("فعلاً بدهی یا طلبی ثبت نشده.")
     debts.forEach { row ->
         val remaining = (row.totalToman - row.paidToman).coerceAtLeast(0)
@@ -390,7 +469,30 @@ private fun DebtsPage(debts: List<Debt>, onEdit: (Debt) -> Unit, onPay: (Debt) -
             }
             MoneyLine("مانده", remaining, if (row.direction == "I_OWE") danger else mint)
             Text("کل: ${toman(row.totalToman)} • تسویه‌شده: ${toman(row.paidToman)}", fontSize = 12.sp, color = muted)
-            if (row.dueDateJalali.isNotBlank()) Text("سررسید: ${row.dueDateJalali}", fontSize = 12.sp, color = muted)
+            if (row.installmentMonths > 0) {
+                val done = Installments.countPaid(row)
+                val left = Installments.remainingCount(row)
+                val next = Installments.nextDate(row)
+                Text("اقساط: ${digitsFa(done.toString())} پرداخت‌شده از ${digitsFa(row.installmentMonths.toString())} • ${digitsFa(left.toString())} قسط باقی‌مانده",
+                    fontSize = 12.sp, color = mint)
+                if (next != null) {
+                    val dueEpoch = JalaliDates.toEpoch(next)
+                    val monthsAway = JalaliDates.monthDistance(Jalali.of(nowEpoch), next)
+                    val status = when {
+                        dueEpoch != null && dueEpoch < nowEpoch -> "سررسید گذشته"
+                        monthsAway > 0 -> "تا ${digitsFa(monthsAway.toString())} ماه دیگر"
+                        else -> "همین ماه"
+                    }
+                    Text("قسط بعد: ${JalaliDates.format(next)} • $status", color = if (dueEpoch != null && dueEpoch < nowEpoch) danger else muted, fontSize = 12.sp)
+                    Text("مبلغ لازم برای تکمیل قسط بعد: ${toman(Installments.nextAmount(row))}", fontSize = 12.sp, color = muted)
+                }
+                LinearProgressIndicator(progress = { (row.paidToman.toFloat() / row.totalToman.coerceAtLeast(1)).coerceIn(0f,1f) },
+                    modifier = Modifier.fillMaxWidth(), color = mint, trackColor = secondary)
+                val dueHere = Installments.dueInPeriod(row, period.start, period.endExclusive)
+                if (dueHere > 0) Tag("سررسید این دوره • ${toman(dueHere)}")
+            } else if (row.dueDateJalali.isNotBlank()) {
+                Text("سررسید: ${row.dueDateJalali}", fontSize = 12.sp, color = muted)
+            }
             if (row.note.isNotBlank()) Text(row.note, fontSize = 12.sp, color = muted)
             Row {
                 if (remaining > 0) TextButton(onClick = { onPay(row) }) { Text(if (row.direction == "I_OWE") "ثبت پرداخت" else "ثبت وصول") }
@@ -403,10 +505,10 @@ private fun DebtsPage(debts: List<Debt>, onEdit: (Debt) -> Unit, onPay: (Debt) -
 
 @Composable
 private fun BudgetsPage(budgets: List<Budget>, txs: List<Transaction>, onEdit: (Budget) -> Unit, onDelete: (Budget) -> Unit) {
-    SectionTitle("سقف پرداخت", "بودجه ماه جاری شمسی؛ صرفاً هشدار، نه محدودیت بانک")
+    SectionTitle("سقف پرداخت", "بودجه دوره انتخابی؛ صرفاً هشدار، نه محدودیت بانکی")
     if (budgets.isEmpty()) EmptyNote("برای تعریف سقف هزینه ماهانه روی + بزن.")
     budgets.forEach { b ->
-        val spent = txs.filter { isThisMonth(it.createdAt) && it.kind == "OUT" && it.category == b.category }.sumOf { it.amountToman }
+        val spent = txs.filter { it.kind == "OUT" && it.category == b.category }.sumOf { it.amountToman }
         val percent = 100f * spent / b.monthlyLimitToman.coerceAtLeast(1)
         Tile(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -502,7 +604,7 @@ private fun TransactionDialog(
         if (transfer) onTransfer(accountId!!, targetAccountId!!, amount!!, note)
         else onSave(Transaction(
             id = initial?.id ?: 0, accountId = accountId!!, amountToman = amount!!,
-            kind = type, category = if (type == "IN") "درآمد" else category,
+            kind = type, category = if (type == "IN" && category !in incomeCategories) "درآمد" else category,
             note = note, createdAt = initial?.createdAt ?: System.currentTimeMillis(),
             source = initial?.source ?: "MANUAL", groupId = initial?.groupId,
             dedupKey = initial?.dedupKey
@@ -511,7 +613,10 @@ private fun TransactionDialog(
         if (initial == null) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("OUT" to "برداشت", "IN" to "واریز", "TRANSFER_OUT" to "انتقال").forEach { (code, label) ->
-                    FilterChip(selected = type == code, onClick = { type = code }, label = { Text(label, fontSize = 11.sp) })
+                    FilterChip(selected = type == code, onClick = {
+                        type = code
+                        if (type == "IN" && category !in incomeCategories) category = "درآمد"
+                    }, label = { Text(label, fontSize = 11.sp) })
                 }
             }
         }
@@ -523,6 +628,10 @@ private fun TransactionDialog(
         }
         TextEntry("مبلغ به تومان", amountStr, { amountStr = it }, number = true)
         if (type == "OUT") SelectItem("دسته‌بندی", category, categories, { it }, { category = it })
+        if (type == "IN") {
+            SelectItem("نوع درآمد", category, incomeCategories, { it }, { category = it })
+            if (category == "حقوق") Text("این واریز در حالت «از حقوق» دوره جدید مالی رو آغاز می‌کنه.", color = mint, fontSize = 11.sp)
+        }
         TextEntry("توضیح (اختیاری)", note, { note = it })
     }
 }
@@ -534,19 +643,61 @@ private fun DebtDialog(initial: Debt?, dismiss: () -> Unit, save: (Debt) -> Unit
     var amountStr by remember(initial) { mutableStateOf(initial?.totalToman?.toString().orEmpty()) }
     var due by remember(initial) { mutableStateOf(initial?.dueDateJalali.orEmpty()) }
     var note by remember(initial) { mutableStateOf(initial?.note.orEmpty()) }
+    var installment by remember(initial) { mutableStateOf((initial?.installmentMonths ?: 0) > 0) }
+    var installmentCount by remember(initial) { mutableStateOf((initial?.installmentMonths?.takeIf { it > 0 } ?: 6).toString()) }
+    var monthsUntilDue by remember(initial) { mutableIntStateOf(1) }
+    var firstDue by remember(initial) {
+        mutableStateOf(initial?.firstInstallmentJalali?.takeIf { it.isNotBlank() } ?:
+            JalaliDates.format(JalaliDates.addMonths(Jalali.of(System.currentTimeMillis()), 1)))
+    }
     val amount = readToman(amountStr)
-    EntryDialog(if (initial == null) "افزودن بدهی یا طلب" else "ویرایش بدهی یا طلب", name.isNotBlank() && amount != null && amount > 0 && amount >= (initial?.paidToman ?: 0), dismiss, {
+    val months = ir.jessi.finance.sms.BankSmsParser.normalizeDigits(installmentCount).toIntOrNull()
+    val valid = name.isNotBlank() && amount != null && amount > 0 &&
+        amount >= (initial?.paidToman ?: 0) &&
+        (if (installment) months != null && months in 1..120 && JalaliDates.parse(firstDue) != null
+         else due.isBlank() || JalaliDates.parse(due) != null)
+    EntryDialog(
+        if (initial == null) "افزودن بدهی، طلب یا قسط" else "ویرایش بدهی یا قسط",
+        valid, dismiss, {
         save(Debt(id = initial?.id ?: 0, person = name.trim(), direction = dir,
             totalToman = amount!!, paidToman = initial?.paidToman ?: 0,
-            dueDateJalali = due.trim(), note = note.trim()))
+            dueDateJalali = if (installment) "" else due.trim(),
+            note = note.trim(),
+            installmentMonths = if (installment) months!! else 0,
+            firstInstallmentJalali = if (installment) JalaliDates.format(JalaliDates.parse(firstDue)!!) else ""))
     }) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = dir == "I_OWE", onClick = { dir = "I_OWE" }, label = { Text("من بدهکارم") })
             FilterChip(selected = dir == "OWED_TO_ME", onClick = { dir = "OWED_TO_ME" }, label = { Text("من طلبکارم") })
         }
-        TextEntry("نام شخص یا مؤسسه", name, { name = it })
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = !installment, onClick = { installment = false }, label = { Text("بدهی عادی") })
+            FilterChip(selected = installment, onClick = { installment = true }, label = { Text("قسطی") })
+        }
+        TextEntry("نام شخص، بانک یا مؤسسه", name, { name = it })
         TextEntry("مبلغ کل به تومان", amountStr, { amountStr = it }, number = true)
-        TextEntry("تاریخ سررسید شمسی (مثلاً ۱۴۰۵/۰۹/۱۵)", due, { due = it })
+        if (installment) {
+            TextEntry("تعداد کل اقساط (ماه)", installmentCount, { installmentCount = it }, number = true)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("اولین قسط چند ماه دیگر؟", fontSize = 12.sp, modifier = Modifier.weight(1f))
+                OutlinedButton(onClick = {
+                    monthsUntilDue = (monthsUntilDue - 1).coerceAtLeast(0)
+                    firstDue = JalaliDates.format(JalaliDates.addMonths(Jalali.of(System.currentTimeMillis()), monthsUntilDue))
+                }, enabled = monthsUntilDue > 0) { Text("−") }
+                Text(digitsFa(monthsUntilDue.toString()), color = mint)
+                OutlinedButton(onClick = {
+                    monthsUntilDue = (monthsUntilDue + 1).coerceAtMost(36)
+                    firstDue = JalaliDates.format(JalaliDates.addMonths(Jalali.of(System.currentTimeMillis()), monthsUntilDue))
+                }, enabled = monthsUntilDue < 36) { Text("+") }
+            }
+            TextEntry("تاریخ اولین سررسید شمسی", firstDue, { firstDue = it })
+            if (amount != null && months != null && months > 0) {
+                Text("مبلغ تقریبی هر قسط: ${toman(amount / months)} • مانده با ثبت پرداخت کم می‌شه.",
+                    fontSize = 11.sp, color = mint)
+            }
+        } else {
+            TextEntry("تاریخ سررسید شمسی (اختیاری؛ مثلاً ۱۴۰۵/۰۹/۱۵)", due, { due = it })
+        }
         TextEntry("توضیح", note, { note = it })
     }
 }
@@ -561,13 +712,15 @@ private fun BudgetDialog(initial: Budget?, existing: List<Budget>, dismiss: () -
     }) {
         SelectItem("دسته‌بندی هزینه", category, categories, { it }, { category = it })
         TextEntry("سقف ماهانه (تومان)", amountStr, { amountStr = it }, number = true)
-        Text("دوره بودجه ماه شمسی جاری است. هزینه‌ها بعد از تغییر ماه خودکار از صفر محاسبه می‌شوند.", fontSize = 11.sp, color = muted)
+        Text("سقف‌ها در ابتدای هر دوره انتخابی مجدداً محاسبه می‌شوند؛ مانده حساب صفر نمی‌شود.", fontSize = 11.sp, color = muted)
     }
 }
 
 @Composable
 private fun RepayDialog(debt: Debt, accounts: List<Account>, dismiss: () -> Unit, onPay: (Long, Long) -> Unit) {
-    var amountStr by remember(debt) { mutableStateOf("") }
+    var amountStr by remember(debt) { mutableStateOf(
+        if (debt.installmentMonths > 0) Installments.nextAmount(debt).takeIf { it > 0L }?.toString().orEmpty() else ""
+    ) }
     var accountId by remember(debt) { mutableStateOf(accounts.firstOrNull()?.id) }
     val amount = readToman(amountStr)
     val balance = debt.totalToman - debt.paidToman
@@ -575,6 +728,7 @@ private fun RepayDialog(debt: Debt, accounts: List<Account>, dismiss: () -> Unit
         onPay(amount!!, accountId!!)
     }) {
         Text("مانده: ${toman(balance)}", color = mint)
+        if (debt.installmentMonths > 0) Text("مبلغ قسط بعد: ${toman(Installments.nextAmount(debt))}", color = mint, fontSize = 12.sp)
         if (accounts.isEmpty()) Text("برای ثبت پرداخت، ابتدا یک حساب بساز.", color = danger)
         else SelectItem("حساب مرتبط", accountId?.let { id -> accounts.firstOrNull { it.id == id } }, accounts, { it.title }, { accountId = it.id })
         TextEntry("مبلغ پرداخت یا دریافت (تومان)", amountStr, { amountStr = it }, number = true)
@@ -585,7 +739,7 @@ private fun RepayDialog(debt: Debt, accounts: List<Account>, dismiss: () -> Unit
 @Composable
 private fun ReviewDialog(row: SmsReview, accounts: List<Account>, dismiss: () -> Unit, onAccept: (Long, String, String) -> Unit, onReject: () -> Unit) {
     var accountId by remember(row.id) { mutableStateOf(row.accountGuess ?: accounts.firstOrNull()?.id) }
-    var category by remember(row.id) { mutableStateOf("سایر") }
+    var category by remember(row.id) { mutableStateOf(if (row.kind == "IN") "درآمد" else "سایر") }
     var note by remember(row.id) { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = dismiss,
@@ -597,7 +751,8 @@ private fun ReviewDialog(row: SmsReview, accounts: List<Account>, dismiss: () ->
                 Text("فرستنده: ${row.sender}", fontSize = 12.sp)
                 if (accounts.isEmpty()) Text("اول یک حساب بساز.", color = danger)
                 else SelectItem("این تراکنش برای کدام حساب است؟", accountId?.let { id -> accounts.firstOrNull { it.id == id } }, accounts, { it.title }, { accountId = it.id })
-                SelectItem("برای چه دسته‌ای بود؟", category, categories, { it }, { category = it })
+                SelectItem("برای چه دسته‌ای بود؟", category, if (row.kind == "IN") incomeCategories else categories, { it }, { category = it })
+                if (category == "حقوق" && row.kind == "IN") Text("تأیید این واریز می‌تونه دوره جدید رو در حالت «از حقوق» آغاز کنه.", color = mint, fontSize = 11.sp)
                 TextEntry("برای چی بود؟ (توضیح اختیاری)", note, { note = it }, singleLine = false)
                 Text("قبل از تأیید، مبلغ و نوع تراکنش را با پیامک اصلی تطبیق بده.", fontSize = 11.sp, color = muted)
             }

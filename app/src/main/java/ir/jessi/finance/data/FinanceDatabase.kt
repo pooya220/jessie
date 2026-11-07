@@ -37,7 +37,9 @@ data class Debt(
     val totalToman: Long,
     val paidToman: Long = 0,
     val dueDateJalali: String = "",
-    val note: String = ""
+    val note: String = "",
+    @ColumnInfo(defaultValue = "0") val installmentMonths: Int = 0,
+    @ColumnInfo(defaultValue = "''") val firstInstallmentJalali: String = ""
 )
 
 @Entity(tableName = "budgets", indices = [Index(value = ["category"], unique = true)])
@@ -133,7 +135,7 @@ interface FinanceDao {
     }
 }
 
-@Database(entities = [Account::class, Transaction::class, Debt::class, Budget::class, SmsReview::class, IgnoredSms::class], version = 2, exportSchema = false)
+@Database(entities = [Account::class, Transaction::class, Debt::class, Budget::class, SmsReview::class, IgnoredSms::class], version = 3, exportSchema = false)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun dao(): FinanceDao
     companion object {
@@ -142,10 +144,16 @@ abstract class FinanceDatabase : RoomDatabase() {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `sms_ignored` (`fingerprint` TEXT NOT NULL, PRIMARY KEY(`fingerprint`))")
             }
         }
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `debts` ADD COLUMN `installmentMonths` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `debts` ADD COLUMN `firstInstallmentJalali` TEXT NOT NULL DEFAULT ''")
+            }
+        }
         @Volatile private var instance: FinanceDatabase? = null
         fun get(context: Context): FinanceDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, FinanceDatabase::class.java, "jessi_finance.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build().also { instance = it }
         }
     }
