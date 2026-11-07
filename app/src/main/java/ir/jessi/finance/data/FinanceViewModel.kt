@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import ir.jessi.finance.sms.SmsReviewNotifications
 
 class FinanceViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = FinanceDatabase.get(application).dao()
@@ -42,13 +43,12 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         if (row.id == 0L) dao.insertBudget(row) else dao.updateBudget(row)
     }
     fun deleteBudget(id: Long) = viewModelScope.launch(Dispatchers.IO) { dao.deleteBudget(id) }
-    fun acceptReview(row: SmsReview, accountId: Long) = viewModelScope.launch(Dispatchers.IO) {
-        val insertedId = dao.insertTransaction(Transaction(
-            accountId = accountId, amountToman = row.amountToman,
-            kind = row.kind, category = "سایر", note = "پیامک بانکی • ${row.sender}",
-            createdAt = row.receivedAt, source = "SMS", dedupKey = row.fingerprint
-        ))
-        if (insertedId > 0) dao.deleteReview(row.id)
+    fun acceptReview(row: SmsReview, accountId: Long, category: String, note: String) = viewModelScope.launch(Dispatchers.IO) {
+        dao.approveReview(row.id, accountId, category, note)
+        SmsReviewNotifications.cancel(getApplication(), row.id)
     }
-    fun dismissReview(id: Long) = viewModelScope.launch(Dispatchers.IO) { dao.deleteReview(id) }
+    fun dismissReview(id: Long) = viewModelScope.launch(Dispatchers.IO) {
+        dao.ignoreReview(id)
+        SmsReviewNotifications.cancel(getApplication(), id)
+    }
 }

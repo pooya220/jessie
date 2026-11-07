@@ -3,6 +3,8 @@ package ir.jessi.finance
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Build
+import ir.jessi.finance.sms.SmsReviewNotifications
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -39,8 +41,11 @@ private val muted = Color(0xFFAFBDB8)
 private val danger = Color(0xFFFF9B9B)
 
 class MainActivity : ComponentActivity() {
+    private val notificationReviewId = mutableLongStateOf(-1L)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        notificationReviewId.longValue = intent.getLongExtra(SmsReviewNotifications.EXTRA_REVIEW_ID, -1L)
         window.statusBarColor = android.graphics.Color.rgb(14,23,24)
         window.navigationBarColor = android.graphics.Color.rgb(14,23,24)
         setContent {
@@ -51,9 +56,17 @@ class MainActivity : ComponentActivity() {
                 error = danger
             )
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                MaterialTheme(colorScheme = colors) { JessiHome() }
+                MaterialTheme(colorScheme = colors) {
+                    JessiHome(openReviewId = notificationReviewId.longValue, onReviewOpened = { notificationReviewId.longValue = -1L })
+                }
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        notificationReviewId.longValue = intent.getLongExtra(SmsReviewNotifications.EXTRA_REVIEW_ID, -1L)
     }
 }
 
@@ -72,7 +85,7 @@ private sealed interface Editor {
 }
 
 @Composable
-private fun JessiHome(vm: FinanceViewModel = viewModel()) {
+private fun JessiHome(openReviewId: Long, onReviewOpened: () -> Unit, vm: FinanceViewModel = viewModel()) {
     val accounts by vm.accounts.collectAsState()
     val txs by vm.transactions.collectAsState()
     val debts by vm.debts.collectAsState()
@@ -81,9 +94,20 @@ private fun JessiHome(vm: FinanceViewModel = viewModel()) {
     val context = LocalContext.current
     var smsPermitted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { smsPermitted = it }
+    var notificationsPermitted by remember { mutableStateOf(Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { notificationsPermitted = it }
     var tabName by rememberSaveable { mutableStateOf(Tab.HOME.name) }
     val tab = Tab.valueOf(tabName)
     var editor by remember { mutableStateOf<Editor?>(null) }
+
+    LaunchedEffect(openReviewId, reviews) {
+        if (openReviewId > 0L) {
+            reviews.firstOrNull { it.id == openReviewId }?.let {
+                editor = Editor.Review(it)
+                onReviewOpened()
+            }
+        }
+    }
 
     Scaffold(
         containerColor = background,
@@ -133,6 +157,8 @@ private fun JessiHome(vm: FinanceViewModel = viewModel()) {
                     accounts, txs, debts, budgets, reviews,
                     smsPermitted = smsPermitted,
                     requestPermission = { permissionLauncher.launch(Manifest.permission.RECEIVE_SMS) },
+                    notificationsPermitted = notificationsPermitted,
+                    requestNotificationPermission = { if (Build.VERSION.SDK_INT >= 33) notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
                     onReview = { editor = Editor.Review(it) },
                     onNewTx = { editor = Editor.TxForm() },
                     onSelectTab = { tabName = it.name }
@@ -165,7 +191,7 @@ private fun JessiHome(vm: FinanceViewModel = viewModel()) {
         is Editor.DebtForm -> DebtDialog(e.value, dismiss = { editor = null }) { vm.saveDebt(it); editor = null }
         is Editor.BudgetForm -> BudgetDialog(e.value, budgets, dismiss = { editor = null }) { vm.saveBudget(it); editor = null }
         is Editor.Repay -> RepayDialog(e.value, accounts, dismiss = { editor = null }) { amount, accountId -> vm.settleDebt(e.value, amount, accountId); editor = null }
-        is Editor.Review -> ReviewDialog(e.value, accounts, dismiss = { editor = null }, onAccept = { id -> vm.acceptReview(e.value, id); editor = null }, onReject = { vm.dismissReview(e.value.id); editor = null })
+        is Editor.Review -> ReviewDialog(e.value, accounts, dismiss = { editor = null }, onAccept = { id, category, note -> vm.acceptReview(e.value, id, category, note); editor = null }, onReject = { vm.dismissReview(e.value.id); editor = null })
         is Editor.Delete -> AlertDialog(onDismissRequest = { editor = null }, title = { Text("تأیید حذف") }, text = { Text(e.title) }, confirmButton = { TextButton(onClick = { e.action(); editor = null }) { Text("حذف", color = danger) } }, dismissButton = { TextButton(onClick = { editor = null }) { Text("انصراف") } })
         null -> Unit
     }
@@ -207,6 +233,7 @@ private fun isThisMonth(epoch: Long): Boolean = Jalali.of(epoch).monthKey == Jal
 private fun Dashboard(
     accounts: List<Account>, txs: List<Transaction>, debts: List<Debt>, budgets: List<Budget>, reviews: List<SmsReview>,
     smsPermitted: Boolean, requestPermission: () -> Unit,
+    notificationsPermitted: Boolean, requestNotificationPermission: () -> Unit,
     onReview: (SmsReview) -> Unit, onNewTx: () -> Unit, onSelectTab: (Tab) -> Unit
 ) {
     val total = accounts.sumOf { accountBalance(it.id, it.openingToman, txs) }
@@ -232,7 +259,14 @@ private fun Dashboard(
     } else {
         Tile(Modifier.fillMaxWidth()) {
             Text("✓ دریافت پیامک‌های جدید فعال است", color = mint, fontWeight = FontWeight.Bold)
-            Text("فقط پیامک‌های تازه بررسی می‌شوند؛ کدهای تأیید و متن اصلی پیام ذخیره نمی‌شوند.", fontSize = 12.sp, color = muted)
+            Text("فقط پیامک‌های تازه بررسی می‌شوند؛ تا تأیید نکنی تراکنش ثبت نمی‌شود. کدهای تأیید و متن اصلی پیام ذخیره نمی‌شوند.", fontSize = 12.sp, color = muted)
+        }
+    }
+    if (!notificationsPermitted) {
+        Tile(Modifier.fillMaxWidth()) {
+            Text("اعلان‌های پیامک بانکی غیرفعال است", fontWeight = FontWeight.Bold)
+            Text("برای نمایش اعلان ثبت یا نادیده گرفتن پیامک‌های جدید، اجازه اعلان‌ها را فعال کن. بدون این مجوز پیامک‌ها همچنان داخل داشبورد منتظر بررسی می‌مانند.", fontSize = 12.sp, color = muted)
+            Button(onClick = requestNotificationPermission) { Text("فعال‌کردن اعلان‌ها") }
         }
     }
     if (reviews.isNotEmpty()) {
@@ -549,8 +583,10 @@ private fun RepayDialog(debt: Debt, accounts: List<Account>, dismiss: () -> Unit
 }
 
 @Composable
-private fun ReviewDialog(row: SmsReview, accounts: List<Account>, dismiss: () -> Unit, onAccept: (Long) -> Unit, onReject: () -> Unit) {
-    var accountId by remember(row) { mutableStateOf(row.accountGuess ?: accounts.firstOrNull()?.id) }
+private fun ReviewDialog(row: SmsReview, accounts: List<Account>, dismiss: () -> Unit, onAccept: (Long, String, String) -> Unit, onReject: () -> Unit) {
+    var accountId by remember(row.id) { mutableStateOf(row.accountGuess ?: accounts.firstOrNull()?.id) }
+    var category by remember(row.id) { mutableStateOf("سایر") }
+    var note by remember(row.id) { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = dismiss,
         title = { Text("بررسی پیامک بانکی") },
@@ -561,13 +597,15 @@ private fun ReviewDialog(row: SmsReview, accounts: List<Account>, dismiss: () ->
                 Text("فرستنده: ${row.sender}", fontSize = 12.sp)
                 if (accounts.isEmpty()) Text("اول یک حساب بساز.", color = danger)
                 else SelectItem("این تراکنش برای کدام حساب است؟", accountId?.let { id -> accounts.firstOrNull { it.id == id } }, accounts, { it.title }, { accountId = it.id })
+                SelectItem("برای چه دسته‌ای بود؟", category, categories, { it }, { category = it })
+                TextEntry("برای چی بود؟ (توضیح اختیاری)", note, { note = it }, singleLine = false)
                 Text("قبل از تأیید، مبلغ و نوع تراکنش را با پیامک اصلی تطبیق بده.", fontSize = 11.sp, color = muted)
             }
         },
-        confirmButton = { Button(onClick = { accountId?.let(onAccept) }, enabled = accountId != null) { Text("ثبت تراکنش") } },
+        confirmButton = { Button(onClick = { accountId?.let { onAccept(it, category, note) } }, enabled = accountId != null) { Text("ثبت تراکنش") } },
         dismissButton = {
             Row {
-                TextButton(onClick = onReject) { Text("رد کردن", color = danger) }
+                TextButton(onClick = onReject) { Text("نادیده گرفتن", color = danger) }
                 TextButton(onClick = dismiss) { Text("بعداً") }
             }
         }

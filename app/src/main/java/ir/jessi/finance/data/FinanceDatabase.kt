@@ -2,6 +2,8 @@ package ir.jessi.finance.data
 
 import android.content.Context
 import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "accounts")
@@ -56,6 +58,9 @@ data class SmsReview(
     val accountGuess: Long? = null
 )
 
+@Entity(tableName = "sms_ignored")
+data class IgnoredSms(@PrimaryKey val fingerprint: String)
+
 @Dao
 interface FinanceDao {
     @Query("SELECT * FROM accounts ORDER BY id DESC") fun watchAccounts(): Flow<List<Account>>
@@ -88,7 +93,37 @@ interface FinanceDao {
         ))
     }
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertReview(row: SmsReview): Long
+    @Query("SELECT * FROM sms_reviews WHERE id=:id LIMIT 1") suspend fun findReview(id: Long): SmsReview?
+    @Query("SELECT EXISTS(SELECT 1 FROM sms_ignored WHERE fingerprint=:fingerprint)") suspend fun isIgnored(fingerprint: String): Boolean
+    @Query("SELECT EXISTS(SELECT 1 FROM transactions WHERE dedupKey=:fingerprint)") suspend fun isRecorded(fingerprint: String): Boolean
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertIgnored(row: IgnoredSms): Long
     @Query("DELETE FROM sms_reviews WHERE id=:id") suspend fun deleteReview(id: Long)
+
+    // The review stays pending until the user chooses a category and approves it.
+    @androidx.room.Transaction suspend fun enqueueReview(row: SmsReview): Long {
+        if (isIgnored(row.fingerprint) || isRecorded(row.fingerprint)) return -1L
+        return insertReview(row)
+    }
+
+    @androidx.room.Transaction suspend fun approveReview(id: Long, accountId: Long, category: String, note: String): Boolean {
+        val row = findReview(id) ?: return false
+        val saved = insertTransaction(Transaction(
+            accountId = accountId, amountToman = row.amountToman,
+            kind = row.kind, category = category,
+            note = note.trim().ifBlank { "پیامک بانکی • ${row.sender}" },
+            createdAt = row.receivedAt, source = "SMS", dedupKey = row.fingerprint
+        ))
+        if (saved > 0L) deleteReview(id)
+        return saved > 0L
+    }
+
+    // Delete extracted SMS details, retaining only a one-way hash to prevent re-import.
+    @androidx.room.Transaction suspend fun ignoreReview(id: Long): Boolean {
+        val row = findReview(id) ?: return false
+        insertIgnored(IgnoredSms(row.fingerprint))
+        deleteReview(id)
+        return true
+    }
     @androidx.room.Transaction suspend fun transfer(fromId: Long, toId: Long, amount: Long, note: String) {
         require(fromId != toId && amount > 0)
         val group = java.util.UUID.randomUUID().toString()
@@ -98,13 +133,19 @@ interface FinanceDao {
     }
 }
 
-@Database(entities = [Account::class, Transaction::class, Debt::class, Budget::class, SmsReview::class], version = 1, exportSchema = false)
+@Database(entities = [Account::class, Transaction::class, Debt::class, Budget::class, SmsReview::class, IgnoredSms::class], version = 2, exportSchema = false)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun dao(): FinanceDao
     companion object {
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `sms_ignored` (`fingerprint` TEXT NOT NULL, PRIMARY KEY(`fingerprint`))")
+            }
+        }
         @Volatile private var instance: FinanceDatabase? = null
         fun get(context: Context): FinanceDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, FinanceDatabase::class.java, "jessi_finance.db")
+                .addMigrations(MIGRATION_1_2)
                 .build().also { instance = it }
         }
     }

@@ -6,7 +6,6 @@ import android.content.Intent
 import android.provider.Telephony
 import ir.jessi.finance.data.FinanceDatabase
 import ir.jessi.finance.data.SmsReview
-import ir.jessi.finance.data.Transaction
 import kotlinx.coroutines.runBlocking
 import java.security.MessageDigest
 
@@ -32,21 +31,15 @@ class BankSmsReceiver : BroadcastReceiver() {
                     val hashInput = "$sender|$text|$timestamp"
                     val hash = MessageDigest.getInstance("SHA-256")
                         .digest(hashInput.toByteArray()).joinToString("") { "%02x".format(it) }
-                    if (guessed != null) {
-                        // A unique fingerprint prevents duplicate postings on repeated broadcasts.
-                        dao.insertTransaction(Transaction(
-                            accountId = guessed, amountToman = parsed.amountToman,
-                            kind = parsed.kind, category = "سایر",
-                            note = "پیامک بانکی • $sender", createdAt = timestamp,
-                            source = "SMS", dedupKey = hash
-                        ))
-                    } else {
-                        // No original SMS, account number or OTP is stored.
-                        dao.insertReview(SmsReview(
-                            sender = sender, amountToman = parsed.amountToman,
-                            kind = parsed.kind, receivedAt = timestamp,
-                            fingerprint = hash, accountGuess = guessed
-                        ))
+                    // Never change balances without explicit user approval.
+                    // No original SMS, account number or OTP is stored.
+                    val reviewId = dao.enqueueReview(SmsReview(
+                        sender = sender, amountToman = parsed.amountToman,
+                        kind = parsed.kind, receivedAt = timestamp,
+                        fingerprint = hash, accountGuess = guessed
+                    ))
+                    if (reviewId > 0L) {
+                        SmsReviewNotifications.show(context, reviewId, parsed.kind)
                     }
                 }
             } catch (_: Exception) {
