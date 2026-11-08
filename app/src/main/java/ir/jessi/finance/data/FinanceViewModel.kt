@@ -43,8 +43,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         if (row.id == 0L) dao.insertBudget(row) else dao.updateBudget(row)
     }
     fun deleteBudget(id: Long) = viewModelScope.launch(Dispatchers.IO) { dao.deleteBudget(id) }
-    fun acceptReview(row: SmsReview, accountId: Long, category: String, note: String) = viewModelScope.launch(Dispatchers.IO) {
-        dao.approveReview(row.id, accountId, category, note)
+    fun acceptReview(row: SmsReview, accountId: Long, category: String, note: String, unitChoice: String) = viewModelScope.launch(Dispatchers.IO) {
+        dao.approveReview(row.id, accountId, category, note, unitChoice)
         SmsReviewNotifications.cancel(getApplication(), row.id)
     }
     fun dismissReview(id: Long) = viewModelScope.launch(Dispatchers.IO) {

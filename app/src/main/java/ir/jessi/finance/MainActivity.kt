@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -154,6 +155,32 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { smsPermitted = it }
     var notificationsPermitted by remember { mutableStateOf(Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { notificationsPermitted = it }
+    val permissionPrefs = remember(context) {
+        context.getSharedPreferences("jessi_permissions_onboarding", android.content.Context.MODE_PRIVATE)
+    }
+    val installedVersion = remember(context) {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") (info.versionCode.toLong())
+    }
+    val firstOpenPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        smsPermitted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+        notificationsPermitted = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    }
+    LaunchedEffect(installedVersion) {
+        if (permissionPrefs.getLong("asked_version", -1L) != installedVersion) {
+            permissionPrefs.edit().putLong("asked_version", installedVersion).apply()
+            val missing = buildList {
+                if (!smsPermitted) add(Manifest.permission.RECEIVE_SMS)
+                if (Build.VERSION.SDK_INT >= 33 && !notificationsPermitted) {
+                    add(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+            if (missing.isNotEmpty()) firstOpenPermissionLauncher.launch(missing.toTypedArray())
+        }
+    }
     var tabName by rememberSaveable { mutableStateOf(Tab.HOME.name) }
     val tab = Tab.valueOf(tabName)
     var editor by remember { mutableStateOf<Editor?>(null) }
@@ -190,30 +217,35 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                     Text("جسی", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
                     Text("مدیریت مالی شخصی", color = muted, fontSize = 10.sp)
                 }
-                // Two actual controls, matching the sun/moon switch in the reference.
-                Row(
-                    Modifier.background(secondary, RoundedCornerShape(50.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .55f), RoundedCornerShape(50.dp))
-                        .padding(3.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // One accessible toggle: tap anywhere to flip between light and dark.
+                Surface(
+                    onClick = onToggleTheme,
+                    modifier = Modifier.width(80.dp).height(40.dp),
+                    color = secondary,
+                    shape = RoundedCornerShape(50.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .55f))
                 ) {
-                    Surface(
-                        onClick = { if (darkMode) onToggleTheme() },
-                        shape = RoundedCornerShape(50.dp),
-                        color = if (!darkMode) Color(0xFF00A960) else Color.Transparent
-                    ) {
-                        Icon(Icons.Outlined.LightMode, contentDescription = "فعال کردن لایت مود",
-                            tint = if (darkMode) muted else Color.White,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp).size(20.dp))
-                    }
-                    Surface(
-                        onClick = { if (!darkMode) onToggleTheme() },
-                        shape = RoundedCornerShape(50.dp),
-                        color = if (darkMode) Color(0xFF7B3CDE) else Color.Transparent
-                    ) {
-                        Icon(Icons.Outlined.DarkMode, contentDescription = "فعال کردن دارک مود",
-                            tint = if (darkMode) Color.White else muted,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp).size(20.dp))
+                    Box(Modifier.fillMaxSize().padding(3.dp)) {
+                        Icon(Icons.Outlined.LightMode, contentDescription = null,
+                            tint = muted, modifier = Modifier.align(Alignment.CenterStart)
+                                .padding(start = 8.dp).size(18.dp))
+                        Icon(Icons.Outlined.DarkMode, contentDescription = null,
+                            tint = muted, modifier = Modifier.align(Alignment.CenterEnd)
+                                .padding(end = 8.dp).size(18.dp))
+                        Box(
+                            Modifier.align(if (darkMode) Alignment.CenterEnd else Alignment.CenterStart)
+                                .size(34.dp).background(
+                                    if (darkMode) Color(0xFF8143E5) else Color(0xFF00A960),
+                                    CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                if (darkMode) Icons.Outlined.DarkMode else Icons.Outlined.LightMode,
+                                contentDescription = if (darkMode) "دارک مود؛ تغییر به لایت" else "لایت مود؛ تغییر به دارک",
+                                tint = Color.White, modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -316,7 +348,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
         is Editor.DebtForm -> DebtDialog(e.value, dismiss = { editor = null }) { vm.saveDebt(it); editor = null }
         is Editor.BudgetForm -> BudgetDialog(e.value, budgets, dismiss = { editor = null }) { vm.saveBudget(it); editor = null }
         is Editor.Repay -> RepayDialog(e.value, accounts, dismiss = { editor = null }) { amount, accountId -> vm.settleDebt(e.value, amount, accountId); editor = null }
-        is Editor.Review -> ReviewDialog(e.value, accounts, dismiss = { editor = null }, onAccept = { id, category, note -> vm.acceptReview(e.value, id, category, note); editor = null }, onReject = { vm.dismissReview(e.value.id); editor = null })
+        is Editor.Review -> ReviewDialog(e.value, accounts, dismiss = { editor = null }, onAccept = { id, category, note, unit -> vm.acceptReview(e.value, id, category, note, unit); editor = null }, onReject = { vm.dismissReview(e.value.id); editor = null })
         is Editor.Delete -> AlertDialog(onDismissRequest = { editor = null }, title = { Text("تأیید حذف") }, text = { Text(e.title) }, confirmButton = { TextButton(onClick = { e.action(); editor = null }) { Text("حذف", color = danger) } }, dismissButton = { TextButton(onClick = { editor = null }) { Text("انصراف") } })
         null -> Unit
     }
@@ -654,7 +686,7 @@ private fun Dashboard(
                     Column(Modifier.weight(1f)) {
                         Text(if (row.kind == "IN") "واریز احتمالی" else "برداشت احتمالی",
                             fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        Text("${toman(row.amountToman)} • ${row.sender}", fontSize = 11.sp, color = muted)
+                        Text("${reviewAmountLabel(row)} • ${row.sender}", fontSize = 11.sp, color = muted)
                     }
                     TextButton(onClick = { onReview(row) }) { Text("بررسی") }
                 }
@@ -1080,28 +1112,82 @@ private fun RepayDialog(debt: Debt, accounts: List<Account>, dismiss: () -> Unit
     }
 }
 
+private fun reviewAmountLabel(row: SmsReview): String {
+    val raw = row.amountRaw.takeIf { it > 0L } ?: row.amountToman
+    return if (row.amountUnit == "UNKNOWN")
+        digitsFa(NumberFormat.getIntegerInstance(Locale.US).format(raw)) + " (واحد نامشخص)"
+    else toman(row.amountToman)
+}
+
 @Composable
-private fun ReviewDialog(row: SmsReview, accounts: List<Account>, dismiss: () -> Unit, onAccept: (Long, String, String) -> Unit, onReject: () -> Unit) {
+private fun ReviewDialog(
+    row: SmsReview, accounts: List<Account>, dismiss: () -> Unit,
+    onAccept: (Long, String, String, String) -> Unit, onReject: () -> Unit
+) {
     var accountId by remember(row.id) { mutableStateOf(row.accountGuess ?: accounts.firstOrNull()?.id) }
     var category by remember(row.id) { mutableStateOf(if (row.kind == "IN") "درآمد" else "سایر") }
     var note by remember(row.id) { mutableStateOf("") }
+    val needsUnit = row.amountUnit == "UNKNOWN"
+    var selectedUnit by remember(row.id) { mutableStateOf(if (needsUnit) "" else row.amountUnit) }
+    val original = row.amountRaw.takeIf { it > 0L } ?: row.amountToman
+    val selectedAmount = when (selectedUnit) {
+        "TOMAN" -> original
+        "RIAL" -> if (original % 10L == 0L) original / 10L else 0L
+        else -> 0L
+    }
     AlertDialog(
         onDismissRequest = dismiss,
         title = { Text("بررسی پیامک بانکی") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(if (row.kind == "IN") "واریز احتمالی" else "برداشت احتمالی", color = mint)
-                Text(toman(row.amountToman), fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                if (row.bankName.isNotBlank()) Text(row.bankName, fontSize = 13.sp, color = muted)
+                Text(if (needsUnit && selectedUnit.isBlank())
+                    reviewAmountLabel(row) else toman(selectedAmount),
+                    fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 Text("فرستنده: ${row.sender}", fontSize = 12.sp)
+                if (needsUnit) {
+                    Text("واحد پول در پیامک مشخص نیست؛ قبل از ثبت انتخاب کن:",
+                        color = danger, fontSize = 12.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        FilterChip(
+                            selected = selectedUnit == "RIAL",
+                            onClick = { selectedUnit = "RIAL" },
+                            label = { Text("ریال") }
+                        )
+                        FilterChip(
+                            selected = selectedUnit == "TOMAN",
+                            onClick = { selectedUnit = "TOMAN" },
+                            label = { Text("تومان") }
+                        )
+                    }
+                    if (selectedUnit == "RIAL" && original % 10L != 0L) {
+                        Text("مبلغ ریالی به تومانِ صحیح قابل تبدیل نیست؛ این مورد را دستی بررسی کن.",
+                            fontSize = 11.sp, color = danger)
+                    }
+                }
                 if (accounts.isEmpty()) Text("اول یک حساب بساز.", color = danger)
-                else SelectItem("این تراکنش برای کدام حساب است؟", accountId?.let { id -> accounts.firstOrNull { it.id == id } }, accounts, { it.title }, { accountId = it.id })
-                SelectItem("برای چه دسته‌ای بود؟", category, if (row.kind == "IN") incomeCategories else categories, { it }, { category = it })
-                if (category == "حقوق" && row.kind == "IN") Text("تأیید این واریز می‌تونه دوره جدید رو در حالت «از حقوق» آغاز کنه.", color = mint, fontSize = 11.sp)
+                else SelectItem("این تراکنش برای کدام حساب است؟",
+                    accountId?.let { id -> accounts.firstOrNull { it.id == id } },
+                    accounts, { it.title }, { accountId = it.id })
+                SelectItem("برای چه دسته‌ای بود؟", category,
+                    if (row.kind == "IN") incomeCategories else categories,
+                    { it }, { category = it })
+                if (category == "حقوق" && row.kind == "IN") {
+                    Text("این واریز می‌تونه دوره جدید رو در حالت «از حقوق» آغاز کنه.",
+                        color = mint, fontSize = 11.sp)
+                }
                 TextEntry("برای چی بود؟ (توضیح اختیاری)", note, { note = it }, singleLine = false)
-                Text("قبل از تأیید، مبلغ و نوع تراکنش را با پیامک اصلی تطبیق بده.", fontSize = 11.sp, color = muted)
+                Text("قبل از تأیید، مبلغ و نوع تراکنش را با پیامک اصلی تطبیق بده.",
+                    fontSize = 11.sp, color = muted)
             }
         },
-        confirmButton = { Button(onClick = { accountId?.let { onAccept(it, category, note) } }, enabled = accountId != null) { Text("ثبت تراکنش") } },
+        confirmButton = {
+            Button(
+                onClick = { accountId?.let { onAccept(it, category, note, selectedUnit) } },
+                enabled = accountId != null && selectedAmount > 0L
+            ) { Text("ثبت تراکنش") }
+        },
         dismissButton = {
             Row {
                 TextButton(onClick = onReject) { Text("نادیده گرفتن", color = danger) }

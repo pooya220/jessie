@@ -57,7 +57,10 @@ data class SmsReview(
     val kind: String,
     val receivedAt: Long,
     val fingerprint: String,
-    val accountGuess: Long? = null
+    val accountGuess: Long? = null,
+    @ColumnInfo(defaultValue = "0") val amountRaw: Long = 0L,
+    @ColumnInfo(defaultValue = "'TOMAN'") val amountUnit: String = "TOMAN",
+    @ColumnInfo(defaultValue = "''") val bankName: String = ""
 )
 
 @Entity(tableName = "sms_ignored")
@@ -107,10 +110,20 @@ interface FinanceDao {
         return insertReview(row)
     }
 
-    @androidx.room.Transaction suspend fun approveReview(id: Long, accountId: Long, category: String, note: String): Boolean {
+    @androidx.room.Transaction suspend fun approveReview(
+        id: Long, accountId: Long, category: String, note: String, unitChoice: String
+    ): Boolean {
         val row = findReview(id) ?: return false
+        val unit = if (row.amountUnit == "UNKNOWN") unitChoice else row.amountUnit
+        val raw = row.amountRaw.takeIf { it > 0L } ?: row.amountToman
+        val amount = when (unit) {
+            "TOMAN" -> raw
+            "RIAL" -> if (raw % 10L == 0L) raw / 10L else return false
+            else -> return false
+        }
+        if (amount <= 0L || amount > 100_000_000_000L) return false
         val saved = insertTransaction(Transaction(
-            accountId = accountId, amountToman = row.amountToman,
+            accountId = accountId, amountToman = amount,
             kind = row.kind, category = category,
             note = note.trim().ifBlank { "پیامک بانکی • ${row.sender}" },
             createdAt = row.receivedAt, source = "SMS", dedupKey = row.fingerprint
@@ -135,7 +148,7 @@ interface FinanceDao {
     }
 }
 
-@Database(entities = [Account::class, Transaction::class, Debt::class, Budget::class, SmsReview::class, IgnoredSms::class], version = 3, exportSchema = false)
+@Database(entities = [Account::class, Transaction::class, Debt::class, Budget::class, SmsReview::class, IgnoredSms::class], version = 4, exportSchema = false)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun dao(): FinanceDao
     companion object {
@@ -150,10 +163,17 @@ abstract class FinanceDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `debts` ADD COLUMN `firstInstallmentJalali` TEXT NOT NULL DEFAULT ''")
             }
         }
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `sms_reviews` ADD COLUMN `amountRaw` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `sms_reviews` ADD COLUMN `amountUnit` TEXT NOT NULL DEFAULT 'TOMAN'")
+                db.execSQL("ALTER TABLE `sms_reviews` ADD COLUMN `bankName` TEXT NOT NULL DEFAULT ''")
+            }
+        }
         @Volatile private var instance: FinanceDatabase? = null
         fun get(context: Context): FinanceDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, FinanceDatabase::class.java, "jessi_finance.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build().also { instance = it }
         }
     }

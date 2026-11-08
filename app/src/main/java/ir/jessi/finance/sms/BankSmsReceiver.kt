@@ -17,7 +17,7 @@ class BankSmsReceiver : BroadcastReceiver() {
         val text = messages.joinToString(separator = "") { it.messageBody ?: "" }
         val sender = messages.first().originatingAddress.orEmpty()
         val timestamp = messages.first().timestampMillis.takeIf { it > 0 } ?: System.currentTimeMillis()
-        val parsed = BankSmsParser.parse(text) ?: return
+        val parsed = BankSmsParser.parse(text, sender) ?: return
         val pendingResult = goAsync()
         Thread {
             try {
@@ -36,7 +36,9 @@ class BankSmsReceiver : BroadcastReceiver() {
                     val reviewId = dao.enqueueReview(SmsReview(
                         sender = sender, amountToman = parsed.amountToman,
                         kind = parsed.kind, receivedAt = timestamp,
-                        fingerprint = hash, accountGuess = guessed
+                        fingerprint = hash, accountGuess = guessed,
+                        amountRaw = parsed.amountRaw, amountUnit = parsed.amountUnit,
+                        bankName = parsed.bankName
                     ))
                     if (reviewId > 0L) {
                         SmsReviewNotifications.show(context, reviewId, parsed.kind)
