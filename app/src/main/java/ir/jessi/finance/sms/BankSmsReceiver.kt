@@ -12,6 +12,8 @@ import java.security.MessageDigest
 class BankSmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
+        val preferences = context.getSharedPreferences("jessi_finance_settings", Context.MODE_PRIVATE)
+        if (!preferences.getBoolean("sms_monitoring_enabled", true)) return
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
         if (messages.isEmpty()) return
         val text = messages.joinToString(separator = "") { it.messageBody ?: "" }

@@ -21,6 +21,8 @@ object SmsReviewNotifications {
     private const val CHANNEL_ID = "sms_review_v1"
 
     fun show(context: Context, reviewId: Long, kind: String) {
+        val preferences = context.getSharedPreferences("jessi_finance_settings", Context.MODE_PRIVATE)
+        if (!preferences.getBoolean("sms_review_notifications_enabled", true)) return
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return

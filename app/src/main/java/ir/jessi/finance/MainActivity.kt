@@ -1,6 +1,9 @@
 package ir.jessi.finance
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings as AndroidSettings
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Build
@@ -147,6 +150,17 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
     val settings = remember(context) { context.getSharedPreferences("jessi_finance_settings", android.content.Context.MODE_PRIVATE) }
     var periodMode by remember { mutableStateOf(settings.getString("period_mode", FinancePeriodEngine.MONTHLY) ?: FinancePeriodEngine.MONTHLY) }
     var periodOffset by rememberSaveable { mutableIntStateOf(0) }
+    var balanceVisible by remember {
+        mutableStateOf(settings.getBoolean("show_balance", true))
+    }
+    var smsMonitoringEnabled by remember {
+        mutableStateOf(settings.getBoolean("sms_monitoring_enabled", true))
+    }
+    var reviewNotificationsEnabled by remember {
+        mutableStateOf(settings.getBoolean("sms_review_notifications_enabled", true))
+    }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+
     val periods = remember(txs, periodMode, nowEpoch) { FinancePeriodEngine.periods(txs, periodMode, nowEpoch) }
     val selectedIndex = periodOffset.coerceIn(0, (periods.size - 1).coerceAtLeast(0))
     val chosenPeriod = periods[selectedIndex]
@@ -168,6 +182,15 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
         smsPermitted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
         notificationsPermitted = Build.VERSION.SDK_INT < 33 ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    }
+    LaunchedEffect(nowEpoch) {
+        smsPermitted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.RECEIVE_SMS
+        ) == PackageManager.PERMISSION_GRANTED
+        notificationsPermitted = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
     }
     LaunchedEffect(installedVersion) {
         if (permissionPrefs.getLong("asked_version", -1L) != installedVersion) {
@@ -216,6 +239,16 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                 Column(Modifier.weight(1f)) {
                     Text("جسی", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
                     Text("مدیریت مالی شخصی", color = muted, fontSize = 10.sp)
+                }
+                IconButton(
+                    onClick = { showSettings = !showSettings },
+                    modifier = Modifier.size(43.dp)
+                ) {
+                    Icon(
+                        if (showSettings) Icons.Outlined.ArrowBack else Icons.Outlined.Settings,
+                        contentDescription = if (showSettings) "بازگشت به برنامه" else "تنظیمات جسی",
+                        tint = muted, modifier = Modifier.size(23.dp)
+                    )
                 }
                 // One accessible toggle: tap anywhere to flip between light and dark.
                 Surface(
@@ -266,7 +299,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                     }
                     NavigationBarItem(
                         selected = tab == item,
-                        onClick = { tabName = item.name },
+                        onClick = { tabName = item.name; showSettings = false },
                         icon = { Icon(navigationIcon, contentDescription = item.label, modifier = Modifier.size(22.dp)) },
                         label = { Text(item.label, fontSize = 10.sp, maxLines = 1) },
                         alwaysShowLabel = true,
@@ -279,7 +312,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
             }
         },
         floatingActionButton = {
-            if (tab != Tab.HOME) {
+            if (tab != Tab.HOME && !showSettings) {
                 FloatingActionButton(onClick = {
                     editor = when (tab) {
                         Tab.ACCOUNTS -> Editor.AccountForm()
@@ -295,6 +328,52 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            if (showSettings) {
+                SettingsPage(
+                    darkMode = darkMode,
+                    onToggleTheme = onToggleTheme,
+                    balanceVisible = balanceVisible,
+                    onBalanceVisibilityChange = { value ->
+                        balanceVisible = value
+                        settings.edit().putBoolean("show_balance", value).apply()
+                    },
+                    smsMonitoringEnabled = smsMonitoringEnabled,
+                    onSmsMonitoringChange = { value ->
+                        smsMonitoringEnabled = value
+                        settings.edit().putBoolean("sms_monitoring_enabled", value).apply()
+                        if (value && !smsPermitted) {
+                            permissionLauncher.launch(Manifest.permission.RECEIVE_SMS)
+                        }
+                    },
+                    reviewNotificationsEnabled = reviewNotificationsEnabled,
+                    onReviewNotificationsChange = { value ->
+                        reviewNotificationsEnabled = value
+                        settings.edit().putBoolean("sms_review_notifications_enabled", value).apply()
+                        if (value && !notificationsPermitted && Build.VERSION.SDK_INT >= 33) {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    },
+                    periodMode = periodMode,
+                    onPeriodChange = { value ->
+                        periodMode = value
+                        periodOffset = 0
+                        settings.edit().putString("period_mode", value).apply()
+                    },
+                    smsPermitted = smsPermitted,
+                    notificationsPermitted = notificationsPermitted,
+                    onSmsPermission = { permissionLauncher.launch(Manifest.permission.RECEIVE_SMS) },
+                    onNotificationPermission = {
+                        if (Build.VERSION.SDK_INT >= 33) notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    },
+                    onSystemSettings = {
+                        context.startActivity(Intent(
+                            AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:${context.packageName}")
+                        ))
+                    },
+                    versionName = "0.7.0"
+                )
+            } else {
             PeriodSwitcher(
                 mode = periodMode, period = chosenPeriod, selectedIndex = selectedIndex,
                 count = periods.size,
@@ -318,7 +397,15 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                     requestNotificationPermission = { if (Build.VERSION.SDK_INT >= 33) notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
                     onReview = { editor = Editor.Review(it) },
                     onNewTx = { editor = Editor.TxForm() },
-                    onSelectTab = { tabName = it.name }
+                    onSelectTab = { tabName = it.name; showSettings = false },
+                    balanceVisible = balanceVisible,
+                    onBalanceVisibilityChange = { value ->
+                        balanceVisible = value
+                        settings.edit().putBoolean("show_balance", value).apply()
+                    },
+                    smsMonitoringEnabled = smsMonitoringEnabled,
+                    reviewNotificationsEnabled = reviewNotificationsEnabled,
+                    onOpenSettings = { showSettings = true }
                 )
                 Tab.ACCOUNTS -> AccountsPage(accounts, txs,
                     onEdit = { editor = Editor.AccountForm(it) },
@@ -338,6 +425,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                     onDelete = { row -> editor = Editor.Delete("سقف «${row.category}» حذف شود؟") { vm.deleteBudget(row.id) } }
                 )
             }
+            }
             Spacer(Modifier.height(86.dp))
         }
     }
@@ -351,6 +439,146 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
         is Editor.Review -> ReviewDialog(e.value, accounts, dismiss = { editor = null }, onAccept = { id, category, note, unit -> vm.acceptReview(e.value, id, category, note, unit); editor = null }, onReject = { vm.dismissReview(e.value.id); editor = null })
         is Editor.Delete -> AlertDialog(onDismissRequest = { editor = null }, title = { Text("تأیید حذف") }, text = { Text(e.title) }, confirmButton = { TextButton(onClick = { e.action(); editor = null }) { Text("حذف", color = danger) } }, dismissButton = { TextButton(onClick = { editor = null }) { Text("انصراف") } })
         null -> Unit
+    }
+}
+
+
+@Composable
+private fun SettingsPage(
+    darkMode: Boolean, onToggleTheme: () -> Unit,
+    balanceVisible: Boolean, onBalanceVisibilityChange: (Boolean) -> Unit,
+    smsMonitoringEnabled: Boolean, onSmsMonitoringChange: (Boolean) -> Unit,
+    reviewNotificationsEnabled: Boolean, onReviewNotificationsChange: (Boolean) -> Unit,
+    periodMode: String, onPeriodChange: (String) -> Unit,
+    smsPermitted: Boolean, notificationsPermitted: Boolean,
+    onSmsPermission: () -> Unit, onNotificationPermission: () -> Unit,
+    onSystemSettings: () -> Unit, versionName: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        Column(Modifier.padding(vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("تنظیمات", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+            Text("شخصی‌سازی جسی و کنترل دسترسی‌ها", fontSize = 12.sp, color = muted)
+        }
+        Tile(Modifier.fillMaxWidth()) {
+            SettingsGroupTitle(Icons.Outlined.Palette, "ظاهر و حریم خصوصی")
+            SettingsToggle(
+                icon = if (darkMode) Icons.Outlined.DarkMode else Icons.Outlined.LightMode,
+                title = "حالت تاریک",
+                description = "دارک شب‌آبی و بنفش / لایت مینیمال",
+                checked = darkMode,
+                onChange = { if (it != darkMode) onToggleTheme() }
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .35f))
+            SettingsToggle(
+                icon = Icons.Outlined.VisibilityOff,
+                title = "نمایش موجودی در داشبورد",
+                description = "موجودی کل، درآمد و هزینه را پنهان یا نمایش بده",
+                checked = balanceVisible, onChange = onBalanceVisibilityChange
+            )
+        }
+
+        Tile(Modifier.fillMaxWidth()) {
+            SettingsGroupTitle(Icons.Outlined.Sms, "پیامک بانکی و اعلان‌ها")
+            SettingsToggle(
+                icon = Icons.Outlined.Markunread,
+                title = "بررسی پیامک‌های بانکی",
+                description = "فقط پیامک جدید را برای تأیید در صف بگذار؛ ثبت خودکار انجام نمی‌شود",
+                checked = smsMonitoringEnabled, onChange = onSmsMonitoringChange
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .35f))
+            SettingsToggle(
+                icon = Icons.Outlined.NotificationsActive,
+                title = "اعلان پیامک جدید",
+                description = "نمایش اعلان ثبت یا نادیده‌گرفتن؛ پیامک‌های بدون اعلان در صف می‌مانند",
+                checked = reviewNotificationsEnabled, onChange = onReviewNotificationsChange
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .35f))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("دسترسی SMS", fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                    Text(if (smsPermitted) "اجازه داده شده" else "اجازه داده نشده",
+                        fontSize = 11.sp, color = if (smsPermitted) mint else danger)
+                }
+                if (!smsPermitted) TextButton(onClick = onSmsPermission) { Text("درخواست مجوز") }
+                else Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = mint)
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("دسترسی اعلان‌ها", fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                    Text(if (notificationsPermitted) "اجازه داده شده" else "اجازه داده نشده",
+                        fontSize = 11.sp, color = if (notificationsPermitted) mint else danger)
+                }
+                if (!notificationsPermitted) TextButton(onClick = onNotificationPermission) { Text("درخواست مجوز") }
+                else Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = mint)
+            }
+            OutlinedButton(onClick = onSystemSettings, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Outlined.OpenInNew, contentDescription = null,
+                    modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(7.dp))
+                Text("مدیریت مجوزها در تنظیمات اندروید")
+            }
+        }
+
+        Tile(Modifier.fillMaxWidth()) {
+            SettingsGroupTitle(Icons.Outlined.CalendarMonth, "دوره مالی")
+            Text("شروع دوره جدید و محاسبه سقف هزینه‌ها",
+                fontSize = 12.sp, color = muted)
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                FilterChip(
+                    selected = periodMode == FinancePeriodEngine.MONTHLY,
+                    onClick = { onPeriodChange(FinancePeriodEngine.MONTHLY) },
+                    label = { Text("اول هر ماه شمسی") }
+                )
+                FilterChip(
+                    selected = periodMode == FinancePeriodEngine.SALARY,
+                    onClick = { onPeriodChange(FinancePeriodEngine.SALARY) },
+                    label = { Text("پس از تأیید حقوق") }
+                )
+            }
+            Text("تعویض دوره هیچ تراکنش یا بدهی را پاک نمی‌کند.",
+                fontSize = 11.sp, color = muted)
+        }
+
+        Tile(Modifier.fillMaxWidth()) {
+            SettingsGroupTitle(Icons.Outlined.Info, "درباره جسی")
+            Text("نسخه " + digitsFa(versionName),
+                fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text("اطلاعات حساب‌ها و تراکنش‌ها در حافظه همین گوشی نگهداری می‌شوند. متن کامل پیامک بانکی ذخیره نمی‌شود.",
+                fontSize = 12.sp, color = muted)
+            Text("هنگام حذف برنامه، ممکن است داده‌های ذخیره‌شده حذف شوند؛ بدون پشتیبان برنامه را پاک نکن.",
+                fontSize = 11.sp, color = danger)
+        }
+    }
+}
+
+@Composable
+private fun SettingsGroupTitle(icon: ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+        Surface(shape = RoundedCornerShape(11.dp), color = mint.copy(alpha = .13f)) {
+            Icon(icon, contentDescription = null, tint = mint,
+                modifier = Modifier.padding(8.dp).size(21.dp))
+        }
+        Text(text, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+    }
+}
+
+@Composable
+private fun SettingsToggle(
+    icon: ImageVector, title: String, description: String,
+    checked: Boolean, onChange: (Boolean) -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth().clickable { onChange(!checked) }.padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = muted, modifier = Modifier.size(22.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Text(description, color = muted, fontSize = 10.sp, lineHeight = 15.sp)
+        }
+        Switch(checked = checked, onCheckedChange = onChange,
+            modifier = Modifier.height(32.dp))
     }
 }
 
@@ -522,14 +750,16 @@ private fun Dashboard(
     currentPeriod: FinancePeriod, periods: List<FinancePeriod>, selectedPeriodIndex: Int, nowEpoch: Long,
     smsPermitted: Boolean, requestPermission: () -> Unit,
     notificationsPermitted: Boolean, requestNotificationPermission: () -> Unit,
-    onReview: (SmsReview) -> Unit, onNewTx: () -> Unit, onSelectTab: (Tab) -> Unit
+    onReview: (SmsReview) -> Unit, onNewTx: () -> Unit, onSelectTab: (Tab) -> Unit,
+    balanceVisible: Boolean, onBalanceVisibilityChange: (Boolean) -> Unit,
+    smsMonitoringEnabled: Boolean, reviewNotificationsEnabled: Boolean,
+    onOpenSettings: () -> Unit
 ) {
     val dark = LocalJessiDark.current
     val total = accounts.sumOf { accountBalance(it.id, it.openingToman, txs) }
     val current = txs.filter { currentPeriod.contains(it.createdAt) }
     val income = current.filter { it.kind == "IN" }.sumOf { it.amountToman }
     val expense = current.filter { it.kind == "OUT" }.sumOf { it.amountToman }
-    var balanceVisible by rememberSaveable { mutableStateOf(true) }
     val heroGradient = if (dark)
         Brush.linearGradient(listOf(Color(0xFF123E6A), Color(0xFF28205E), Color(0xFF461D75)))
     else Brush.linearGradient(listOf(Color(0xFFEAF8F2), Color(0xFFF4FBFF), Color(0xFFF9F7FF)))
@@ -555,7 +785,7 @@ private fun Dashboard(
             Spacer(Modifier.width(9.dp))
             Text("موجودی کل حساب‌ها", modifier = Modifier.weight(1f),
                 fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            IconButton(onClick = { balanceVisible = !balanceVisible }, modifier = Modifier.size(36.dp)) {
+            IconButton(onClick = { onBalanceVisibilityChange(!balanceVisible) }, modifier = Modifier.size(36.dp)) {
                 Icon(if (balanceVisible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
                     contentDescription = if (balanceVisible) "پنهان کردن موجودی" else "نمایش موجودی",
                     tint = muted, modifier = Modifier.size(21.dp))
@@ -722,9 +952,14 @@ private fun Dashboard(
             }
         }
     }
-    if (!smsPermitted || !notificationsPermitted) {
+    if (!smsPermitted || !notificationsPermitted || !smsMonitoringEnabled || !reviewNotificationsEnabled) {
         Tile(Modifier.fillMaxWidth()) {
             Text("دسترسی‌های پیامک بانکی", fontWeight = FontWeight.Bold)
+            if (!smsMonitoringEnabled || !reviewNotificationsEnabled) {
+                Text("بررسی پیامک یا اعلان‌ها از تنظیمات جسی غیرفعال شده.",
+                    fontSize = 12.sp, color = muted)
+                TextButton(onClick = onOpenSettings) { Text("تنظیمات پیامک و اعلان") }
+            }
             if (!smsPermitted) {
                 Text("برای شناسایی پیامک‌های بانکی جدید، مجوز SMS را فعال کن.", fontSize = 12.sp, color = muted)
                 TextButton(onClick = requestPermission) { Text("فعال‌کردن SMS") }
