@@ -371,7 +371,9 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                             Uri.parse("package:${context.packageName}")
                         ))
                     },
-                    versionName = "0.7.0"
+                    versionName = remember(context, installedVersion) {
+                        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "نامشخص"
+                    }
                 )
             } else {
             PeriodSwitcher(
