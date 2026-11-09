@@ -1305,14 +1305,15 @@ private fun EmptyNote(message: String) {
 @Composable
 private fun FinanceSectionHero(
     title: String, description: String, icon: ImageVector,
-    mainStat: String, statLabel: String
+    mainStat: String, statLabel: String, accent: Color = Color.Unspecified
 ) {
     val dark = LocalJessiDark.current
+    val highlight = if (accent == Color.Unspecified) mint else accent
     val shape = RoundedCornerShape(22.dp)
     val gradient = if (dark) Brush.linearGradient(
-        listOf(Color(0xFF12375D), Color(0xFF252359), Color(0xFF3B246B))
+        listOf(highlight.copy(alpha = .30f).compositeOver(Color(0xFF101936)), Color(0xFF252359), Color(0xFF30214F))
     ) else Brush.linearGradient(
-        listOf(Color(0xFFE5F7EF), Color(0xFFEEF7FB), Color(0xFFF4F0FD))
+        listOf(highlight.copy(alpha = .13f).compositeOver(Color.White), Color(0xFFF1F7FA), Color(0xFFF4F0FD))
     )
     Column(
         Modifier.fillMaxWidth().clip(shape).background(gradient)
@@ -1323,10 +1324,10 @@ private fun FinanceSectionHero(
         Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Surface(
-                color = if (dark) Color(0xFF34477E) else Color(0xFFD4F0E3),
+                color = highlight.copy(alpha = if (dark) .21f else .12f),
                 shape = RoundedCornerShape(13.dp)
             ) {
-                Icon(icon, contentDescription = null, tint = mint,
+                Icon(icon, contentDescription = null, tint = highlight,
                     modifier = Modifier.padding(11.dp).size(24.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -1395,7 +1396,7 @@ private fun AccountsPage(accounts: List<Account>, txs: List<Transaction>, onEdit
     FinanceSectionHero(
         "حساب‌های من", "نمای یکجا از حساب‌ها و موجودی ثبت‌شده",
         Icons.Outlined.AccountBalanceWallet,
-        toman(balance), digitsFa(accounts.size.toString()) + " حساب"
+        toman(balance), digitsFa(accounts.size.toString()) + " حساب", accent = Color(0xFF21C9AA)
     )
     if (accounts.isEmpty()) EmptyNote("حسابی ثبت نشده. برای شروع روی + بزن و موجودی اولیه را وارد کن.")
     accounts.forEach { acc ->
@@ -1404,23 +1405,25 @@ private fun AccountsPage(accounts: List<Account>, txs: List<Transaction>, onEdit
         Tile(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FinanceIconTile(Icons.Outlined.AccountBalanceWallet)
+                FinanceIconTile(Icons.Outlined.AccountBalanceWallet, Color(0xFF21C9AA))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(acc.title, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Text(listOf(acc.bank, if (acc.last4.isNotBlank())
                         "•••• " + digitsFa(acc.last4) else "").filter { it.isNotBlank() }
                         .joinToString(" • "), color = muted, fontSize = 11.sp)
                 }
-                Tag("حساب", true)
+                Surface(color = Color(0xFF21C9AA).copy(alpha = .12f), shape = RoundedCornerShape(30.dp)) {
+                    Text("حساب", Modifier.padding(horizontal = 11.dp, vertical = 5.dp), color = Color(0xFF21C9AA), fontSize = 11.sp)
+                }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .27f))
             Column(Modifier.fillMaxWidth().background(
-                mint.copy(alpha = if (LocalJessiDark.current) .09f else .055f),
+                Brush.horizontalGradient(listOf(Color(0xFF21C9AA).copy(alpha = .13f), Color(0xFF6EA8FF).copy(alpha = .055f))),
                 RoundedCornerShape(13.dp)).padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text("موجودی فعلی", color = muted, fontSize = 11.sp)
-                Text(toman(amount), color = mint, fontSize = 21.sp,
+                Text(toman(amount), color = Color(0xFF21C9AA), fontSize = 21.sp,
                     fontWeight = FontWeight.ExtraBold)
             }
             FinanceActionRow(
@@ -1439,7 +1442,7 @@ private fun TransactionsPage(txs: List<Transaction>, accounts: List<Account>, on
     FinanceSectionHero(
         "تراکنش‌ها", "گردش مالی دوره انتخاب‌شده",
         Icons.Outlined.ReceiptLong,
-        digitsFa(visible.size.toString()), "تراکنش"
+        digitsFa(visible.size.toString()), "تراکنش", accent = Color(0xFF6EA8FF)
     )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
         FinanceSummaryChip("درآمد", income, income = true, Modifier.weight(1f))
@@ -1518,13 +1521,13 @@ private fun DebtsPage(
         .sumOf { (it.totalToman - it.paidToman).coerceAtLeast(0) }
     FinanceSectionHero(
         "بدهی و اقساط", "پیگیری سررسیدها و پرداخت‌های باقی‌مانده",
-        Icons.Outlined.CreditCard, toman(totalOwed), "بدهی باقی‌مانده"
+        Icons.Outlined.CreditCard, toman(totalOwed), "بدهی باقی‌مانده", accent = Color(0xFFAA91FF)
     )
     if (debts.isEmpty()) EmptyNote("فعلاً بدهی یا طلبی ثبت نشده.")
     debts.forEach { row ->
         val remaining = (row.totalToman - row.paidToman).coerceAtLeast(0)
         val mine = row.direction == "I_OWE"
-        val tone = if (mine) Color(0xFF789FF3) else mint
+        val tone = if (mine) Color(0xFFAA91FF) else Color(0xFF21C9AA)
         Tile(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1555,7 +1558,7 @@ private fun DebtsPage(
             LinearProgressIndicator(
                 progress = { progress }, modifier = Modifier.fillMaxWidth().height(7.dp)
                     .clip(RoundedCornerShape(7.dp)),
-                color = mint, trackColor = secondary
+                color = tone, trackColor = tone.copy(alpha = .12f)
             )
             if (row.installmentMonths > 0) {
                 val done = Installments.countPaid(row)
@@ -1617,7 +1620,7 @@ private fun BudgetsPage(
     FinanceSectionHero(
         "بودجه‌بندی", "کنترل هزینه‌ها در دوره مالی انتخاب‌شده",
         Icons.Outlined.PieChartOutline,
-        toman(totalLimit), "سقف کل بودجه‌ها"
+        toman(totalLimit), "سقف کل بودجه‌ها", accent = Color(0xFFF1AD63)
     )
     if (budgets.isEmpty()) EmptyNote("برای تعریف سقف هزینه ماهانه روی + بزن.")
     budgets.forEach { b ->
@@ -1658,7 +1661,7 @@ private fun BudgetsPage(
             LinearProgressIndicator(progress = { ratio.coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth().height(8.dp)
                     .clip(RoundedCornerShape(7.dp)),
-                color = usedColor, trackColor = secondary)
+                color = usedColor, trackColor = usedColor.copy(alpha = .12f))
             Text(
                 if (percent >= 100) "سقف هزینه این دسته رد شده"
                 else if (percent >= 80) "نزدیک سقف هزینه هستی"
