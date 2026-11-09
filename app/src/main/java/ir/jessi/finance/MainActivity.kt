@@ -65,20 +65,31 @@ private val muted: Color @Composable get() = MaterialTheme.colorScheme.onSurface
 private val danger: Color @Composable get() = MaterialTheme.colorScheme.error
 
 private val lightColors = lightColorScheme(
-    primary = Color(0xFF008A62), onPrimary = Color.White,
-    secondary = Color(0xFF087D91), background = Color(0xFFF6FAFB),
-    surface = Color.White, surfaceVariant = Color(0xFFECF3F5),
-    onSurface = Color(0xFF17272E), onSurfaceVariant = Color(0xFF617582),
-    error = Color(0xFFDC4261), outline = Color(0xFFDCE8EC)
+    primary = Color(0xFF008E5B), onPrimary = Color.White,
+    secondary = Color(0xFF087D91), background = Color(0xFFF5FAF8),
+    surface = Color.White, surfaceVariant = Color(0xFFEAF4F0),
+    onSurface = Color(0xFF152A2D), onSurfaceVariant = Color(0xFF627980),
+    error = Color(0xFFD83D67), outline = Color(0xFFDCEBE8)
 )
 private val darkColors = darkColorScheme(
-    primary = Color(0xFFBA8AFF), onPrimary = Color(0xFF16102F),
-    secondary = Color(0xFF40C9FF), background = Color(0xFF080F26),
-    surface = Color(0xFF131B3C), surfaceVariant = Color(0xFF202952),
-    onSurface = Color(0xFFF5F4FF), onSurfaceVariant = Color(0xFFADB9D7),
-    error = Color(0xFFFF749E), outline = Color(0xFF37446B)
+    primary = Color(0xFFD062FF), onPrimary = Color(0xFF1A0F31),
+    secondary = Color(0xFF41DDFB), background = Color(0xFF090E29),
+    surface = Color(0xFF17183E), surfaceVariant = Color(0xFF242553),
+    onSurface = Color(0xFFF7F5FF), onSurfaceVariant = Color(0xFFB7B9D9),
+    error = Color(0xFFFF699E), outline = Color(0xFF41407C)
 )
 private val LocalJessiDark = compositionLocalOf { true }
+
+// Consistent four-tone accents shared across every tab: jade, cyan, violet and amber.
+private val financeAqua: Color @Composable get() =
+    if (LocalJessiDark.current) Color(0xFF36E8C4) else Color(0xFF008F69)
+private val financeBlue: Color @Composable get() =
+    if (LocalJessiDark.current) Color(0xFF43C8FF) else Color(0xFF2477C8)
+private val financePurple: Color @Composable get() =
+    if (LocalJessiDark.current) Color(0xFFD062FF) else Color(0xFF8450C8)
+private val financeAmber: Color @Composable get() =
+    if (LocalJessiDark.current) Color(0xFFFFC779) else Color(0xFFB47827)
+
 
 
 class MainActivity : ComponentActivity() {
@@ -460,9 +471,10 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                     },
                     onRefreshDiagnostics = { diagnosticRefresh++ },
                     onSimulateSms = { raw, sender ->
-                        vm.simulateSms(raw, sender) { message ->
+                        vm.simulateSms(raw, sender) { message, candidate ->
                             diagnosticRefresh++
                             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                            if (candidate != null) editor = Editor.Review(candidate)
                         }
                     },
                     onExportBackup = {
@@ -589,7 +601,23 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
         is Editor.DebtForm -> DebtDialog(e.value, dismiss = { editor = null }) { vm.saveDebt(it); editor = null }
         is Editor.BudgetForm -> BudgetDialog(e.value, budgets, dismiss = { editor = null }) { vm.saveBudget(it); editor = null }
         is Editor.Repay -> RepayDialog(e.value, accounts, dismiss = { editor = null }) { amount, accountId -> vm.settleDebt(e.value, amount, accountId); editor = null }
-        is Editor.Review -> ReviewDialog(e.value, accounts, dismiss = { editor = null }, onAccept = { id, category, note, unit -> vm.acceptReview(e.value, id, category, note, unit); editor = null }, onReject = { vm.dismissReview(e.value.id); editor = null })
+        is Editor.Review -> ReviewDialog(
+            e.value, accounts,
+            dismiss = { editor = null },
+            onAccept = { id, category, note, unit ->
+                vm.acceptReview(e.value, id, category, note, unit) { saved ->
+                    if (saved) {
+                        editor = null
+                        showSettings = false
+                        tabName = Tab.HOME.name
+                        Toast.makeText(context, "تراکنش ثبت شد و در آمار اعمال شد", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(context, "ثبت تراکنش انجام نشد؛ مبلغ، واحد و حساب را بررسی کن", Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
+            onReject = { vm.dismissReview(e.value.id); editor = null }
+        )
         is Editor.Delete -> AlertDialog(onDismissRequest = { editor = null }, title = { Text("تأیید حذف") }, text = { Text(e.title) }, confirmButton = { TextButton(onClick = { e.action(); editor = null }) { Text("حذف", color = danger) } }, dismissButton = { TextButton(onClick = { editor = null }) { Text("انصراف") } })
         null -> Unit
     }
@@ -827,10 +855,13 @@ private fun SmsParserTestSettings(onSimulateSms: (String, String) -> Unit) {
                 ) {
                     Icon(Icons.Outlined.Send, contentDescription = null, modifier = Modifier.size(19.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("شبیه‌سازی صف بررسی و اعلان")
+                    Text("ساخت نمونه و بازکردن فرم ثبت")
                 }
-                Text("این آزمایش وارد صف می‌شه و اعلان آزمایشی می‌فرسته، اما قابل ثبت به‌عنوان تراکنش واقعی نیست.",
-                    fontSize = 11.sp, color = muted)
+                Text(
+                    "نمونه به صف بررسی اضافه می‌شه؛ سپس می‌تونی با تأیید جداگانه، " +
+                    "اون رو به‌عنوان «آزمایشی» در موجودی، بودجه و نمودارها هم ثبت کنی.",
+                    fontSize = 11.sp, color = muted
+                )
             }
         }
         Text("متن پیامک در فرم نگهداری دائمی نمی‌شود؛ تست مستقل از مجوز دریافت SMS است.",
@@ -1501,6 +1532,16 @@ private fun TransactionTile(
                     color = muted, fontSize = 10.sp)
             }
         }
+        if (row.source == SmsReviewPolicy.TEST_SOURCE) {
+            Surface(
+                color = financePurple.copy(alpha = .13f),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("آزمایشی • در آمار و مانده حساب محاسبه شده",
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    color = financePurple, fontSize = 10.sp)
+            }
+        }
         if (row.note.isNotBlank()) {
             Text(row.note, color = muted, fontSize = 11.sp,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -1897,7 +1938,8 @@ private fun ReviewDialog(
     row: SmsReview, accounts: List<Account>, dismiss: () -> Unit,
     onAccept: (Long, String, String, String) -> Unit, onReject: () -> Unit
 ) {
-    val isSimulation = row.fingerprint.startsWith("JESSI_TEST_")
+    val isSimulation = SmsReviewPolicy.isSimulation(row.fingerprint)
+    var testRegistrationConsent by remember(row.id) { mutableStateOf(false) }
     var accountId by remember(row.id) { mutableStateOf(row.accountGuess ?: accounts.firstOrNull()?.id) }
     var category by remember(row.id) { mutableStateOf(if (row.kind == "IN") "درآمد" else "سایر") }
     var note by remember(row.id) { mutableStateOf("") }
@@ -1913,9 +1955,17 @@ private fun ReviewDialog(
         onDismissRequest = dismiss,
         title = { Text("بررسی پیامک بانکی") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (isSimulation) Text("این یک آزمایش است و در حساب‌های واقعی ثبت نمی‌شود.",
-                    color = danger, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Column(
+                Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (isSimulation) {
+                    Text("نمونه آزمایشی • ثبت اختیاری", color = financePurple,
+                        fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("در صورت تأیید، تراکنش آزمایشی مانند تراکنش عادی روی موجودی حساب، " +
+                        "بودجه‌ها و نمودارهای درآمد و هزینه تأثیر می‌گذارد و با برچسب آزمایشی قابل شناسایی و حذف است.",
+                        color = danger, fontSize = 12.sp, lineHeight = 19.sp)
+                }
                 Text(if (row.kind == "IN") "واریز احتمالی" else "برداشت احتمالی", color = mint)
                 if (row.bankName.isNotBlank()) Text(row.bankName, fontSize = 13.sp, color = muted)
                 Text(if (needsUnit && selectedUnit.isBlank())
@@ -1954,23 +2004,33 @@ private fun ReviewDialog(
                         color = mint, fontSize = 11.sp)
                 }
                 TextEntry("برای چی بود؟ (توضیح اختیاری)", note, { note = it }, singleLine = false)
-                Text("قبل از تأیید، مبلغ و نوع تراکنش را با پیامک اصلی تطبیق بده.",
-                    fontSize = 11.sp, color = muted)
+                if (isSimulation) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = testRegistrationConsent,
+                            onCheckedChange = { testRegistrationConsent = it })
+                        Text("می‌پذیرم این تراکنش آزمایشی در آمار و مانده حساب اعمال شود.",
+                            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                } else {
+                    Text("قبل از تأیید، مبلغ و نوع تراکنش را با پیامک اصلی تطبیق بده.",
+                        fontSize = 11.sp, color = muted)
+                }
             }
         },
         confirmButton = {
-            if (isSimulation) {
-                Button(onClick = onReject) { Text("پایان آزمایش و حذف از صف") }
-            } else {
-                Button(
-                    onClick = { accountId?.let { onAccept(it, category, note, selectedUnit) } },
-                    enabled = accountId != null && selectedAmount > 0L
-                ) { Text("ثبت تراکنش") }
+            Button(
+                onClick = { accountId?.let { onAccept(it, category, note, selectedUnit) } },
+                enabled = accountId != null && selectedAmount > 0L &&
+                    (!isSimulation || testRegistrationConsent)
+            ) {
+                Text(if (isSimulation) "ثبت آزمایشی در آمار" else "ثبت تراکنش")
             }
         },
         dismissButton = {
             Row {
-                TextButton(onClick = onReject) { Text("نادیده گرفتن", color = danger) }
+                TextButton(onClick = onReject) {
+                    Text(if (isSimulation) "حذف نمونه" else "نادیده گرفتن", color = danger)
+                }
                 TextButton(onClick = dismiss) { Text("بعداً") }
             }
         }
