@@ -93,7 +93,7 @@ object SmsReviewNotifications {
         val open = PendingIntent.getActivity(
             context, TEST_ID,
             Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                this.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }, flags
         )
         context.getSystemService(NotificationManager::class.java).notify(
