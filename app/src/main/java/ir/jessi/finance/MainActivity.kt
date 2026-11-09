@@ -673,8 +673,8 @@ private fun SettingsPage(
             Text("تنظیمات", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
             Text("شخصی‌سازی جسی و کنترل دسترسی‌ها", fontSize = 12.sp, color = muted)
         }
-        Tile(Modifier.fillMaxWidth()) {
-            SettingsGroupTitle(Icons.Outlined.Palette, "ظاهر و حریم خصوصی")
+        Tile(Modifier.fillMaxWidth(), accent = financeAqua) {
+            SettingsGroupTitle(Icons.Outlined.Palette, "ظاهر و حریم خصوصی", accent = financeAqua)
             SettingsToggle(
                 icon = if (darkMode) Icons.Outlined.DarkMode else Icons.Outlined.LightMode,
                 title = "حالت تاریک",
@@ -691,8 +691,8 @@ private fun SettingsPage(
             )
         }
 
-        Tile(Modifier.fillMaxWidth()) {
-            SettingsGroupTitle(Icons.Outlined.Sms, "پیامک بانکی و اعلان‌ها")
+        Tile(Modifier.fillMaxWidth(), accent = financeBlue) {
+            SettingsGroupTitle(Icons.Outlined.Sms, "پیامک بانکی و اعلان‌ها", accent = financeBlue)
             SettingsToggle(
                 icon = Icons.Outlined.Markunread,
                 title = "بررسی پیامک‌های بانکی",
@@ -733,8 +733,8 @@ private fun SettingsPage(
             }
         }
 
-        Tile(Modifier.fillMaxWidth()) {
-            SettingsGroupTitle(Icons.Outlined.BugReport, "عیب‌یابی دریافت پیامک")
+        Tile(Modifier.fillMaxWidth(), accent = financePurple) {
+            SettingsGroupTitle(Icons.Outlined.BugReport, "عیب‌یابی دریافت پیامک", accent = financePurple)
             Text("وضعیت اعلان: " + (notificationBlocker ?: "مجوز و کانال اعلان فعال است"),
                 fontSize = 12.sp, color = if (notificationBlocker == null) mint else danger)
             Text("وضعیت آخرین پیامک در جسی:", fontWeight = FontWeight.Medium, fontSize = 12.sp)
@@ -764,8 +764,8 @@ private fun SettingsPage(
 
         SmsParserTestSettings(onSimulateSms)
 
-        Tile(Modifier.fillMaxWidth()) {
-            SettingsGroupTitle(Icons.Outlined.SaveAlt, "پشتیبان‌گیری و بازیابی اطلاعات")
+        Tile(Modifier.fillMaxWidth(), accent = financeAqua) {
+            SettingsGroupTitle(Icons.Outlined.SaveAlt, "پشتیبان‌گیری و بازیابی اطلاعات", accent = financeAqua)
             Text(
                 "از حساب‌ها، تراکنش‌ها، بدهی‌ها، اقساط، بودجه‌ها و صف پیامک‌ها یک فایل JSON بگیر.",
                 fontSize = 12.sp, color = muted
@@ -792,8 +792,8 @@ private fun SettingsPage(
             )
         }
 
-        Tile(Modifier.fillMaxWidth()) {
-            SettingsGroupTitle(Icons.Outlined.CalendarMonth, "دوره مالی")
+        Tile(Modifier.fillMaxWidth(), accent = financeAmber) {
+            SettingsGroupTitle(Icons.Outlined.CalendarMonth, "دوره مالی", accent = financeAmber)
             Text("شروع دوره جدید و محاسبه سقف هزینه‌ها",
                 fontSize = 12.sp, color = muted)
             Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -812,8 +812,8 @@ private fun SettingsPage(
                 fontSize = 11.sp, color = muted)
         }
 
-        Tile(Modifier.fillMaxWidth()) {
-            SettingsGroupTitle(Icons.Outlined.Info, "درباره جسی")
+        Tile(Modifier.fillMaxWidth(), accent = financeBlue) {
+            SettingsGroupTitle(Icons.Outlined.Info, "درباره جسی", accent = financeBlue)
             Text("نسخه " + digitsFa(versionName),
                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             Text("اطلاعات حساب‌ها و تراکنش‌ها در حافظه همین گوشی نگهداری می‌شوند. متن کامل پیامک بانکی ذخیره نمی‌شود.",
@@ -831,8 +831,8 @@ private fun SmsParserTestSettings(onSimulateSms: (String, String) -> Unit) {
     var sender by remember { mutableStateOf("") }
     var tested by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<BankSmsParser.Result?>(null) }
-    Tile(Modifier.fillMaxWidth()) {
-        SettingsGroupTitle(Icons.Outlined.Science, "آزمایش متن پیامک بانکی")
+    Tile(Modifier.fillMaxWidth(), accent = financeBlue) {
+        SettingsGroupTitle(Icons.Outlined.Science, "آزمایش متن پیامک بانکی", accent = financeBlue)
         Text("متن پیامک رو از برنامه پیام‌ها کپی کن و اینجا بچسبون؛ بدون دریافت SMS واقعی هم تشخیص آزمایش می‌شه.",
             fontSize = 12.sp, color = muted)
         OutlinedTextField(
@@ -895,11 +895,12 @@ private fun SmsParserTestSettings(onSimulateSms: (String, String) -> Unit) {
 }
 
 @Composable
-private fun SettingsGroupTitle(icon: ImageVector, text: String) {
+private fun SettingsGroupTitle(icon: ImageVector, text: String, accent: Color = mint) {
     Row(verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-        Surface(shape = RoundedCornerShape(11.dp), color = mint.copy(alpha = .13f)) {
-            Icon(icon, contentDescription = null, tint = mint,
+        Surface(shape = RoundedCornerShape(11.dp), color = accent.copy(alpha = .16f),
+            border = BorderStroke(1.dp, accent.copy(alpha = .23f))) {
+            Icon(icon, contentDescription = null, tint = accent,
                 modifier = Modifier.padding(8.dp).size(21.dp))
         }
         Text(text, fontWeight = FontWeight.Bold, fontSize = 15.sp)
@@ -1813,7 +1814,16 @@ private fun <T> SelectItem(label: String, selected: T?, items: List<T>, display:
 private fun EntryDialog(title: String, valid: Boolean, dismiss: () -> Unit, onSave: () -> Unit, body: @Composable ColumnScope.() -> Unit) {
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text(title, fontWeight = FontWeight.Bold) },
+        shape = RoundedCornerShape(24.dp),
+        containerColor = if (LocalJessiDark.current) Color(0xFF1B1B45) else Color.White,
+        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text(title, color = mint, fontWeight = FontWeight.ExtraBold)
+                Box(Modifier.width(58.dp).height(3.dp)
+                    .background(Brush.horizontalGradient(listOf(financeAqua, financePurple)),
+                        RoundedCornerShape(5.dp)))
+            }
+        },
         text = {
             Column(Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp), content = body)
         },
