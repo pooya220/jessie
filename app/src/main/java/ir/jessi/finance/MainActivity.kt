@@ -5,11 +5,17 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings as AndroidSettings
 import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Build
 import ir.jessi.finance.sms.SmsReviewNotifications
 import ir.jessi.finance.sms.SmsDiagnostics
+import ir.jessi.finance.sms.BankSmsParser
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -216,6 +222,44 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
     var tabName by rememberSaveable { mutableStateOf(Tab.HOME.name) }
     val tab = Tab.valueOf(tabName)
     var editor by remember { mutableStateOf<Editor?>(null) }
+    val ioScope = rememberCoroutineScope()
+    var backupBusy by remember { mutableStateOf(false) }
+    var restorePreview by remember { mutableStateOf<FinanceBackup.Snapshot?>(null) }
+    val backupExportPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            backupBusy = true
+            ioScope.launch {
+                try {
+                    val output = withContext(Dispatchers.IO) { FinanceBackup.export(context, uri) }
+                    Toast.makeText(context, "پشتیبان جسی ذخیره شد. " +
+                        output.accounts.size + " حساب و " + output.transactions.size + " تراکنش",
+                        Toast.LENGTH_LONG).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "خطای پشتیبان‌گیری: " +
+                        (e.message ?: "فایل قابل ذخیره نیست"), Toast.LENGTH_LONG).show()
+                } finally { backupBusy = false }
+            }
+        }
+    }
+    val backupImportPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            backupBusy = true
+            ioScope.launch {
+                try {
+                    restorePreview = withContext(Dispatchers.IO) {
+                        FinanceBackup.inspect(context, uri)
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "خطای خواندن فایل: " +
+                        (e.message ?: "فایل معتبر نیست"), Toast.LENGTH_LONG).show()
+                } finally { backupBusy = false }
+            }
+        }
+    }
 
     LaunchedEffect(openReviewId, reviews) {
         if (openReviewId > 0L) {
@@ -395,7 +439,10 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                     onResendPending = {
                         var sent = 0
                         reviews.take(10).forEach {
-                            if (SmsReviewNotifications.show(context, it.id, it.kind)) sent++
+                            if (SmsReviewNotifications.show(
+                                    context, it.id, it.kind,
+                                    isTest = it.fingerprint.startsWith("JESSI_TEST_")
+                                )) sent++
                         }
                         diagnosticRefresh++
                         Toast.makeText(context,
@@ -412,6 +459,25 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                         context.startActivity(i)
                     },
                     onRefreshDiagnostics = { diagnosticRefresh++ },
+                    onSimulateSms = { raw, sender ->
+                        vm.simulateSms(raw, sender) { message ->
+                            diagnosticRefresh++
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    onExportBackup = {
+                        if (!backupBusy) {
+                            val stamp = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.US)
+                                .format(Date())
+                            backupExportPicker.launch("Jessi-Backup-$stamp.json")
+                        }
+                    },
+                    onImportBackup = {
+                        if (!backupBusy) backupImportPicker.launch(
+                            arrayOf("application/json", "text/plain", "application/octet-stream")
+                        )
+                    },
+                    backupBusy = backupBusy,
                     versionName = remember(context, installedVersion) {
                         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "نامشخص"
                     }
@@ -473,6 +539,50 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
         }
     }
 
+    if (restorePreview != null) {
+        val candidate = restorePreview!!
+        AlertDialog(
+            onDismissRequest = { if (!backupBusy) restorePreview = null },
+            title = { Text("بازیابی اطلاعات جسی") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("فایل معتبر است و این موارد را دارد:", fontWeight = FontWeight.Bold)
+                    Text(candidate.summary(), fontSize = 12.sp)
+                    Text("توجه: با تأیید، تمام اطلاعات مالی فعلی با محتویات این فایل جایگزین می‌شود. " +
+                        "بازیابی با داده‌های فعلی ادغام نمی‌شود.",
+                        color = danger, fontSize = 12.sp)
+                    Text("بهتر است پیش از بازیابی، از وضعیت فعلی پشتیبان بگیری.",
+                        color = muted, fontSize = 11.sp)
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (!backupBusy) {
+                        backupBusy = true
+                        ioScope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    FinanceBackup.restore(context, candidate)
+                                }
+                                restorePreview = null
+                                periodOffset = 0
+                                Toast.makeText(context, "بازیابی اطلاعات موفق بود", Toast.LENGTH_LONG).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "بازیابی انجام نشد؛ اطلاعات قبلی حفظ شدند: " +
+                                    (e.message ?: "خطای نامشخص"), Toast.LENGTH_LONG).show()
+                            } finally { backupBusy = false }
+                        }
+                    }
+                }, enabled = !backupBusy) { Text("جایگزینی اطلاعات") }
+            },
+            dismissButton = {
+                TextButton(onClick = { restorePreview = null }, enabled = !backupBusy) {
+                    Text("انصراف")
+                }
+            }
+        )
+    }
+
     when (val e = editor) {
         is Editor.AccountForm -> AccountDialog(e.value, dismiss = { editor = null }) { vm.saveAccount(it); editor = null }
         is Editor.TxForm -> TransactionDialog(e.value, accounts, dismiss = { editor = null }, onSave = { vm.saveTransaction(it); editor = null }, onTransfer = { a, b, amount, note -> vm.transfer(a,b,amount,note); editor = null })
@@ -501,6 +611,8 @@ private fun SettingsPage(
     onResendPending: () -> Unit,
     onNotificationSettings: () -> Unit,
     onRefreshDiagnostics: () -> Unit,
+    onSimulateSms: (String, String) -> Unit,
+    onExportBackup: () -> Unit, onImportBackup: () -> Unit, backupBusy: Boolean,
     versionName: String
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
@@ -597,6 +709,36 @@ private fun SettingsPage(
                 color = muted, fontSize = 10.sp)
         }
 
+        SmsParserTestSettings(onSimulateSms)
+
+        Tile(Modifier.fillMaxWidth()) {
+            SettingsGroupTitle(Icons.Outlined.SaveAlt, "پشتیبان‌گیری و بازیابی اطلاعات")
+            Text(
+                "از حساب‌ها، تراکنش‌ها، بدهی‌ها، اقساط، بودجه‌ها و صف پیامک‌ها یک فایل JSON بگیر.",
+                fontSize = 12.sp, color = muted
+            )
+            OutlinedButton(
+                onClick = onExportBackup, enabled = !backupBusy, modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Outlined.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("ذخیره فایل پشتیبان")
+            }
+            OutlinedButton(
+                onClick = onImportBackup, enabled = !backupBusy, modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Outlined.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("انتخاب فایل و بازیابی")
+            }
+            if (backupBusy) CircularProgressIndicator(modifier = Modifier.size(23.dp))
+            Text(
+                "فایل پشتیبان رمزگذاری نشده و اطلاعات مالی حساس دارد. در جای امن نگهداری کن. " +
+                "بازیابی فقط بعد از بررسی فایل و تأیید تو انجام می‌شود.",
+                fontSize = 11.sp, color = danger
+            )
+        }
+
         Tile(Modifier.fillMaxWidth()) {
             SettingsGroupTitle(Icons.Outlined.CalendarMonth, "دوره مالی")
             Text("شروع دوره جدید و محاسبه سقف هزینه‌ها",
@@ -626,6 +768,73 @@ private fun SettingsPage(
             Text("هنگام حذف برنامه، ممکن است داده‌های ذخیره‌شده حذف شوند؛ بدون پشتیبان برنامه را پاک نکن.",
                 fontSize = 11.sp, color = danger)
         }
+    }
+}
+
+
+@Composable
+private fun SmsParserTestSettings(onSimulateSms: (String, String) -> Unit) {
+    var body by remember { mutableStateOf("") }
+    var sender by remember { mutableStateOf("") }
+    var tested by remember { mutableStateOf(false) }
+    var result by remember { mutableStateOf<BankSmsParser.Result?>(null) }
+    Tile(Modifier.fillMaxWidth()) {
+        SettingsGroupTitle(Icons.Outlined.Science, "آزمایش متن پیامک بانکی")
+        Text("متن پیامک رو از برنامه پیام‌ها کپی کن و اینجا بچسبون؛ بدون دریافت SMS واقعی هم تشخیص آزمایش می‌شه.",
+            fontSize = 12.sp, color = muted)
+        OutlinedTextField(
+            value = sender,
+            onValueChange = { sender = it; tested = false },
+            label = { Text("فرستنده (اختیاری)") },
+            singleLine = true, modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = body,
+            onValueChange = { body = it; tested = false },
+            label = { Text("متن پیامک") },
+            minLines = 3, maxLines = 8, modifier = Modifier.fillMaxWidth()
+        )
+        Button(
+            onClick = { result = BankSmsParser.parse(body, sender); tested = true },
+            enabled = body.isNotBlank(), modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(19.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("تست تشخیص پیامک")
+        }
+        if (tested) {
+            val found = result
+            if (found == null) {
+                Text("این متن با قواعد فعلی، تراکنش بانکی تشخیص داده نشد.",
+                    color = danger, fontSize = 12.sp)
+                Text("برای اصلاح الگوریتم، همین نمونه رو به جسی بفرست.",
+                    color = muted, fontSize = 11.sp)
+            } else {
+                Text("پیامک شناسایی شد", color = mint, fontWeight = FontWeight.Bold)
+                Text("بانک: " + found.bankName.ifBlank { "نامشخص" }, fontSize = 12.sp)
+                Text("نوع: " + if (found.kind == "IN") "واریز" else "برداشت",
+                    fontSize = 12.sp)
+                Text(
+                    "مبلغ: " + if (found.amountUnit == BankSmsParser.UNKNOWN) {
+                        digitsFa(NumberFormat.getIntegerInstance(Locale.US).format(found.amountRaw)) +
+                            " (واحد نامشخص؛ هنگام بررسی باید انتخاب شود)"
+                    } else toman(found.amountToman),
+                    fontSize = 12.sp, fontWeight = FontWeight.Bold
+                )
+                OutlinedButton(
+                    onClick = { onSimulateSms(body, sender) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Outlined.Send, contentDescription = null, modifier = Modifier.size(19.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("شبیه‌سازی صف بررسی و اعلان")
+                }
+                Text("این آزمایش وارد صف می‌شه و اعلان آزمایشی می‌فرسته، اما قابل ثبت به‌عنوان تراکنش واقعی نیست.",
+                    fontSize = 11.sp, color = muted)
+            }
+        }
+        Text("متن پیامک در فرم نگهداری دائمی نمی‌شود؛ تست مستقل از مجوز دریافت SMS است.",
+            fontSize = 11.sp, color = muted)
     }
 }
 
@@ -1379,13 +1588,13 @@ private fun DebtDialog(initial: Debt?, dismiss: () -> Unit, save: (Debt) -> Unit
                     firstDue = JalaliDates.format(JalaliDates.addMonths(Jalali.of(System.currentTimeMillis()), monthsUntilDue))
                 }, enabled = monthsUntilDue < 36) { Text("+") }
             }
-            TextEntry("تاریخ اولین سررسید شمسی", firstDue, { firstDue = it })
+            JalaliDateInput("تاریخ اولین سررسید شمسی", firstDue, onChange = { firstDue = it })
             if (amount != null && months != null && months > 0) {
                 Text("مبلغ تقریبی هر قسط: ${toman(amount / months)} • مانده با ثبت پرداخت کم می‌شه.",
                     fontSize = 11.sp, color = mint)
             }
         } else {
-            TextEntry("تاریخ سررسید شمسی (اختیاری؛ مثلاً ۱۴۰۵/۰۹/۱۵)", due, { due = it })
+            JalaliDateInput("تاریخ سررسید شمسی", due, optional = true, onChange = { due = it })
         }
         TextEntry("توضیح", note, { note = it })
     }
@@ -1437,6 +1646,7 @@ private fun ReviewDialog(
     row: SmsReview, accounts: List<Account>, dismiss: () -> Unit,
     onAccept: (Long, String, String, String) -> Unit, onReject: () -> Unit
 ) {
+    val isSimulation = row.fingerprint.startsWith("JESSI_TEST_")
     var accountId by remember(row.id) { mutableStateOf(row.accountGuess ?: accounts.firstOrNull()?.id) }
     var category by remember(row.id) { mutableStateOf(if (row.kind == "IN") "درآمد" else "سایر") }
     var note by remember(row.id) { mutableStateOf("") }
@@ -1453,6 +1663,8 @@ private fun ReviewDialog(
         title = { Text("بررسی پیامک بانکی") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (isSimulation) Text("این یک آزمایش است و در حساب‌های واقعی ثبت نمی‌شود.",
+                    color = danger, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text(if (row.kind == "IN") "واریز احتمالی" else "برداشت احتمالی", color = mint)
                 if (row.bankName.isNotBlank()) Text(row.bankName, fontSize = 13.sp, color = muted)
                 Text(if (needsUnit && selectedUnit.isBlank())
@@ -1496,10 +1708,14 @@ private fun ReviewDialog(
             }
         },
         confirmButton = {
-            Button(
-                onClick = { accountId?.let { onAccept(it, category, note, selectedUnit) } },
-                enabled = accountId != null && selectedAmount > 0L
-            ) { Text("ثبت تراکنش") }
+            if (isSimulation) {
+                Button(onClick = onReject) { Text("پایان آزمایش و حذف از صف") }
+            } else {
+                Button(
+                    onClick = { accountId?.let { onAccept(it, category, note, selectedUnit) } },
+                    enabled = accountId != null && selectedAmount > 0L
+                ) { Text("ثبت تراکنش") }
+            }
         },
         dismissButton = {
             Row {

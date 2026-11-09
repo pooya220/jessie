@@ -47,7 +47,7 @@ object SmsReviewNotifications {
     }
 
     /** Returns whether Android accepted the notification posting, not whether it was seen. */
-    fun show(context: Context, reviewId: Long, kind: String): Boolean {
+    fun show(context: Context, reviewId: Long, kind: String, isTest: Boolean = false): Boolean {
         if (blockedReason(context) != null) return false
         ensureChannel(context)
         if (blockedReason(context) != null) return false
@@ -71,7 +71,7 @@ object SmsReviewNotifications {
 
         manager.notify(reviewId.toInt(), NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_jessi)
-            .setContentTitle("جسی • پیامک بانکی جدید")
+            .setContentTitle(if (isTest) "جسی • پیامک آزمایشی" else "جسی • پیامک بانکی جدید")
             .setContentText("یک $type جدید منتظر ثبت یا نادیده گرفتن است")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)

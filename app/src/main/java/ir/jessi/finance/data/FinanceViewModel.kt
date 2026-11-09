@@ -8,6 +8,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ir.jessi.finance.sms.SmsReviewNotifications
+import ir.jessi.finance.sms.BankSmsParser
+import java.util.UUID
+import kotlinx.coroutines.withContext
 
 class FinanceViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = FinanceDatabase.get(application).dao()
@@ -47,6 +50,40 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         dao.approveReview(row.id, accountId, category, note, unitChoice)
         SmsReviewNotifications.cancel(getApplication(), row.id)
     }
+    fun simulateSms(raw: String, sender: String, onComplete: (String) -> Unit) =
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = BankSmsParser.parse(raw, sender)
+            val report = if (result == null) {
+                "این متن تراکنش بانکی تشخیص داده نشد"
+            } else {
+                try {
+                    // The sample body and actual account number are NEVER written to the database.
+                    val row = SmsReview(
+                        sender = "آزمایشی • بدون ثبت مالی",
+                        amountToman = result.amountToman,
+                        kind = result.kind,
+                        receivedAt = System.currentTimeMillis(),
+                        fingerprint = "JESSI_TEST_" + UUID.randomUUID().toString(),
+                        accountGuess = null,
+                        amountRaw = result.amountRaw,
+                        amountUnit = result.amountUnit,
+                        bankName = result.bankName
+                    )
+                    val id = dao.enqueueReview(row)
+                    if (id > 0L) {
+                        val notified = SmsReviewNotifications.show(
+                            getApplication(), id, result.kind, isTest = true
+                        )
+                        if (notified) "نمونه آزمایشی به صف رفت و اعلان ارسال شد"
+                        else "نمونه آزمایشی به صف رفت، اما نمایش اعلان مسدود است"
+                    } else "این نمونه قبلاً در صف ثبت شده"
+                } catch (_: Exception) {
+                    "خطا هنگام ثبت نمونه آزمایشی در صف"
+                }
+            }
+            withContext(Dispatchers.Main) { onComplete(report) }
+        }
+
     fun dismissReview(id: Long) = viewModelScope.launch(Dispatchers.IO) {
         dao.ignoreReview(id)
         SmsReviewNotifications.cancel(getApplication(), id)

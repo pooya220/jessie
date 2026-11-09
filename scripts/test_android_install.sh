@@ -3,18 +3,18 @@ set -euo pipefail
 APK="app/build/outputs/apk/signed/Jessi.apk"
 echo "=== Android API ==="
 adb shell getprop ro.build.version.sdk
-echo "=== Installing previous official v0.7.0 APK ==="
-OLD_APK="/tmp/jessi-previous-0.7.0.apk"
+echo "=== Installing previous official v0.7.1 APK ==="
+OLD_APK="/tmp/jessi-previous-0.7.1.apk"
 curl --fail --location --retry 3 --retry-delay 2 --silent --show-error \
-  "https://github.com/pooya220/jessie/releases/download/v0.7.0/Jessi-v0.7.0.apk" \
+  "https://github.com/pooya220/jessie/releases/download/v0.7.1/Jessi-v0.7.1.apk" \
   -o "$OLD_APK"
 test -s "$OLD_APK"
 adb install -r "$OLD_APK"
 adb shell am start -n ir.jessi.finance/.MainActivity
 sleep 3
-echo "=== Updating without uninstalling to Jessie v0.7.1 ==="
+echo "=== Updating without uninstalling to Jessie v0.8.0 ==="
 adb install -r "$APK"
-adb shell dumpsys package ir.jessi.finance | grep 'versionCode=12' | head -1
+adb shell dumpsys package ir.jessi.finance | grep 'versionCode=13' | head -1
 echo "=== Verifying installed package ==="
 adb shell pm path ir.jessi.finance | grep -F 'package:'
 echo "=== Granting SMS and notification permissions for deterministic emulator startup ==="
