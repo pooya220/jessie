@@ -39,7 +39,7 @@ object Jalali {
 
 fun accountBalance(accountId: Long, initial: Long, transactions: List<Transaction>): Long =
     transactions.filter { it.accountId == accountId }.fold(initial) { balance, tx ->
-        balance + (if (tx.kind in setOf("IN", "TRANSFER_IN", "DEBT_IN")) tx.amountToman else -tx.amountToman)
+        balance + (if (tx.kind in setOf("IN", "TRANSFER_IN", "DEBT_IN", "GOAL_IN")) tx.amountToman else -tx.amountToman)
     }
 
 val incomeCategories = listOf("درآمد", "حقوق", "هدیه", "بازگشت وجه", "سایر")

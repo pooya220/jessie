@@ -19,6 +19,10 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     val debts = dao.watchDebts().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val budgets = dao.watchBudgets().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val reviews = dao.watchReviews().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val goals = dao.watchGoals().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val goalMovements = dao.watchGoalMovements().stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
+    )
 
     fun saveAccount(row: Account) = viewModelScope.launch(Dispatchers.IO) {
         if (row.id == 0L) dao.insertAccount(row) else dao.updateAccount(row)
@@ -46,6 +50,43 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         if (row.id == 0L) dao.insertBudget(row) else dao.updateBudget(row)
     }
     fun deleteBudget(id: Long) = viewModelScope.launch(Dispatchers.IO) { dao.deleteBudget(id) }
+    fun saveGoal(row: SavingsGoal, onComplete: (Boolean) -> Unit) =
+        viewModelScope.launch(Dispatchers.IO) {
+            val ok = try {
+                require(row.title.isNotBlank() && row.title.length <= 120)
+                require(row.targetToman in 0L..100_000_000_000L)
+                require(row.monthlyToman in 0L..100_000_000_000L)
+                require(row.targetToman > 0L || row.monthlyToman > 0L)
+                if (row.id == 0L) dao.insertGoal(row) > 0L
+                else { dao.updateGoal(row); true }
+            } catch (_: Exception) { false }
+            withContext(Dispatchers.Main) { onComplete(ok) }
+        }
+
+    fun moveGoalMoney(
+        goalId: Long, accountId: Long, amountToman: Long, operation: String,
+        onComplete: (Boolean) -> Unit
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        val ok = try { dao.moveGoalMoney(goalId, accountId, amountToman, operation) }
+            catch (_: Exception) { false }
+        withContext(Dispatchers.Main) { onComplete(ok) }
+    }
+
+    fun setGoalArchive(id: Long, archived: Boolean, onComplete: (Boolean) -> Unit) =
+        viewModelScope.launch(Dispatchers.IO) {
+            val ok = try {
+                if (archived) dao.archiveGoalIfEmpty(id)
+                else dao.setGoalArchived(id, false) > 0
+            } catch (_: Exception) { false }
+            withContext(Dispatchers.Main) { onComplete(ok) }
+        }
+
+    fun deleteEmptyGoal(id: Long, onComplete: (Boolean) -> Unit) =
+        viewModelScope.launch(Dispatchers.IO) {
+            val ok = try { dao.deleteUnusedGoal(id) > 0 } catch (_: Exception) { false }
+            withContext(Dispatchers.Main) { onComplete(ok) }
+        }
+
     fun acceptReview(
         row: SmsReview, accountId: Long, category: String, note: String,
         unitChoice: String, onResult: (Boolean) -> Unit
