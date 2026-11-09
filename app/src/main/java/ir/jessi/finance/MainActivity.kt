@@ -1311,9 +1311,9 @@ private fun FinanceSectionHero(
     val highlight = if (accent == Color.Unspecified) mint else accent
     val shape = RoundedCornerShape(22.dp)
     val gradient = if (dark) Brush.linearGradient(
-        listOf(highlight.copy(alpha = .30f).compositeOver(Color(0xFF101936)), Color(0xFF252359), Color(0xFF30214F))
+        listOf(Color(0xFF172E50), Color(0xFF252359), Color(0xFF30214F))
     ) else Brush.linearGradient(
-        listOf(highlight.copy(alpha = .13f).compositeOver(Color.White), Color(0xFFF1F7FA), Color(0xFFF4F0FD))
+        listOf(Color(0xFFE9F5F3), Color(0xFFF1F7FA), Color(0xFFF4F0FD))
     )
     Column(
         Modifier.fillMaxWidth().clip(shape).background(gradient)
