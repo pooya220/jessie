@@ -93,15 +93,81 @@ interface FinanceDao {
     @Query("SELECT * FROM budgets") suspend fun getBudgets(): List<Budget>
     @Query("SELECT * FROM sms_reviews") suspend fun getSmsReviews(): List<SmsReview>
     @Query("SELECT * FROM sms_ignored") suspend fun getIgnoredSms(): List<IgnoredSms>
+    @Query("SELECT * FROM savings_goals ORDER BY createdAt DESC, id DESC")
+    fun watchGoals(): Flow<List<SavingsGoal>>
+    @Query("SELECT * FROM goal_movements ORDER BY createdAt DESC, id DESC")
+    fun watchGoalMovements(): Flow<List<GoalMovement>>
+    @Query("SELECT * FROM savings_goals") suspend fun getGoals(): List<SavingsGoal>
+    @Query("SELECT * FROM goal_movements") suspend fun getGoalMovements(): List<GoalMovement>
+    @Query("SELECT * FROM savings_goals WHERE id = :id LIMIT 1")
+    suspend fun findGoal(id: Long): SavingsGoal?
+    @Query("SELECT IFNULL(SUM(CASE WHEN operation='DEPOSIT' THEN amountToman ELSE -amountToman END),0) FROM goal_movements WHERE goalId=:id")
+    suspend fun goalBalance(id: Long): Long
+    @Query("SELECT openingToman + IFNULL((SELECT SUM(CASE WHEN kind IN ('IN','TRANSFER_IN','DEBT_IN','GOAL_IN') THEN amountToman ELSE -amountToman END) FROM transactions WHERE accountId=accounts.id),0) FROM accounts WHERE id=:accountId")
+    suspend fun availableInAccount(accountId: Long): Long?
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertGoal(goal: SavingsGoal): Long
+    @Update suspend fun updateGoal(goal: SavingsGoal)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertGoalMovement(movement: GoalMovement): Long
+    @Query("SELECT COUNT(*) FROM goal_movements WHERE goalId=:id")
+    suspend fun goalMovementCount(id: Long): Int
+    @Query("DELETE FROM savings_goals WHERE id=:id AND NOT EXISTS(SELECT 1 FROM goal_movements WHERE goalId=:id)")
+    suspend fun deleteUnusedGoal(id: Long): Int
+    @Query("UPDATE savings_goals SET archived=:archived WHERE id=:id")
+    suspend fun setGoalArchived(id: Long, archived: Boolean): Int
+
+    /** Each deposit/withdrawal is one atomic transfer between bank money and goal pot. */
+    @androidx.room.Transaction
+    suspend fun moveGoalMoney(
+        goalId: Long, accountId: Long, amountToman: Long, operation: String
+    ): Boolean {
+        require(amountToman in 1L..100_000_000_000L)
+        require(operation == "DEPOSIT" || operation == "WITHDRAW")
+        val goal = findGoal(goalId) ?: return false
+        if (goal.archived) return false
+        if (operation == "DEPOSIT") {
+            val available = availableInAccount(accountId) ?: return false
+            if (available < amountToman) return false
+        } else {
+            if (goalBalance(goalId) < amountToman) return false
+            if (availableInAccount(accountId) == null) return false
+        }
+        val now = System.currentTimeMillis()
+        val bankKind = if (operation == "DEPOSIT") "GOAL_OUT" else "GOAL_IN"
+        val label = if (operation == "DEPOSIT") "پس‌انداز برای «${goal.title}»"
+            else "برگشت پس‌انداز «${goal.title}»"
+        val transactionId = insertTransaction(Transaction(
+            accountId = accountId, amountToman = amountToman, kind = bankKind,
+            category = if (operation == "DEPOSIT") "پس‌انداز هدف" else "برداشت از هدف",
+            note = label, source = "GOAL", createdAt = now
+        ))
+        check(transactionId > 0L)
+        insertGoalMovement(GoalMovement(
+            goalId = goalId, accountId = accountId, transactionId = transactionId,
+            amountToman = amountToman, operation = operation, createdAt = now
+        ))
+        return true
+    }
+
+    @androidx.room.Transaction
+    suspend fun archiveGoalIfEmpty(id: Long): Boolean {
+        if (findGoal(id) == null || goalBalance(id) != 0L) return false
+        return setGoalArchived(id, true) > 0
+    }
 
     // Restore only after a fully validated backup and explicit confirmation.
     // The caller encloses these in a single Room transaction for rollback on failure.
+    @Query("DELETE FROM goal_movements") suspend fun clearAllGoalMovements()
+    @Query("DELETE FROM savings_goals") suspend fun clearAllGoals()
     @Query("DELETE FROM transactions") suspend fun clearAllTransactions()
     @Query("DELETE FROM sms_reviews") suspend fun clearAllSmsReviews()
     @Query("DELETE FROM sms_ignored") suspend fun clearAllIgnoredSms()
     @Query("DELETE FROM budgets") suspend fun clearAllBudgets()
     @Query("DELETE FROM debts") suspend fun clearAllDebts()
     @Query("DELETE FROM accounts") suspend fun clearAllAccounts()
+    @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun restoreGoals(rows: List<SavingsGoal>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun restoreGoalMovements(rows: List<GoalMovement>)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun restoreAccounts(rows: List<Account>)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun restoreTransactions(rows: List<Transaction>)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun restoreDebts(rows: List<Debt>)
@@ -184,7 +250,11 @@ interface FinanceDao {
     }
 }
 
-@Database(entities = [Account::class, Transaction::class, Debt::class, Budget::class, SmsReview::class, IgnoredSms::class], version = 4, exportSchema = false)
+@Database(
+    entities = [Account::class, Transaction::class, Debt::class, Budget::class,
+        SmsReview::class, IgnoredSms::class, SavingsGoal::class, GoalMovement::class],
+    version = 5, exportSchema = false
+)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun dao(): FinanceDao
     companion object {
@@ -206,10 +276,41 @@ abstract class FinanceDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `sms_reviews` ADD COLUMN `bankName` TEXT NOT NULL DEFAULT ''")
             }
         }
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `savings_goals` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `title` TEXT NOT NULL, `category` TEXT NOT NULL,
+                        `targetToman` INTEGER NOT NULL,
+                        `monthlyToman` INTEGER NOT NULL,
+                        `deadlineJalali` TEXT NOT NULL,
+                        `note` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `archived` INTEGER NOT NULL DEFAULT 0
+                    )"""
+                )
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `goal_movements` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `goalId` INTEGER NOT NULL, `accountId` INTEGER NOT NULL,
+                        `transactionId` INTEGER NOT NULL,
+                        `amountToman` INTEGER NOT NULL,
+                        `operation` TEXT NOT NULL, `createdAt` INTEGER NOT NULL,
+                        FOREIGN KEY(`goalId`) REFERENCES `savings_goals`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_goal_movements_goalId` ON `goal_movements`(`goalId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_goal_movements_accountId` ON `goal_movements`(`accountId`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_goal_movements_transactionId` ON `goal_movements`(`transactionId`)")
+            }
+        }
         @Volatile private var instance: FinanceDatabase? = null
         fun get(context: Context): FinanceDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, FinanceDatabase::class.java, "jessi_finance.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build().also { instance = it }
         }
     }
