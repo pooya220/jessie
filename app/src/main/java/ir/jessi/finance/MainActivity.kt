@@ -146,13 +146,16 @@ class MainActivity : ComponentActivity() {
 
 private enum class Tab(val label: String, val icon: String) {
     HOME("خانه", "⌂"), DEBTS("اقساط", "⇆"),
-    BUDGETS("بودجه", "◉"), TXS("تراکنش‌ها", "≋"), ACCOUNTS("حساب‌ها", "▣")
+    GOALS("اهداف", "◈"), BUDGETS("بودجه", "◉"),
+    TXS("تراکنش‌ها", "≋"), ACCOUNTS("حساب‌ها", "▣")
 }
 private sealed interface Editor {
     data class AccountForm(val value: Account? = null) : Editor
     data class TxForm(val value: Transaction? = null) : Editor
     data class DebtForm(val value: Debt? = null) : Editor
     data class BudgetForm(val value: Budget? = null) : Editor
+    data class GoalForm(val value: SavingsGoal? = null) : Editor
+    data class GoalMoney(val goal: SavingsGoal, val operation: String) : Editor
     data class Repay(val value: Debt) : Editor
     data class Review(val value: SmsReview) : Editor
     data class Delete(val title: String, val action: () -> Unit) : Editor
@@ -165,6 +168,8 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
     val debts by vm.debts.collectAsState()
     val budgets by vm.budgets.collectAsState()
     val reviews by vm.reviews.collectAsState()
+    val goals by vm.goals.collectAsState()
+    val goalMovements by vm.goalMovements.collectAsState()
     val context = LocalContext.current
     val settings = remember(context) { context.getSharedPreferences("jessi_finance_settings", android.content.Context.MODE_PRIVATE) }
     var periodMode by remember { mutableStateOf(settings.getString("period_mode", FinancePeriodEngine.MONTHLY) ?: FinancePeriodEngine.MONTHLY) }
@@ -360,6 +365,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                         Tab.BUDGETS -> Icons.Outlined.PieChartOutline
                         Tab.TXS -> Icons.Outlined.ReceiptLong
                         Tab.ACCOUNTS -> Icons.Outlined.AccountBalanceWallet
+                        Tab.GOALS -> Icons.Outlined.Savings
                     }
                     val accent = when (item) {
                         Tab.HOME -> mint
@@ -367,12 +373,13 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                         Tab.TXS -> financeBlue
                         Tab.DEBTS -> financePurple
                         Tab.BUDGETS -> financeAmber
+                        Tab.GOALS -> financePurple
                     }
                     NavigationBarItem(
                         selected = tab == item,
                         onClick = { tabName = item.name; showSettings = false },
                         icon = { Icon(navigationIcon, contentDescription = item.label, modifier = Modifier.size(22.dp)) },
-                        label = { Text(item.label, fontSize = 10.sp, maxLines = 1) },
+                        label = { Text(item.label, fontSize = 9.sp, maxLines = 1) },
                         alwaysShowLabel = true,
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = accent, selectedTextColor = accent,
@@ -391,6 +398,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                         Tab.TXS -> Editor.TxForm()
                         Tab.DEBTS -> Editor.DebtForm()
                         Tab.BUDGETS -> Editor.BudgetForm()
+                        Tab.GOALS -> Editor.GoalForm()
                         Tab.HOME -> null
                     }
                 }, containerColor = when (tab) {
@@ -398,6 +406,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                     Tab.TXS -> financeBlue
                     Tab.DEBTS -> financePurple
                     Tab.BUDGETS -> financeAmber
+                    Tab.GOALS -> financePurple
                     else -> mint
                 }) {
                     Icon(Icons.Outlined.Add, contentDescription = "افزودن",
@@ -520,21 +529,23 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                     }
                 )
             } else {
-            PeriodSwitcher(
-                mode = periodMode, period = chosenPeriod, selectedIndex = selectedIndex,
-                count = periods.size,
-                salaryAvailable = txs.any { it.kind == "IN" && it.category == "حقوق" },
-                onModeChange = {
-                    periodMode = it
-                    periodOffset = 0
-                    settings.edit().putString("period_mode", it).apply()
-                },
-                onPrevious = { periodOffset = (selectedIndex + 1).coerceAtMost(periods.lastIndex) },
-                onNext = { periodOffset = (selectedIndex - 1).coerceAtLeast(0) }
-            )
+            if (tab != Tab.GOALS) {
+                PeriodSwitcher(
+                    mode = periodMode, period = chosenPeriod, selectedIndex = selectedIndex,
+                    count = periods.size,
+                    salaryAvailable = txs.any { it.kind == "IN" && it.category == "حقوق" },
+                    onModeChange = {
+                        periodMode = it
+                        periodOffset = 0
+                        settings.edit().putString("period_mode", it).apply()
+                    },
+                    onPrevious = { periodOffset = (selectedIndex + 1).coerceAtMost(periods.lastIndex) },
+                    onNext = { periodOffset = (selectedIndex - 1).coerceAtLeast(0) }
+                )
+            }
             when (tab) {
                 Tab.HOME -> Dashboard(
-                    accounts, txs, debts, budgets, reviews,
+                    accounts, txs, debts, budgets, reviews, goals, goalMovements,
                     currentPeriod = chosenPeriod, periods = periods, selectedPeriodIndex = selectedIndex,
                     nowEpoch = nowEpoch,
                     smsPermitted = smsPermitted,
@@ -565,6 +576,31 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                     onEdit = { editor = Editor.DebtForm(it) },
                     onPay = { editor = Editor.Repay(it) },
                     onDelete = { row -> editor = Editor.Delete("این بدهی یا طلب حذف شود؟") { vm.deleteDebt(row.id) } }
+                )
+                Tab.GOALS -> SavingsGoalsScreen(
+                    goals = goals, movements = goalMovements, accounts = accounts,
+                    nowEpoch = nowEpoch, dark = darkMode,
+                    onAdd = { editor = Editor.GoalForm() },
+                    onEdit = { editor = Editor.GoalForm(it) },
+                    onDeposit = { editor = Editor.GoalMoney(it, "DEPOSIT") },
+                    onWithdraw = { editor = Editor.GoalMoney(it, "WITHDRAW") },
+                    onArchive = { goal ->
+                        vm.setGoalArchive(goal.id, !goal.archived) { ok ->
+                            Toast.makeText(context, if (ok) {
+                                if (goal.archived) "هدف از آرشیو بازگردانده شد" else "هدف بایگانی شد"
+                            } else "برای بایگانی اول موجودی هدف را به حساب برگردان",
+                                Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    onDelete = { goal ->
+                        editor = Editor.Delete("هدف «${goal.title}» حذف شود؟") {
+                            vm.deleteEmptyGoal(goal.id) { ok ->
+                                Toast.makeText(context, if (ok) "هدف حذف شد"
+                                else "هدفِ دارای سابقه مالی قابل حذف نیست؛ بایگانی‌اش کن",
+                                    Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
                 )
                 Tab.BUDGETS -> BudgetsPage(budgets, periodTransactions,
                     onEdit = { editor = Editor.BudgetForm(it) },
@@ -625,6 +661,43 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
         is Editor.TxForm -> TransactionDialog(e.value, accounts, dismiss = { editor = null }, onSave = { vm.saveTransaction(it); editor = null }, onTransfer = { a, b, amount, note -> vm.transfer(a,b,amount,note); editor = null })
         is Editor.DebtForm -> DebtDialog(e.value, dismiss = { editor = null }) { vm.saveDebt(it); editor = null }
         is Editor.BudgetForm -> BudgetDialog(e.value, budgets, dismiss = { editor = null }) { vm.saveBudget(it); editor = null }
+        is Editor.GoalForm -> SavingsGoalFormDialog(
+            initial = e.value,
+            onDismiss = { editor = null },
+            onSave = { goal ->
+                vm.saveGoal(goal) { ok ->
+                    if (ok) {
+                        editor = null
+                        tabName = Tab.GOALS.name
+                        showSettings = false
+                        Toast.makeText(context, "هدف پس‌انداز ذخیره شد", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "خطا در ذخیره هدف؛ مقادیر را بررسی کن",
+                            Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        )
+        is Editor.GoalMoney -> GoalMoneyDialog(
+            goal = e.goal, operation = e.operation, accounts = accounts,
+            transactions = txs,
+            currentGoalBalance = SavingsGoalMath.saved(goalMovements, e.goal.id),
+            onDismiss = { editor = null },
+            onSubmit = { amount, accountId, finished ->
+                vm.moveGoalMoney(e.goal.id, accountId, amount, e.operation) { ok ->
+                    finished(ok)
+                    Toast.makeText(context,
+                        if (ok) "جابجایی با موفقیت ثبت شد؛ هزینه یا درآمد محسوب نمی‌شود"
+                        else "واریز/برداشت انجام نشد؛ مانده‌ها را بررسی کن",
+                        Toast.LENGTH_LONG).show()
+                    if (ok) {
+                        editor = null
+                        tabName = Tab.GOALS.name
+                        showSettings = false
+                    }
+                }
+            }
+        )
         is Editor.Repay -> RepayDialog(e.value, accounts, dismiss = { editor = null }) { amount, accountId -> vm.settleDebt(e.value, amount, accountId); editor = null }
         is Editor.Review -> ReviewDialog(
             e.value, accounts,
@@ -1122,6 +1195,7 @@ private fun isThisMonth(epoch: Long): Boolean = Jalali.of(epoch).monthKey == Jal
 @Composable
 private fun Dashboard(
     accounts: List<Account>, txs: List<Transaction>, debts: List<Debt>, budgets: List<Budget>, reviews: List<SmsReview>,
+    goals: List<SavingsGoal>, goalMovements: List<GoalMovement>,
     currentPeriod: FinancePeriod, periods: List<FinancePeriod>, selectedPeriodIndex: Int, nowEpoch: Long,
     smsPermitted: Boolean, requestPermission: () -> Unit,
     notificationsPermitted: Boolean, requestNotificationPermission: () -> Unit,
@@ -1197,8 +1271,36 @@ private fun Dashboard(
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
         DashboardAction(Icons.Outlined.AddCircleOutline, "تراکنش جدید", Modifier.weight(1f), onNewTx)
         DashboardAction(Icons.Outlined.EventNote, "اقساط و بدهی", Modifier.weight(1f)) { onSelectTab(Tab.DEBTS) }
+        DashboardAction(Icons.Outlined.Savings, "بانک اهداف", Modifier.weight(1f)) { onSelectTab(Tab.GOALS) }
         DashboardAction(Icons.Outlined.AccountBalanceWallet, "حساب‌ها", Modifier.weight(1f)) { onSelectTab(Tab.ACCOUNTS) }
-        DashboardAction(Icons.Outlined.BarChart, "گزارش‌ها", Modifier.weight(1f)) { onSelectTab(Tab.BUDGETS) }
+    }
+
+    val savedForGoals = goals.sumOf { SavingsGoalMath.saved(goalMovements, it.id) }
+    Tile(Modifier.fillMaxWidth(), accent = financePurple) {
+        Row(verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            FinanceIconTile(Icons.Outlined.Savings, financePurple)
+            Column(Modifier.weight(1f)) {
+                Text("بانک اهداف", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("دانشگاه، خرید و پس‌انداز ماهانه",
+                    color = muted, fontSize = 11.sp)
+            }
+            TextButton(onClick = { onSelectTab(Tab.GOALS) }) {
+                Text("مشاهده")
+                Icon(Icons.Outlined.ChevronLeft, contentDescription = null,
+                    modifier = Modifier.size(16.dp))
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("پس‌انداز کنارگذاشته‌شده", modifier = Modifier.weight(1f),
+                color = muted, fontSize = 11.sp)
+            Text(if (balanceVisible) toman(savedForGoals) else "••••••",
+                fontWeight = FontWeight.ExtraBold, color = financePurple, fontSize = 15.sp)
+        }
+        Text(
+            "این مبلغ جدا از مانده حساب‌هاست و به عنوان هزینه حساب نمی‌شود.",
+            color = muted, fontSize = 10.sp
+        )
     }
 
     val nextDebt = debts.asSequence()
@@ -1550,7 +1652,8 @@ private fun TransactionsPage(txs: List<Transaction>, accounts: List<Account>, on
         TransactionTile(
             row, accounts, txs,
             if (row.kind in listOf("IN", "OUT")) ({ onEdit(row) }) else null,
-            if (row.kind in listOf("DEBT_IN", "DEBT_OUT")) null else ({ onDelete(row) })
+            if (row.kind in listOf("DEBT_IN", "DEBT_OUT", "GOAL_IN", "GOAL_OUT"))
+                null else ({ onDelete(row) })
         )
     }
 }
@@ -1560,20 +1663,24 @@ private fun TransactionTile(
     row: Transaction, accounts: List<Account>, txs: List<Transaction>,
     edit: (() -> Unit)?, delete: (() -> Unit)?
 ) {
-    val credit = row.kind in listOf("IN", "DEBT_IN")
-    val transfer = row.kind == "TRANSFER_OUT"
+    val credit = row.kind in listOf("IN", "DEBT_IN", "GOAL_IN")
+    val transfer = row.kind == "TRANSFER_OUT" || row.kind == "GOAL_OUT" || row.kind == "GOAL_IN"
     val transferTarget = if (transfer) txs.firstOrNull {
         it.groupId == row.groupId && it.kind == "TRANSFER_IN"
     }?.accountId else null
     val description = if (transferTarget != null)
         "انتقال به " + (accounts.firstOrNull { it.id == transferTarget }?.title ?: "حساب دیگر")
+    else if (row.kind == "GOAL_OUT") "کنارگذاشتن برای هدف"
+    else if (row.kind == "GOAL_IN") "بازگشت پول از هدف"
     else row.category
     val tone = when {
+        row.kind in listOf("GOAL_OUT", "GOAL_IN") -> financePurple
         transfer -> financeBlue
         credit -> financeAqua
         else -> danger
     }
     val icon = when {
+        row.kind in listOf("GOAL_OUT", "GOAL_IN") -> Icons.Outlined.Savings
         transfer -> Icons.Outlined.SwapHoriz
         credit -> Icons.Outlined.SouthWest
         else -> Icons.Outlined.NorthEast
@@ -1594,7 +1701,8 @@ private fun TransactionTile(
                 Text((if (credit) "+" else "−") + toman(row.amountToman),
                     color = tone, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
                     maxLines = 1)
-                Text(if (transfer) "انتقال" else if (credit) "ورودی" else "خروجی",
+                Text(if (row.kind in listOf("GOAL_OUT", "GOAL_IN")) "بانک اهداف"
+                    else if (transfer) "انتقال" else if (credit) "ورودی" else "خروجی",
                     color = muted, fontSize = 10.sp)
             }
         }
