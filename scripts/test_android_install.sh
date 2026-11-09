@@ -17,7 +17,11 @@ adb install -r "$APK"
 adb shell dumpsys package ir.jessi.finance | grep 'versionCode=12' | head -1
 echo "=== Verifying installed package ==="
 adb shell pm path ir.jessi.finance | grep -F 'package:'
-echo "=== Starting Jessie main activity ==="
+echo "=== Granting SMS and notification permissions for deterministic emulator startup ==="
+adb shell pm grant ir.jessi.finance android.permission.RECEIVE_SMS
+adb shell pm grant ir.jessi.finance android.permission.POST_NOTIFICATIONS
+adb shell am force-stop ir.jessi.finance
+echo "=== Starting Jessie main activity after permission onboarding ==="
 adb logcat -c
 adb shell am start -W -n ir.jessi.finance/.MainActivity
 sleep 8
