@@ -43,6 +43,22 @@ class BankSmsParserTest {
         assertEquals(BankSmsParser.UNKNOWN, r?.amountUnit)
     }
 
+    @Test fun newerSinaMessageUsesDebitNotRemainingBalance() {
+        val body = """
+            بانک سينا
+            برداشت از ‪412-700-4365673-1‬
+            مبلغ  1,000,000 ريال
+            مانده 2,819,181 ريال
+            زمان : 1405/8/18 ; 13:20:08
+        """.trimIndent()
+        val result = BankSmsParser.parse(body, "BANK-SINA")
+        assertNotNull(result)
+        assertEquals(100_000L, result?.amountToman)
+        assertEquals("OUT", result?.kind)
+        assertEquals(BankSmsParser.RIAL, result?.amountUnit)
+        assertEquals("بانک سینا", result?.bankName)
+    }
+
     @Test fun sinaWithArabicYehParsesDebit() {
         val sms = """
             بانک سينا

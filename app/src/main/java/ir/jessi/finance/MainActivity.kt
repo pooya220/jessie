@@ -4,10 +4,12 @@ import android.Manifest
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings as AndroidSettings
+import android.widget.Toast
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Build
 import ir.jessi.finance.sms.SmsReviewNotifications
+import ir.jessi.finance.sms.SmsDiagnostics
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -160,6 +162,13 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
         mutableStateOf(settings.getBoolean("sms_review_notifications_enabled", true))
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var diagnosticRefresh by remember { mutableIntStateOf(0) }
+    val currentDiagnostic = remember(nowEpoch, showSettings, diagnosticRefresh) {
+        SmsDiagnostics.summary(context)
+    }
+    val notificationBlocker = remember(nowEpoch, showSettings, diagnosticRefresh) {
+        SmsReviewNotifications.blockedReason(context)
+    }
 
     val periods = remember(txs, periodMode, nowEpoch) { FinancePeriodEngine.periods(txs, periodMode, nowEpoch) }
     val selectedIndex = periodOffset.coerceIn(0, (periods.size - 1).coerceAtLeast(0))
@@ -371,6 +380,38 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                             Uri.parse("package:${context.packageName}")
                         ))
                     },
+                    diagnosticSummary = currentDiagnostic,
+                    notificationBlocker = notificationBlocker,
+                    pendingReviews = reviews.size,
+                    onTestNotification = {
+                        val posted = SmsReviewNotifications.showTest(context)
+                        diagnosticRefresh++
+                        Toast.makeText(context,
+                            if (posted) "اعلان تست ارسال شد؛ پنل اعلان‌ها را بررسی کن"
+                            else "اعلان مسدود است؛ دسترسی و کانال اعلان را بررسی کن",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    },
+                    onResendPending = {
+                        var sent = 0
+                        reviews.take(10).forEach {
+                            if (SmsReviewNotifications.show(context, it.id, it.kind)) sent++
+                        }
+                        diagnosticRefresh++
+                        Toast.makeText(context,
+                            "اعلان برای " + sent + " تراکنش در انتظار ارسال شد",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    },
+                    onNotificationSettings = {
+                        SmsReviewNotifications.ensureChannel(context)
+                        val i = Intent(AndroidSettings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                            putExtra(AndroidSettings.EXTRA_APP_PACKAGE, context.packageName)
+                            putExtra(AndroidSettings.EXTRA_CHANNEL_ID, SmsReviewNotifications.CHANNEL_ID)
+                        }
+                        context.startActivity(i)
+                    },
+                    onRefreshDiagnostics = { diagnosticRefresh++ },
                     versionName = remember(context, installedVersion) {
                         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "نامشخص"
                     }
@@ -454,7 +495,13 @@ private fun SettingsPage(
     periodMode: String, onPeriodChange: (String) -> Unit,
     smsPermitted: Boolean, notificationsPermitted: Boolean,
     onSmsPermission: () -> Unit, onNotificationPermission: () -> Unit,
-    onSystemSettings: () -> Unit, versionName: String
+    onSystemSettings: () -> Unit,
+    diagnosticSummary: String, notificationBlocker: String?, pendingReviews: Int,
+    onTestNotification: () -> Unit,
+    onResendPending: () -> Unit,
+    onNotificationSettings: () -> Unit,
+    onRefreshDiagnostics: () -> Unit,
+    versionName: String
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
         Column(Modifier.padding(vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -519,6 +566,35 @@ private fun SettingsPage(
                 Spacer(Modifier.width(7.dp))
                 Text("مدیریت مجوزها در تنظیمات اندروید")
             }
+        }
+
+        Tile(Modifier.fillMaxWidth()) {
+            SettingsGroupTitle(Icons.Outlined.BugReport, "عیب‌یابی دریافت پیامک")
+            Text("وضعیت اعلان: " + (notificationBlocker ?: "مجوز و کانال اعلان فعال است"),
+                fontSize = 12.sp, color = if (notificationBlocker == null) mint else danger)
+            Text("وضعیت آخرین پیامک در جسی:", fontWeight = FontWeight.Medium, fontSize = 12.sp)
+            Text(diagnosticSummary, fontSize = 11.sp, color = muted, lineHeight = 17.sp)
+            Text("پیامک‌های منتظر بررسی: " + digitsFa(pendingReviews.toString()),
+                fontSize = 12.sp, color = muted)
+            OutlinedButton(onClick = onTestNotification, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Outlined.NotificationsActive, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("ارسال اعلان آزمایشی")
+            }
+            OutlinedButton(
+                onClick = onResendPending, enabled = pendingReviews > 0,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Outlined.Replay, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("اعلان دوباره برای پیامک‌های منتظر")
+            }
+            TextButton(onClick = onNotificationSettings) {
+                Text("تنظیمات کانال اعلان پیامک در اندروید")
+            }
+            TextButton(onClick = onRefreshDiagnostics) { Text("به‌روزرسانی وضعیت") }
+            Text("این عیب‌یابی متن پیامک، شماره حساب یا مبلغ رو ذخیره نمی‌کنه.",
+                color = muted, fontSize = 10.sp)
         }
 
         Tile(Modifier.fillMaxWidth()) {

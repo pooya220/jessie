@@ -14,24 +14,45 @@ import androidx.core.content.ContextCompat
 import ir.jessi.finance.MainActivity
 import ir.jessi.finance.R
 
-/** No bank amount, sender, or SMS content is shown on the lock screen. */
+/** Shows a review prompt without leaking amount, sender or SMS text on the lock screen. */
 object SmsReviewNotifications {
     const val EXTRA_REVIEW_ID = "ir.jessi.finance.EXTRA_REVIEW_ID"
     const val ACTION_IGNORE = "ir.jessi.finance.IGNORE_SMS_REVIEW"
-    private const val CHANNEL_ID = "sms_review_v1"
+    const val CHANNEL_ID = "sms_review_v1"
+    private const val TEST_ID = 9824121
 
-    fun show(context: Context, reviewId: Long, kind: String) {
-        val preferences = context.getSharedPreferences("jessi_finance_settings", Context.MODE_PRIVATE)
-        if (!preferences.getBoolean("sms_review_notifications_enabled", true)) return
+    fun ensureChannel(context: Context) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_ID, "بررسی پیامک‌های بانکی", NotificationManager.IMPORTANCE_HIGH
+            ).apply { description = "ثبت یا نادیده گرفتن پیامک‌های بانکی جدید" }
+        )
+    }
+
+    /** A granted POST_NOTIFICATIONS permission alone does not imply this channel can alert. */
+    fun blockedReason(context: Context): String? {
+        val prefs = context.getSharedPreferences("jessi_finance_settings", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("sms_review_notifications_enabled", true))
+            return "اعلان در تنظیمات جسی غیرفعال است"
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) return
+        ) return "مجوز اعلان اندروید تأیید نشده"
+        val manager = context.getSystemService(NotificationManager::class.java)
+        if (!manager.areNotificationsEnabled()) return "اعلان‌های جسی در تنظیمات گوشی مسدود شده"
+        val channel = manager.getNotificationChannel(CHANNEL_ID)
+        if (channel?.importance == NotificationManager.IMPORTANCE_NONE)
+            return "کانال اعلان پیامک بانکی غیرفعال است"
+        return null
+    }
+
+    /** Returns whether Android accepted the notification posting, not whether it was seen. */
+    fun show(context: Context, reviewId: Long, kind: String): Boolean {
+        if (blockedReason(context) != null) return false
+        ensureChannel(context)
+        if (blockedReason(context) != null) return false
 
         val manager = context.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(NotificationChannel(
-            CHANNEL_ID, "بررسی پیامک‌های بانکی", NotificationManager.IMPORTANCE_HIGH
-        ).apply { description = "ثبت یا نادیده گرفتن پیامک‌های بانکی جدید" })
-
         val openIntent = Intent(context, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
             data = Uri.parse("jessi://sms-review/$reviewId")
@@ -60,6 +81,33 @@ object SmsReviewNotifications {
             .addAction(0, "ثبت و دسته‌بندی", open)
             .addAction(0, "نادیده گرفتن", ignore)
             .build())
+        return true
+    }
+
+    /** Independent notification test, never creates a financial transaction or fake SMS. */
+    fun showTest(context: Context): Boolean {
+        if (blockedReason(context) != null) return false
+        ensureChannel(context)
+        if (blockedReason(context) != null) return false
+        val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        val open = PendingIntent.getActivity(
+            context, TEST_ID,
+            Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }, flags
+        )
+        context.getSystemService(NotificationManager::class.java).notify(
+            TEST_ID, NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_stat_jessi)
+                .setContentTitle("جسی • تست اعلان")
+                .setContentText("اعلان‌های جسی فعال هستند؛ این پیام تراکنش نیست.")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .build()
+        )
+        return true
     }
 
     fun cancel(context: Context, reviewId: Long) {

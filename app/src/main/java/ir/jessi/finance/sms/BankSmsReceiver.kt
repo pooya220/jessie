@@ -12,14 +12,30 @@ import java.security.MessageDigest
 class BankSmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
+        SmsDiagnostics.mark(context, SmsDiagnostics.RECEIVED)
         val preferences = context.getSharedPreferences("jessi_finance_settings", Context.MODE_PRIVATE)
-        if (!preferences.getBoolean("sms_monitoring_enabled", true)) return
-        val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-        if (messages.isEmpty()) return
+        if (!preferences.getBoolean("sms_monitoring_enabled", true)) {
+            SmsDiagnostics.mark(context, SmsDiagnostics.DISABLED)
+            return
+        }
+        val messages = try {
+            Telephony.Sms.Intents.getMessagesFromIntent(intent)
+        } catch (_: Exception) {
+            SmsDiagnostics.mark(context, SmsDiagnostics.ERROR)
+            return
+        }
+        if (messages.isEmpty()) {
+            SmsDiagnostics.mark(context, SmsDiagnostics.UNRECOGNIZED)
+            return
+        }
         val text = messages.joinToString(separator = "") { it.messageBody ?: "" }
         val sender = messages.first().originatingAddress.orEmpty()
         val timestamp = messages.first().timestampMillis.takeIf { it > 0 } ?: System.currentTimeMillis()
-        val parsed = BankSmsParser.parse(text, sender) ?: return
+        val parsed = BankSmsParser.parse(text, sender)
+        if (parsed == null) {
+            SmsDiagnostics.mark(context, SmsDiagnostics.UNRECOGNIZED)
+            return
+        }
         val pendingResult = goAsync()
         Thread {
             try {
@@ -43,11 +59,18 @@ class BankSmsReceiver : BroadcastReceiver() {
                         bankName = parsed.bankName
                     ))
                     if (reviewId > 0L) {
-                        SmsReviewNotifications.show(context, reviewId, parsed.kind)
+                        SmsDiagnostics.mark(context, SmsDiagnostics.QUEUED)
+                        val sent = SmsReviewNotifications.show(context, reviewId, parsed.kind)
+                        SmsDiagnostics.mark(context,
+                            if (sent) SmsDiagnostics.POSTED else SmsDiagnostics.BLOCKED
+                        )
+                    } else {
+                        SmsDiagnostics.mark(context, SmsDiagnostics.DUPLICATE)
                     }
                 }
             } catch (_: Exception) {
-                // Do not leak private bank text to logcat.
+                // Report a category only. Never leak private bank text to logs or settings.
+                SmsDiagnostics.mark(context, SmsDiagnostics.ERROR)
             } finally {
                 pendingResult.finish()
             }
