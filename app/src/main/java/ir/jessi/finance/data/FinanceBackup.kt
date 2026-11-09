@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets
  */
 object FinanceBackup {
     private const val FORMAT = "jessi-finance-backup"
-    private const val SCHEMA = 1
+    private const val SCHEMA = 2
     private const val MAX_SIZE = 25 * 1024 * 1024
     private const val MAX_ROWS = 100_000
 
@@ -23,11 +23,14 @@ object FinanceBackup {
         val debts: List<Debt>,
         val budgets: List<Budget>,
         val reviews: List<SmsReview>,
-        val ignored: List<IgnoredSms>
+        val ignored: List<IgnoredSms>,
+        val goals: List<SavingsGoal> = emptyList(),
+        val movements: List<GoalMovement> = emptyList()
     ) {
         fun summary(): String = "حساب‌ها: ${accounts.size} • تراکنش‌ها: ${transactions.size}" +
             "\nبدهی‌ها و اقساط: ${debts.size} • بودجه‌ها: ${budgets.size}" +
-            "\nپیامک‌های در صف: ${reviews.size} • پیامک‌های نادیده‌گرفته‌شده: ${ignored.size}"
+            "\nپیامک‌های در صف: ${reviews.size} • پیامک‌های نادیده‌گرفته‌شده: ${ignored.size}" +
+            "\nاهداف پس‌انداز: ${goals.size} • واریز و برداشت اهداف: ${movements.size}"
     }
 
     private fun JSONArray.objects(): List<JSONObject> {
@@ -70,6 +73,17 @@ object FinanceBackup {
         put("amountRaw", amountRaw); put("amountUnit", amountUnit); put("bankName", bankName)
     }
     private fun IgnoredSms.json() = JSONObject().apply { put("fingerprint", fingerprint) }
+    private fun SavingsGoal.json() = JSONObject().apply {
+        put("id", id); put("title", title); put("category", category)
+        put("targetToman", targetToman); put("monthlyToman", monthlyToman)
+        put("deadlineJalali", deadlineJalali); put("note", note)
+        put("createdAt", createdAt); put("archived", archived)
+    }
+    private fun GoalMovement.json() = JSONObject().apply {
+        put("id", id); put("goalId", goalId); put("accountId", accountId)
+        put("transactionId", transactionId); put("amountToman", amountToman)
+        put("operation", operation); put("createdAt", createdAt)
+    }
     private fun <T> List<T>.jsonArray(transform: (T) -> JSONObject): JSONArray =
         JSONArray().also { out -> forEach { out.put(transform(it)) } }
 
@@ -83,6 +97,8 @@ object FinanceBackup {
             put("budgets", snapshot.budgets.jsonArray { it.json() })
             put("smsReviews", snapshot.reviews.jsonArray { it.json() })
             put("smsIgnored", snapshot.ignored.jsonArray { it.json() })
+            put("goals", snapshot.goals.jsonArray { it.json() })
+            put("goalMovements", snapshot.movements.jsonArray { it.json() })
         }
         val bytes = root.toString(2).toByteArray(StandardCharsets.UTF_8)
         require(bytes.size <= MAX_SIZE) { "حجم فایل پشتیبان بیشتر از حد مجاز است" }
@@ -92,7 +108,8 @@ object FinanceBackup {
     private fun decode(input: ByteArray): Snapshot {
         require(input.isNotEmpty() && input.size <= MAX_SIZE) { "حجم فایل نامعتبر است" }
         val root = JSONObject(String(input, StandardCharsets.UTF_8))
-        require(root.getString("format") == FORMAT && root.getInt("schema") == SCHEMA) {
+        val schema = root.getInt("schema")
+        require(root.getString("format") == FORMAT && schema in 1..SCHEMA) {
             "این فایل متعلق به نسخه پشتیبانی‌شده جسی نیست"
         }
         val snapshot = Snapshot(
@@ -123,7 +140,28 @@ object FinanceBackup {
             },
             ignored = root.getJSONArray("smsIgnored").objects().map {
                 IgnoredSms(it.getString("fingerprint"))
-            }
+            },
+            goals = if (schema == 1) emptyList() else root.getJSONArray("goals").objects().map {
+                SavingsGoal(
+                    id = it.getLong("id"), title = it.getString("title"),
+                    category = it.getString("category"), targetToman = it.getLong("targetToman"),
+                    monthlyToman = it.getLong("monthlyToman"),
+                    deadlineJalali = it.getString("deadlineJalali"),
+                    note = it.getString("note"), createdAt = it.getLong("createdAt"),
+                    archived = it.getBoolean("archived")
+                )
+            },
+            movements = if (schema == 1) emptyList()
+                else root.getJSONArray("goalMovements").objects().map {
+                    GoalMovement(
+                        id = it.getLong("id"), goalId = it.getLong("goalId"),
+                        accountId = it.getLong("accountId"),
+                        transactionId = it.getLong("transactionId"),
+                        amountToman = it.getLong("amountToman"),
+                        operation = it.getString("operation"),
+                        createdAt = it.getLong("createdAt")
+                    )
+                }
         )
         validate(snapshot)
         return snapshot
@@ -142,7 +180,7 @@ object FinanceBackup {
         require(unique(data.transactions.map { it.id }) && data.transactions.all {
             it.id > 0L && it.accountId in accountIds &&
                 it.amountToman in 1..100_000_000_000L &&
-                it.kind in setOf("IN","OUT","TRANSFER_IN","TRANSFER_OUT","DEBT_IN","DEBT_OUT") &&
+                it.kind in setOf("IN","OUT","TRANSFER_IN","TRANSFER_OUT","DEBT_IN","DEBT_OUT","GOAL_IN","GOAL_OUT") &&
                 it.createdAt > 0L
         }) { "تراکنش‌ها یا ارتباط آن‌ها با حساب‌ها نامعتبر است" }
         val keys = data.transactions.mapNotNull { it.dedupKey }
@@ -172,6 +210,38 @@ object FinanceBackup {
             data.ignored.all { it.fingerprint.isNotBlank() }) {
             "شناسه پیامک‌های نادیده‌گرفته‌شده نامعتبر است"
         }
+        val goalIds = data.goals.map { it.id }
+        require(unique(goalIds) && data.goals.all {
+            it.id > 0 && it.title.isNotBlank() && it.title.length <= 120 &&
+            it.category.isNotBlank() && it.targetToman in 0L..100_000_000_000L &&
+            it.monthlyToman in 0L..100_000_000_000L &&
+            (it.targetToman > 0L || it.monthlyToman > 0L) &&
+            it.createdAt > 0L &&
+            (it.deadlineJalali.isBlank() ||
+                ir.jessi.finance.ui.JalaliDates.parse(it.deadlineJalali) != null)
+        }) { "اطلاعات اهداف پس‌انداز نامعتبر است" }
+        val txById = data.transactions.associateBy { it.id }
+        require(unique(data.movements.map { it.id }) &&
+            unique(data.movements.map { it.transactionId }) &&
+            data.movements.all { m ->
+                val tx = txById[m.transactionId]
+                m.id > 0 && m.goalId in goalIds && m.accountId in accountIds &&
+                    m.amountToman in 1L..100_000_000_000L && m.createdAt > 0L &&
+                    m.operation in setOf("DEPOSIT", "WITHDRAW") &&
+                    tx != null && tx.accountId == m.accountId &&
+                    tx.amountToman == m.amountToman &&
+                    tx.kind == if (m.operation == "DEPOSIT") "GOAL_OUT" else "GOAL_IN"
+            }
+        ) { "واریزها و برداشت‌های اهداف با تراکنش‌های بانکی همخوانی ندارند" }
+        val goalTransactionIds = data.transactions
+            .filter { it.kind in setOf("GOAL_IN", "GOAL_OUT") }.map { it.id }.toSet()
+        require(goalTransactionIds == data.movements.map { it.transactionId }.toSet()) {
+            "داده‌های حساب و بانک اهداف ناقص است"
+        }
+        require(data.goals.all { goal ->
+            val balance = SavingsGoalMath.saved(data.movements, goal.id)
+            balance >= 0 && (!goal.archived || balance == 0L)
+        }) { "مانده یکی از اهداف نامعتبر است" }
     }
 
     private suspend fun snapshot(context: Context): Snapshot {
@@ -180,7 +250,8 @@ object FinanceBackup {
             val dao = database.dao()
             Snapshot(
                 dao.getAccounts(), dao.getTransactions(), dao.getDebts(),
-                dao.getBudgets(), dao.getSmsReviews(), dao.getIgnoredSms()
+                dao.getBudgets(), dao.getSmsReviews(), dao.getIgnoredSms(),
+                dao.getGoals(), dao.getGoalMovements()
             )
         }
     }
@@ -216,7 +287,9 @@ object FinanceBackup {
         val database = FinanceDatabase.get(context)
         database.withTransaction {
             val dao = database.dao()
+            dao.clearAllGoalMovements()
             dao.clearAllTransactions()
+            dao.clearAllGoals()
             dao.clearAllSmsReviews()
             dao.clearAllIgnoredSms()
             dao.clearAllBudgets()
@@ -229,6 +302,8 @@ object FinanceBackup {
             dao.restoreBudgets(snapshot.budgets)
             dao.restoreSmsReviews(snapshot.reviews)
             dao.restoreIgnoredSms(snapshot.ignored)
+            dao.restoreGoals(snapshot.goals)
+            dao.restoreGoalMovements(snapshot.movements)
         }
     }
 }
