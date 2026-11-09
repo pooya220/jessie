@@ -74,6 +74,26 @@ interface FinanceDao {
     @Query("SELECT * FROM budgets ORDER BY category") fun watchBudgets(): Flow<List<Budget>>
     @Query("SELECT * FROM sms_reviews ORDER BY receivedAt DESC") fun watchReviews(): Flow<List<SmsReview>>
     @Query("SELECT * FROM accounts") suspend fun getAccounts(): List<Account>
+    @Query("SELECT * FROM transactions") suspend fun getTransactions(): List<Transaction>
+    @Query("SELECT * FROM debts") suspend fun getDebts(): List<Debt>
+    @Query("SELECT * FROM budgets") suspend fun getBudgets(): List<Budget>
+    @Query("SELECT * FROM sms_reviews") suspend fun getSmsReviews(): List<SmsReview>
+    @Query("SELECT * FROM sms_ignored") suspend fun getIgnoredSms(): List<IgnoredSms>
+
+    // Restore only after a fully validated backup and explicit confirmation.
+    // The caller encloses these in a single Room transaction for rollback on failure.
+    @Query("DELETE FROM transactions") suspend fun clearAllTransactions()
+    @Query("DELETE FROM sms_reviews") suspend fun clearAllSmsReviews()
+    @Query("DELETE FROM sms_ignored") suspend fun clearAllIgnoredSms()
+    @Query("DELETE FROM budgets") suspend fun clearAllBudgets()
+    @Query("DELETE FROM debts") suspend fun clearAllDebts()
+    @Query("DELETE FROM accounts") suspend fun clearAllAccounts()
+    @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun restoreAccounts(rows: List<Account>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun restoreTransactions(rows: List<Transaction>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun restoreDebts(rows: List<Debt>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun restoreBudgets(rows: List<Budget>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun restoreSmsReviews(rows: List<SmsReview>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun restoreIgnoredSms(rows: List<IgnoredSms>)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertAccount(row: Account): Long
     @Update suspend fun updateAccount(row: Account)
     @Query("DELETE FROM accounts WHERE id=:id AND NOT EXISTS (SELECT 1 FROM transactions WHERE accountId=:id)") suspend fun deleteUnusedAccount(id: Long): Int
@@ -114,6 +134,8 @@ interface FinanceDao {
         id: Long, accountId: Long, category: String, note: String, unitChoice: String
     ): Boolean {
         val row = findReview(id) ?: return false
+        // Simulation is never allowed to affect financial transactions.
+        if (row.fingerprint.startsWith("JESSI_TEST_")) return false
         val unit = if (row.amountUnit == "UNKNOWN") unitChoice else row.amountUnit
         val raw = row.amountRaw.takeIf { it > 0L } ?: row.amountToman
         val amount = when (unit) {
