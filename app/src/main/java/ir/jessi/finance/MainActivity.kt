@@ -349,8 +349,8 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
         },
         bottomBar = {
             NavigationBar(
-                containerColor = surface,
-                tonalElevation = 0.dp,
+                containerColor = if (darkMode) Color(0xFF111537) else Color.White,
+                tonalElevation = 4.dp,
                 modifier = Modifier.height(75.dp)
             ) {
                 Tab.entries.forEach { item ->
@@ -361,6 +361,13 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                         Tab.TXS -> Icons.Outlined.ReceiptLong
                         Tab.ACCOUNTS -> Icons.Outlined.AccountBalanceWallet
                     }
+                    val accent = when (item) {
+                        Tab.HOME -> mint
+                        Tab.ACCOUNTS -> financeAqua
+                        Tab.TXS -> financeBlue
+                        Tab.DEBTS -> financePurple
+                        Tab.BUDGETS -> financeAmber
+                    }
                     NavigationBarItem(
                         selected = tab == item,
                         onClick = { tabName = item.name; showSettings = false },
@@ -368,8 +375,9 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                         label = { Text(item.label, fontSize = 10.sp, maxLines = 1) },
                         alwaysShowLabel = true,
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = mint, selectedTextColor = mint,
-                            indicatorColor = secondary, unselectedIconColor = muted, unselectedTextColor = muted
+                            selectedIconColor = accent, selectedTextColor = accent,
+                            indicatorColor = accent.copy(alpha = if (darkMode) .19f else .13f),
+                            unselectedIconColor = muted, unselectedTextColor = muted
                         )
                     )
                 }
@@ -385,13 +393,30 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                         Tab.BUDGETS -> Editor.BudgetForm()
                         Tab.HOME -> null
                     }
-                }, containerColor = mint) {
-                    Text("+", fontSize = 29.sp, color = MaterialTheme.colorScheme.onPrimary)
+                }, containerColor = when (tab) {
+                    Tab.ACCOUNTS -> financeAqua
+                    Tab.TXS -> financeBlue
+                    Tab.DEBTS -> financePurple
+                    Tab.BUDGETS -> financeAmber
+                    else -> mint
+                }) {
+                    Icon(Icons.Outlined.Add, contentDescription = "افزودن",
+                        tint = if (darkMode) Color(0xFF14152D) else Color.White,
+                        modifier = Modifier.size(26.dp))
                 }
             }
         }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        val pageWash = if (darkMode) Brush.verticalGradient(
+            listOf(Color(0xFF0A1030), Color(0xFF10143B), Color(0xFF090F2C))
+        ) else Brush.verticalGradient(
+            listOf(Color(0xFFF7FBFA), Color(0xFFF7FAFF), Color(0xFFFCFAFF))
+        )
+        Column(
+            Modifier.fillMaxSize().padding(padding).background(pageWash)
+                .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
             if (showSettings) {
                 SettingsPage(
                     darkMode = darkMode,
@@ -1031,13 +1056,44 @@ private fun SectionTitle(title: String, subtitle: String? = null) {
 }
 
 @Composable
-private fun Tile(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+private fun Tile(
+    modifier: Modifier = Modifier,
+    accent: Color = Color.Unspecified,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val dark = LocalJessiDark.current
+    val tint = if (accent == Color.Unspecified) {
+        if (dark) financePurple else financeAqua
+    } else accent
+    val shape = RoundedCornerShape(20.dp)
+    val backdrop = if (dark) Color(0xFF17193C) else Color.White
+    val overlay = Brush.linearGradient(
+        listOf(
+            tint.copy(alpha = if (dark) {
+                if (accent == Color.Unspecified) .09f else .19f
+            } else {
+                if (accent == Color.Unspecified) .025f else .085f
+            }),
+            Color.Transparent
+        )
+    )
     Surface(
-        modifier = modifier, color = surface, shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (LocalJessiDark.current) .45f else .55f)),
-        shadowElevation = if (LocalJessiDark.current) 0.dp else 2.dp
+        modifier = modifier,
+        color = backdrop,
+        shape = shape,
+        border = BorderStroke(
+            1.dp,
+            if (accent == Color.Unspecified)
+                MaterialTheme.colorScheme.outline.copy(alpha = if (dark) .6f else .8f)
+            else tint.copy(alpha = if (dark) .44f else .26f)
+        ),
+        shadowElevation = if (dark) 2.dp else 3.dp
     ) {
-        Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+        Column(
+            Modifier.background(overlay).padding(15.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            content = content
+        )
     }
 }
 
@@ -1342,13 +1398,19 @@ private fun FinanceSectionHero(
     val highlight = if (accent == Color.Unspecified) mint else accent
     val shape = RoundedCornerShape(22.dp)
     val gradient = if (dark) Brush.linearGradient(
-        listOf(Color(0xFF172E50), Color(0xFF252359), Color(0xFF30214F))
+        listOf(
+            highlight.copy(alpha = .36f), Color(0xFF252259), Color(0xFF20224E)
+        )
     ) else Brush.linearGradient(
-        listOf(Color(0xFFE9F5F3), Color(0xFFF1F7FA), Color(0xFFF4F0FD))
+        listOf(
+            highlight.copy(alpha = .16f), Color(0xFFF0F9F8), Color(0xFFF5F1FC)
+        )
     )
     Column(
-        Modifier.fillMaxWidth().clip(shape).background(gradient)
-            .border(1.dp, if (dark) Color(0xFF514F92) else Color(0xFFD6E9E7), shape)
+        Modifier.fillMaxWidth().clip(shape)
+            .background(if (dark) Color(0xFF171C46) else Color.White)
+            .background(gradient)
+            .border(1.dp, highlight.copy(alpha = if (dark) .48f else .20f), shape)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(11.dp)
     ) {
@@ -1379,8 +1441,9 @@ private fun FinanceSectionHero(
 @Composable
 private fun FinanceIconTile(icon: ImageVector, tint: Color = mint) {
     Surface(
-        color = tint.copy(alpha = if (LocalJessiDark.current) .18f else .11f),
-        shape = RoundedCornerShape(12.dp)
+        color = tint.copy(alpha = if (LocalJessiDark.current) .23f else .12f),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, tint.copy(alpha = .22f))
     ) {
         Icon(icon, contentDescription = null, tint = tint,
             modifier = Modifier.padding(10.dp).size(21.dp))
@@ -1427,34 +1490,36 @@ private fun AccountsPage(accounts: List<Account>, txs: List<Transaction>, onEdit
     FinanceSectionHero(
         "حساب‌های من", "نمای یکجا از حساب‌ها و موجودی ثبت‌شده",
         Icons.Outlined.AccountBalanceWallet,
-        toman(balance), digitsFa(accounts.size.toString()) + " حساب", accent = Color(0xFF21C9AA)
+        toman(balance), digitsFa(accounts.size.toString()) + " حساب", accent = financeAqua
     )
     if (accounts.isEmpty()) EmptyNote("حسابی ثبت نشده. برای شروع روی + بزن و موجودی اولیه را وارد کن.")
     accounts.forEach { acc ->
         val amount = accountBalance(acc.id, acc.openingToman, txs)
         val canDelete = txs.none { it.accountId == acc.id }
-        Tile(Modifier.fillMaxWidth()) {
+        Tile(Modifier.fillMaxWidth(), accent = financeAqua) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FinanceIconTile(Icons.Outlined.AccountBalanceWallet, Color(0xFF21C9AA))
+                FinanceIconTile(Icons.Outlined.AccountBalanceWallet, financeAqua)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(acc.title, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Text(listOf(acc.bank, if (acc.last4.isNotBlank())
                         "•••• " + digitsFa(acc.last4) else "").filter { it.isNotBlank() }
                         .joinToString(" • "), color = muted, fontSize = 11.sp)
                 }
-                Surface(color = Color(0xFF21C9AA).copy(alpha = .12f), shape = RoundedCornerShape(30.dp)) {
-                    Text("حساب", Modifier.padding(horizontal = 11.dp, vertical = 5.dp), color = Color(0xFF21C9AA), fontSize = 11.sp)
+                Surface(color = financeAqua.copy(alpha = .12f), shape = RoundedCornerShape(30.dp)) {
+                    Text("حساب", Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
+                        color = financeAqua, fontSize = 11.sp)
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .27f))
             Column(Modifier.fillMaxWidth().background(
-                Brush.horizontalGradient(listOf(Color(0xFF21C9AA).copy(alpha = .13f), Color(0xFF6EA8FF).copy(alpha = .055f))),
+                Brush.horizontalGradient(listOf(financeAqua.copy(alpha = .15f),
+                    financeBlue.copy(alpha = .055f))),
                 RoundedCornerShape(13.dp)).padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text("موجودی فعلی", color = muted, fontSize = 11.sp)
-                Text(toman(amount), color = Color(0xFF21C9AA), fontSize = 21.sp,
+                Text(toman(amount), color = financeAqua, fontSize = 21.sp,
                     fontWeight = FontWeight.ExtraBold)
             }
             FinanceActionRow(
@@ -1473,7 +1538,7 @@ private fun TransactionsPage(txs: List<Transaction>, accounts: List<Account>, on
     FinanceSectionHero(
         "تراکنش‌ها", "گردش مالی دوره انتخاب‌شده",
         Icons.Outlined.ReceiptLong,
-        digitsFa(visible.size.toString()), "تراکنش", accent = Color(0xFF6EA8FF)
+        digitsFa(visible.size.toString()), "تراکنش", accent = financeBlue
     )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
         FinanceSummaryChip("درآمد", income, income = true, Modifier.weight(1f))
@@ -1503,8 +1568,8 @@ private fun TransactionTile(
         "انتقال به " + (accounts.firstOrNull { it.id == transferTarget }?.title ?: "حساب دیگر")
     else row.category
     val tone = when {
-        transfer -> Color(0xFF789FF3)
-        credit -> mint
+        transfer -> financeBlue
+        credit -> financeAqua
         else -> danger
     }
     val icon = when {
@@ -1512,7 +1577,7 @@ private fun TransactionTile(
         credit -> Icons.Outlined.SouthWest
         else -> Icons.Outlined.NorthEast
     }
-    Tile(Modifier.fillMaxWidth()) {
+    Tile(Modifier.fillMaxWidth(), accent = tone) {
         Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             FinanceIconTile(icon, tone)
@@ -1562,14 +1627,14 @@ private fun DebtsPage(
         .sumOf { (it.totalToman - it.paidToman).coerceAtLeast(0) }
     FinanceSectionHero(
         "بدهی و اقساط", "پیگیری سررسیدها و پرداخت‌های باقی‌مانده",
-        Icons.Outlined.CreditCard, toman(totalOwed), "بدهی باقی‌مانده", accent = Color(0xFFAA91FF)
+        Icons.Outlined.CreditCard, toman(totalOwed), "بدهی باقی‌مانده", accent = financePurple
     )
     if (debts.isEmpty()) EmptyNote("فعلاً بدهی یا طلبی ثبت نشده.")
     debts.forEach { row ->
         val remaining = (row.totalToman - row.paidToman).coerceAtLeast(0)
         val mine = row.direction == "I_OWE"
-        val tone = if (mine) Color(0xFFAA91FF) else Color(0xFF21C9AA)
-        Tile(Modifier.fillMaxWidth()) {
+        val tone = if (mine) financePurple else financeAqua
+        Tile(Modifier.fillMaxWidth(), accent = tone) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FinanceIconTile(if (row.installmentMonths > 0) Icons.Outlined.CalendarMonth
@@ -1661,7 +1726,7 @@ private fun BudgetsPage(
     FinanceSectionHero(
         "بودجه‌بندی", "کنترل هزینه‌ها در دوره مالی انتخاب‌شده",
         Icons.Outlined.PieChartOutline,
-        toman(totalLimit), "سقف کل بودجه‌ها", accent = Color(0xFFF1AD63)
+        toman(totalLimit), "سقف کل بودجه‌ها", accent = financeAmber
     )
     if (budgets.isEmpty()) EmptyNote("برای تعریف سقف هزینه ماهانه روی + بزن.")
     budgets.forEach { b ->
@@ -1670,8 +1735,8 @@ private fun BudgetsPage(
         val ratio = spent.toFloat() / b.monthlyLimitToman.coerceAtLeast(1L)
         val percent = (ratio * 100f).toInt()
         val usedColor = if (percent >= 100) danger
-            else if (percent >= 80) Color(0xFFE2A152) else mint
-        Tile(Modifier.fillMaxWidth()) {
+            else if (percent >= 80) financeAmber else financeAqua
+        Tile(Modifier.fillMaxWidth(), accent = usedColor) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FinanceIconTile(Icons.Outlined.DonutLarge, usedColor)
