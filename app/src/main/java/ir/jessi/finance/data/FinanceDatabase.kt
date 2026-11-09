@@ -66,6 +66,20 @@ data class SmsReview(
 @Entity(tableName = "sms_ignored")
 data class IgnoredSms(@PrimaryKey val fingerprint: String)
 
+/** Simulations are opt-in financial entries with explicit origin for later review/removal. */
+object SmsReviewPolicy {
+    const val TEST_PREFIX = "JESSI_TEST_"
+    const val TEST_SOURCE = "SMS_TEST"
+    fun isSimulation(fingerprint: String): Boolean = fingerprint.startsWith(TEST_PREFIX)
+    fun sourceFor(fingerprint: String): String = if (isSimulation(fingerprint)) TEST_SOURCE else "SMS"
+    fun noteFor(fingerprint: String, note: String, sender: String): String {
+        val details = note.trim().ifBlank {
+            if (isSimulation(fingerprint)) "شبیه‌سازی پیامک بانکی" else "پیامک بانکی • $sender"
+        }
+        return if (isSimulation(fingerprint)) "آزمایشی • $details" else details
+    }
+}
+
 @Dao
 interface FinanceDao {
     @Query("SELECT * FROM accounts ORDER BY id DESC") fun watchAccounts(): Flow<List<Account>>
@@ -134,8 +148,7 @@ interface FinanceDao {
         id: Long, accountId: Long, category: String, note: String, unitChoice: String
     ): Boolean {
         val row = findReview(id) ?: return false
-        // Simulation is never allowed to affect financial transactions.
-        if (row.fingerprint.startsWith("JESSI_TEST_")) return false
+        // Simulations may affect balances/stats ONLY through explicit review approval.
         val unit = if (row.amountUnit == "UNKNOWN") unitChoice else row.amountUnit
         val raw = row.amountRaw.takeIf { it > 0L } ?: row.amountToman
         val amount = when (unit) {
@@ -147,8 +160,9 @@ interface FinanceDao {
         val saved = insertTransaction(Transaction(
             accountId = accountId, amountToman = amount,
             kind = row.kind, category = category,
-            note = note.trim().ifBlank { "پیامک بانکی • ${row.sender}" },
-            createdAt = row.receivedAt, source = "SMS", dedupKey = row.fingerprint
+            note = SmsReviewPolicy.noteFor(row.fingerprint, note, row.sender),
+            createdAt = row.receivedAt,
+            source = SmsReviewPolicy.sourceFor(row.fingerprint), dedupKey = row.fingerprint
         ))
         if (saved > 0L) deleteReview(id)
         return saved > 0L

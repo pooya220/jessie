@@ -46,13 +46,19 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         if (row.id == 0L) dao.insertBudget(row) else dao.updateBudget(row)
     }
     fun deleteBudget(id: Long) = viewModelScope.launch(Dispatchers.IO) { dao.deleteBudget(id) }
-    fun acceptReview(row: SmsReview, accountId: Long, category: String, note: String, unitChoice: String) = viewModelScope.launch(Dispatchers.IO) {
-        dao.approveReview(row.id, accountId, category, note, unitChoice)
-        SmsReviewNotifications.cancel(getApplication(), row.id)
+    fun acceptReview(
+        row: SmsReview, accountId: Long, category: String, note: String,
+        unitChoice: String, onResult: (Boolean) -> Unit
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        val saved = try { dao.approveReview(row.id, accountId, category, note, unitChoice) }
+        catch (_: Exception) { false }
+        if (saved) SmsReviewNotifications.cancel(getApplication(), row.id)
+        withContext(Dispatchers.Main) { onResult(saved) }
     }
-    fun simulateSms(raw: String, sender: String, onComplete: (String) -> Unit) =
+    fun simulateSms(raw: String, sender: String, onComplete: (String, SmsReview?) -> Unit) =
         viewModelScope.launch(Dispatchers.IO) {
             val result = BankSmsParser.parse(raw, sender)
+            var newReview: SmsReview? = null
             val report = if (result == null) {
                 "این متن تراکنش بانکی تشخیص داده نشد"
             } else {
@@ -71,6 +77,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                     )
                     val id = dao.enqueueReview(row)
                     if (id > 0L) {
+                        newReview = dao.findReview(id)
                         val notified = SmsReviewNotifications.show(
                             getApplication(), id, result.kind, isTest = true
                         )
@@ -81,7 +88,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                     "خطا هنگام ثبت نمونه آزمایشی در صف"
                 }
             }
-            withContext(Dispatchers.Main) { onComplete(report) }
+            withContext(Dispatchers.Main) { onComplete(report, newReview) }
         }
 
     fun dismissReview(id: Long) = viewModelScope.launch(Dispatchers.IO) {
