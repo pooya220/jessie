@@ -107,13 +107,13 @@ fun SavingsGoalsScreen(
             Column(Modifier.weight(1f)) {
                 Text("بانک اهداف", fontWeight = FontWeight.ExtraBold, fontSize = 17.sp)
                 Text("پس‌انداز برای دانشگاه، خرید و هر چیزی که برات مهمه",
-                    fontSize = 11.sp, color = textMuted)
+                    fontSize = 11.sp, color = jessiReadableText(textMuted))
             }
         }
         Text(toman(totalSaved), fontWeight = FontWeight.ExtraBold, fontSize = 22.sp,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text("جمع پول کنارگذاشته‌شده • جدا از موجودی حساب‌ها",
-            color = textMuted, fontSize = 11.sp)
+            color = jessiReadableText(textMuted), fontSize = 11.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             GoalMetricTile(
                 label = "برنامه ماهانه", value = toman(monthlyTotal),
@@ -143,7 +143,7 @@ fun SavingsGoalsScreen(
                 Column {
                     Text("اولین هدف پس‌اندازت رو بساز", fontWeight = FontWeight.Bold)
                     Text("مثلاً «دانشگاه» با ماهی ۳ میلیون تومان یا «خرید لپ‌تاپ» با مبلغ نهایی مشخص.",
-                        color = textMuted, fontSize = 12.sp)
+                        color = jessiReadableText(textMuted), fontSize = 12.sp)
                 }
             }
         }
@@ -178,28 +178,28 @@ fun SavingsGoalsScreen(
                     Text(goal.title, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(goalCategoryText(goal.category),
-                        fontSize = 11.sp, color = textMuted)
+                        fontSize = 11.sp, color = jessiReadableText(textMuted))
                 }
                 if (goal.archived) {
-                    Text("آرشیو", color = tone, fontSize = 11.sp)
+                    Text("آرشیو", color = jessiReadableText(tone), fontSize = 11.sp)
                 } else if (hasTarget && saved >= goal.targetToman) {
-                    Text("تکمیل!", color = tone, fontSize = 12.sp,
+                    Text("تکمیل!", color = jessiReadableText(tone), fontSize = 12.sp,
                         fontWeight = FontWeight.ExtraBold)
                 } else {
                     Text(digitsFa((progress * 100).toInt().toString()) + "٪",
-                        color = tone, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+                        color = jessiReadableText(tone), fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
                 }
             }
             Row(verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
-                    Text("پس‌انداز فعلی", color = textMuted, fontSize = 11.sp)
+                    Text("پس‌انداز فعلی", color = jessiReadableText(textMuted), fontSize = 11.sp)
                     Text(toman(saved), fontWeight = FontWeight.ExtraBold,
-                        fontSize = 18.sp, color = tone,
+                        fontSize = 18.sp, color = jessiReadableText(tone),
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 if (hasTarget) {
                     Column(horizontalAlignment = Alignment.End) {
-                        Text("هدف نهایی", color = textMuted, fontSize = 11.sp)
+                        Text("هدف نهایی", color = jessiReadableText(textMuted), fontSize = 11.sp)
                         Text(toman(goal.targetToman), fontSize = 12.sp,
                             fontWeight = FontWeight.Bold)
                     }
@@ -218,15 +218,15 @@ fun SavingsGoalsScreen(
                     .padding(8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("این ماه: " + toman(monthSaved), fontSize = 11.sp,
-                        color = progressColor, fontWeight = FontWeight.Medium)
+                        color = jessiReadableText(progressColor), fontWeight = FontWeight.Medium)
                     Text("برنامه: " + toman(planned), fontSize = 11.sp,
-                        color = textMuted)
+                        color = jessiReadableText(textMuted))
                 }
             }
             val forecast = SavingsGoalMath.monthsToGoal(saved, goal.targetToman, planned)
             if (forecast != null && forecast > 0L) {
                 Text("با همین برنامه: حدود " + digitsFa(forecast.toString()) + " ماه تا هدف",
-                    color = textMuted, fontSize = 11.sp)
+                    color = jessiReadableText(textMuted), fontSize = 11.sp)
             }
             if (goal.deadlineJalali.isNotBlank()) {
                 Row(verticalAlignment = Alignment.CenterVertically,
@@ -234,10 +234,10 @@ fun SavingsGoalsScreen(
                     Icon(Icons.Outlined.Event, contentDescription = null, tint = tone,
                         modifier = Modifier.size(16.dp))
                     Text("تاریخ هدف: " + goal.deadlineJalali, fontSize = 11.sp,
-                        color = textMuted)
+                        color = jessiReadableText(textMuted))
                 }
             }
-            if (goal.note.isNotBlank()) Text(goal.note, fontSize = 11.sp, color = textMuted)
+            if (goal.note.isNotBlank()) Text(goal.note, fontSize = 11.sp, color = jessiReadableText(textMuted))
             if (!goal.archived) {
                 Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                     Button(onClick = { onDeposit(goal) }, modifier = Modifier.weight(1f),
@@ -284,17 +284,17 @@ fun SavingsGoalsScreen(
                                 Text(
                                     (accounts.firstOrNull { it.id == movement.accountId }?.title
                                         ?: "حساب") + " • " + Jalali.of(movement.createdAt),
-                                    color = textMuted, fontSize = 10.sp
+                                    color = jessiReadableText(textMuted), fontSize = 10.sp
                                 )
                             }
                             Text((if (deposit) "+" else "−") + toman(movement.amountToman),
-                                color = if (deposit) aqua else tone,
+                                color = jessiReadableText(if (deposit) aqua else tone),
                                 fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
                     if (goalEntries.size > 20) {
                         Text("۲۰ جابه‌جایی آخر نمایش داده می‌شود.",
-                            color = textMuted, fontSize = 10.sp)
+                            color = jessiReadableText(textMuted), fontSize = 10.sp)
                     }
                 }
             }
@@ -314,7 +314,7 @@ fun SavingsGoalsScreen(
                 }
                 if (goalEntries.isEmpty()) {
                     TextButton(onClick = { onDelete(goal) }) {
-                        Text("حذف", color = MaterialTheme.colorScheme.error)
+                        Text("حذف", color = jessiReadableText(MaterialTheme.colorScheme.error))
                     }
                 }
             }
@@ -325,8 +325,7 @@ fun SavingsGoalsScreen(
             "پول هدف از موجودی حساب انتخابی کم یا به آن بازگردانده می‌شود، " +
                 "ولی درآمد و هزینه روزمره محسوب نمی‌شود. واریز ماهانه برنامه‌ریزی است؛ " +
                 "برداشت خودکار از بانک انجام نمی‌شود.",
-            fontSize = 11.sp, lineHeight = 18.sp, color = textMuted
-        )
+            fontSize = 11.sp, lineHeight = 18.sp, color = jessiReadableText(textMuted))
     }
 }
 
@@ -350,9 +349,9 @@ private fun GoalMetricTile(
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(icon, contentDescription = null, tint = tone, modifier = Modifier.size(17.dp))
-                Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(label, fontSize = 10.sp, color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
             }
-            Text(value, fontWeight = FontWeight.ExtraBold, color = tone,
+            Text(value, fontWeight = FontWeight.ExtraBold, color = jessiReadableText(tone),
                 fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -416,7 +415,7 @@ fun SavingsGoalFormDialog(
                 OutlinedTextField(value = title, onValueChange = { title = it.take(120) },
                     label = { Text("عنوان هدف؛ مثلاً دانشگاه") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
-                Text("نوع هدف", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text("نوع هدف", color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 12.sp)
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(
@@ -447,14 +446,14 @@ fun SavingsGoalFormDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
                 Text("برای پس‌انداز ماهانه دائمی، مبلغ نهایی رو خالی بذار.",
-                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    fontSize = 11.sp, color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
                 JalaliDateInput("تاریخ رسیدن به هدف (اختیاری)",
                     deadline, optional = true, onChange = { deadline = it })
                 OutlinedTextField(value = note, onValueChange = { note = it },
                     label = { Text("توضیحات (اختیاری)") },
                     minLines = 2, maxLines = 3, modifier = Modifier.fillMaxWidth())
                 Text("ساخت هدف پولی منتقل نمی‌کند؛ برای کنارگذاشتن پول از دکمه واریز استفاده کن.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                    color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 11.sp)
             }
         },
         confirmButton = {
@@ -510,7 +509,7 @@ fun GoalMoneyDialog(
                 Text(if (deposit) "واریز به هدف" else "برداشت از هدف",
                     fontWeight = FontWeight.ExtraBold)
                 Text(goal.title, fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
             }
         },
         text = {
@@ -541,17 +540,17 @@ fun GoalMoneyDialog(
                 Text(
                     if (deposit) "موجودی حساب: " + toman(bankBalance)
                     else "موجودی هدف: " + toman(currentGoalBalance),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp
+                    color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 12.sp
                 )
                 Text(
                     if (deposit) "این انتقال از موجودی حساب کم و به بانک اهداف اضافه می‌شود؛ هزینه نیست."
                     else "این مبلغ از هدف کم و به حساب انتخابی اضافه می‌شود؛ درآمد نیست.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp,
+                    color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 11.sp,
                     lineHeight = 17.sp
                 )
                 if (!valid && (amount ?: 0L) > maxAvailable) {
                     Text("مبلغ بیش از موجودی قابل برداشت است.",
-                        color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
+                        color = jessiReadableText(MaterialTheme.colorScheme.error), fontSize = 11.sp)
                 }
                 if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }

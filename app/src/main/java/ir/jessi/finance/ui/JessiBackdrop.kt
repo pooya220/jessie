@@ -127,7 +127,7 @@ fun JessiBackgroundSettings(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("پس‌زمینه و جلوه شیشه‌ای", fontWeight = FontWeight.Bold, fontSize = 15.sp)
         Text("تم رنگی یا عکس دلخواهت رو انتخاب کن. کارت‌ها نیمه‌شفاف‌اند و هاله پس‌زمینه از پشتشان پیدا می‌شود.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 11.sp)
         options.chunked(2).forEach { pair ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 pair.forEach { (id, title, subtitle) ->
@@ -150,7 +150,7 @@ fun JessiBackgroundSettings(
                                 .background(Brush.horizontalGradient(palette(id, dark))))
                             Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             Text(subtitle, fontSize = 9.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
                         }
                     }
                 }
@@ -180,6 +180,6 @@ fun JessiBackgroundSettings(
         Text("شدت پوشش شیشه‌ای پس‌زمینه", fontSize = 12.sp)
         Slider(value = dim, onValueChange = onDimChange, valueRange = 0f..0.78f)
         Text("تصویر انتخابی فقط در همین گوشی استفاده می‌شود و به سرور ارسال نمی‌شود.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+            color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 10.sp)
     }
 }

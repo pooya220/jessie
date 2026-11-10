@@ -78,13 +78,16 @@ private val lightColors = lightColorScheme(
     error = Color(0xFFD83D67), outline = Color(0xFFDCEBE8)
 )
 private val darkColors = darkColorScheme(
-    primary = Color(0xFFD062FF), onPrimary = Color(0xFF1A0F31),
-    secondary = Color(0xFF41DDFB), background = Color(0xFF090E29),
+    primary = Color(0xFFD062FF), onPrimary = Color.White,
+    secondary = Color(0xFF41DDFB), onSecondary = Color.White,
+    background = Color(0xFF090E29), onBackground = Color.White,
     surface = Color(0xFF17183E), surfaceVariant = Color(0xFF242553),
-    onSurface = Color(0xFFF7F5FF), onSurfaceVariant = Color(0xFFB7B9D9),
+    onSurface = Color.White, onSurfaceVariant = Color.White,
+    onPrimaryContainer = Color.White, onSecondaryContainer = Color.White,
+    onTertiaryContainer = Color.White, onError = Color.White,
     error = Color(0xFFFF699E), outline = Color(0xFF41407C)
 )
-private val LocalJessiDark = compositionLocalOf { true }
+internal val LocalJessiDark = compositionLocalOf { true }
 
 // Consistent four-tone accents shared across every tab: jade, cyan, violet and amber.
 private val financeAqua: Color @Composable get() =
@@ -401,7 +404,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                 Spacer(Modifier.width(9.dp))
                 Column(Modifier.weight(1f)) {
                     Text("جسی", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("مدیریت مالی شخصی", color = muted, fontSize = 10.sp)
+                    Text("مدیریت مالی شخصی", color = jessiReadableText(muted), fontSize = 10.sp)
                 }
                 IconButton(
                     onClick = { showSettings = !showSettings },
@@ -826,9 +829,9 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                     Text(candidate.summary(), fontSize = 12.sp)
                     Text("توجه: با تأیید، تمام اطلاعات مالی فعلی با محتویات این فایل جایگزین می‌شود. " +
                         "بازیابی با داده‌های فعلی ادغام نمی‌شود.",
-                        color = danger, fontSize = 12.sp)
+                        color = jessiReadableText(danger), fontSize = 12.sp)
                     Text("بهتر است پیش از بازیابی، از وضعیت فعلی پشتیبان بگیری.",
-                        color = muted, fontSize = 11.sp)
+                        color = jessiReadableText(muted), fontSize = 11.sp)
                 }
             },
             confirmButton = {
@@ -919,7 +922,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
             },
             onReject = { vm.dismissReview(e.value.id); editor = null }
         )
-        is Editor.Delete -> AlertDialog(onDismissRequest = { editor = null }, title = { Text("تأیید حذف") }, text = { Text(e.title) }, confirmButton = { TextButton(onClick = { e.action(); editor = null }) { Text("حذف", color = danger) } }, dismissButton = { TextButton(onClick = { editor = null }) { Text("انصراف") } })
+        is Editor.Delete -> AlertDialog(onDismissRequest = { editor = null }, title = { Text("تأیید حذف") }, text = { Text(e.title) }, confirmButton = { TextButton(onClick = { e.action(); editor = null }) { Text("حذف", color = jessiReadableText(danger)) } }, dismissButton = { TextButton(onClick = { editor = null }) { Text("انصراف") } })
         null -> Unit
     }
 }
@@ -970,7 +973,7 @@ private fun SettingsPage(
                 Text(if (section == "home") "تنظیمات" else titles[section].orEmpty(),
                     fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
                 Text(if (section == "home") "هر موضوع در صفحه جداگانه و مرتب"
-                     else "جسی • تنظیمات", fontSize = 11.sp, color = muted)
+                     else "جسی • تنظیمات", fontSize = 11.sp, color = jessiReadableText(muted))
             }
         }
         if (section == "home") {
@@ -1041,7 +1044,7 @@ private fun SettingsPage(
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("دسترسی SMS", fontWeight = FontWeight.Medium, fontSize = 13.sp)
                     Text(if (smsPermitted) "اجازه داده شده" else "اجازه داده نشده",
-                        fontSize = 11.sp, color = if (smsPermitted) mint else danger)
+                        fontSize = 11.sp, color = jessiReadableText(if (smsPermitted) mint else danger))
                 }
                 if (!smsPermitted) TextButton(onClick = onSmsPermission) { Text("درخواست مجوز") }
                 else Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = mint)
@@ -1050,7 +1053,7 @@ private fun SettingsPage(
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("دسترسی اعلان‌ها", fontWeight = FontWeight.Medium, fontSize = 13.sp)
                     Text(if (notificationsPermitted) "اجازه داده شده" else "اجازه داده نشده",
-                        fontSize = 11.sp, color = if (notificationsPermitted) mint else danger)
+                        fontSize = 11.sp, color = jessiReadableText(if (notificationsPermitted) mint else danger))
                 }
                 if (!notificationsPermitted) TextButton(onClick = onNotificationPermission) { Text("درخواست مجوز") }
                 else Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = mint)
@@ -1069,11 +1072,11 @@ private fun SettingsPage(
         Tile(Modifier.fillMaxWidth(), accent = financePurple) {
             SettingsGroupTitle(Icons.Outlined.BugReport, "عیب‌یابی دریافت پیامک", accent = financePurple)
             Text("وضعیت اعلان: " + (notificationBlocker ?: "مجوز و کانال اعلان فعال است"),
-                fontSize = 12.sp, color = if (notificationBlocker == null) mint else danger)
+                fontSize = 12.sp, color = jessiReadableText(if (notificationBlocker == null) mint else danger))
             Text("وضعیت آخرین پیامک در جسی:", fontWeight = FontWeight.Medium, fontSize = 12.sp)
-            Text(diagnosticSummary, fontSize = 11.sp, color = muted, lineHeight = 17.sp)
+            Text(diagnosticSummary, fontSize = 11.sp, color = jessiReadableText(muted), lineHeight = 17.sp)
             Text("پیامک‌های منتظر بررسی: " + digitsFa(pendingReviews.toString()),
-                fontSize = 12.sp, color = muted)
+                fontSize = 12.sp, color = jessiReadableText(muted))
             OutlinedButton(onClick = onTestNotification, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Outlined.NotificationsActive, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -1092,7 +1095,7 @@ private fun SettingsPage(
             }
             TextButton(onClick = onRefreshDiagnostics) { Text("به‌روزرسانی وضعیت") }
             Text("این عیب‌یابی متن پیامک، شماره حساب یا مبلغ رو ذخیره نمی‌کنه.",
-                color = muted, fontSize = 10.sp)
+                color = jessiReadableText(muted), fontSize = 10.sp)
         }
 
         SmsParserTestSettings(onSimulateSms)
@@ -1104,8 +1107,7 @@ private fun SettingsPage(
             SettingsGroupTitle(Icons.Outlined.SaveAlt, "پشتیبان‌گیری و بازیابی اطلاعات", accent = financeAqua)
             Text(
                 "از حساب‌ها، تراکنش‌ها، بدهی‌ها، اقساط، بودجه‌ها و صف پیامک‌ها یک فایل JSON بگیر.",
-                fontSize = 12.sp, color = muted
-            )
+                fontSize = 12.sp, color = jessiReadableText(muted))
             OutlinedButton(
                 onClick = onExportBackup, enabled = !backupBusy, modifier = Modifier.fillMaxWidth()
             ) {
@@ -1124,8 +1126,7 @@ private fun SettingsPage(
             Text(
                 "فایل پشتیبان رمزگذاری نشده و اطلاعات مالی حساس دارد. در جای امن نگهداری کن. " +
                 "بازیابی فقط بعد از بررسی فایل و تأیید تو انجام می‌شود.",
-                fontSize = 11.sp, color = danger
-            )
+                fontSize = 11.sp, color = jessiReadableText(danger))
         }
 
         }
@@ -1134,7 +1135,7 @@ private fun SettingsPage(
         Tile(Modifier.fillMaxWidth(), accent = financeAmber) {
             SettingsGroupTitle(Icons.Outlined.CalendarMonth, "دوره مالی", accent = financeAmber)
             Text("شروع دوره جدید و محاسبه سقف هزینه‌ها",
-                fontSize = 12.sp, color = muted)
+                fontSize = 12.sp, color = jessiReadableText(muted))
             Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 FilterChip(
                     selected = periodMode == FinancePeriodEngine.MONTHLY,
@@ -1148,7 +1149,7 @@ private fun SettingsPage(
                 )
             }
             Text("تعویض دوره هیچ تراکنش یا بدهی را پاک نمی‌کند.",
-                fontSize = 11.sp, color = muted)
+                fontSize = 11.sp, color = jessiReadableText(muted))
         }
 
         }
@@ -1159,9 +1160,9 @@ private fun SettingsPage(
             Text("نسخه " + digitsFa(versionName),
                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             Text("اطلاعات حساب‌ها و تراکنش‌ها در حافظه همین گوشی نگهداری می‌شوند. متن کامل پیامک بانکی ذخیره نمی‌شود.",
-                fontSize = 12.sp, color = muted)
+                fontSize = 12.sp, color = jessiReadableText(muted))
             Text("هنگام حذف برنامه، ممکن است داده‌های ذخیره‌شده حذف شوند؛ بدون پشتیبان برنامه را پاک نکن.",
-                fontSize = 11.sp, color = danger)
+                fontSize = 11.sp, color = jessiReadableText(danger))
         }
         }
         if (section == "security") {
@@ -1191,7 +1192,7 @@ private fun SettingsNavRow(
         FinanceIconTile(icon, accent)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Text(description, fontSize = 11.sp, color = muted)
+            Text(description, fontSize = 11.sp, color = jessiReadableText(muted))
         }
         Icon(Icons.Outlined.ChevronLeft, contentDescription = null,
             tint = accent, modifier = Modifier.size(20.dp))
@@ -1208,7 +1209,7 @@ private fun SmsParserTestSettings(onSimulateSms: (String, String) -> Unit) {
     Tile(Modifier.fillMaxWidth(), accent = financeBlue) {
         SettingsGroupTitle(Icons.Outlined.Science, "آزمایش متن پیامک بانکی", accent = financeBlue)
         Text("متن پیامک رو از برنامه پیام‌ها کپی کن و اینجا بچسبون؛ بدون دریافت SMS واقعی هم تشخیص آزمایش می‌شه.",
-            fontSize = 12.sp, color = muted)
+            fontSize = 12.sp, color = jessiReadableText(muted))
         OutlinedTextField(
             value = sender,
             onValueChange = { sender = it; tested = false },
@@ -1233,11 +1234,11 @@ private fun SmsParserTestSettings(onSimulateSms: (String, String) -> Unit) {
             val found = result
             if (found == null) {
                 Text("این متن با قواعد فعلی، تراکنش بانکی تشخیص داده نشد.",
-                    color = danger, fontSize = 12.sp)
+                    color = jessiReadableText(danger), fontSize = 12.sp)
                 Text("برای اصلاح الگوریتم، همین نمونه رو به جسی بفرست.",
-                    color = muted, fontSize = 11.sp)
+                    color = jessiReadableText(muted), fontSize = 11.sp)
             } else {
-                Text("پیامک شناسایی شد", color = mint, fontWeight = FontWeight.Bold)
+                Text("پیامک شناسایی شد", color = jessiReadableText(mint), fontWeight = FontWeight.Bold)
                 Text("بانک: " + found.bankName.ifBlank { "نامشخص" }, fontSize = 12.sp)
                 Text("نوع: " + if (found.kind == "IN") "واریز" else "برداشت",
                     fontSize = 12.sp)
@@ -1259,12 +1260,11 @@ private fun SmsParserTestSettings(onSimulateSms: (String, String) -> Unit) {
                 Text(
                     "نمونه به صف بررسی اضافه می‌شه؛ سپس می‌تونی با تأیید جداگانه، " +
                     "اون رو به‌عنوان «آزمایشی» در موجودی، بودجه و نمودارها هم ثبت کنی.",
-                    fontSize = 11.sp, color = muted
-                )
+                    fontSize = 11.sp, color = jessiReadableText(muted))
             }
         }
         Text("متن پیامک در فرم نگهداری دائمی نمی‌شود؛ تست مستقل از مجوز دریافت SMS است.",
-            fontSize = 11.sp, color = muted)
+            fontSize = 11.sp, color = jessiReadableText(muted))
     }
 }
 
@@ -1293,7 +1293,7 @@ private fun SettingsToggle(
         Icon(icon, contentDescription = null, tint = muted, modifier = Modifier.size(22.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            Text(description, color = muted, fontSize = 10.sp, lineHeight = 15.sp)
+            Text(description, color = jessiReadableText(muted), fontSize = 10.sp, lineHeight = 15.sp)
         }
         Switch(checked = checked, onCheckedChange = onChange,
             modifier = Modifier.height(32.dp))
@@ -1310,11 +1310,11 @@ private fun FinanceSummaryChip(title: String, value: Long, income: Boolean, modi
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text((if (income) "↗ " else "↘ ") + title, fontSize = 11.sp,
-            fontWeight = FontWeight.Bold, color = if (LocalJessiDark.current) color
-                else if (income) Color(0xFF007D56) else Color(0xFFC82C56))
+            fontWeight = FontWeight.Bold, color = jessiReadableText(if (LocalJessiDark.current) color
+                else if (income) Color(0xFF007D56) else Color(0xFFC82C56)))
         Text(if (hidden) "••••••" else toman(value), fontSize = 14.sp, fontWeight = FontWeight.ExtraBold,
-            color = if (LocalJessiDark.current) color
-                else if (income) Color(0xFF007D56) else Color(0xFFC82C56),
+            color = jessiReadableText(if (LocalJessiDark.current) color
+                else if (income) Color(0xFF007D56) else Color(0xFFC82C56)),
             maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -1351,8 +1351,8 @@ private fun PeriodSwitcher(
                         tint = if (selectedIndex < count-1) mint else muted, modifier = Modifier.size(21.dp))
                 }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("دوره مالی", fontSize = 10.sp, color = muted)
-                    Text(title, color = mint, fontWeight = FontWeight.Bold,
+                    Text("دوره مالی", fontSize = 10.sp, color = jessiReadableText(muted))
+                    Text(title, color = jessiReadableText(mint), fontWeight = FontWeight.Bold,
                         fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 IconButton(onClick = onNext, enabled = selectedIndex > 0,
@@ -1395,7 +1395,7 @@ private fun PeriodSwitcher(
     }
     if (mode == FinancePeriodEngine.SALARY && !salaryAvailable) {
         Text("بعد از تأیید اولین واریز حقوق، دوره‌های حقوقی فعال می‌شن.",
-            fontSize = 11.sp, color = muted)
+            fontSize = 11.sp, color = jessiReadableText(muted))
     }
 }
 
@@ -1403,7 +1403,7 @@ private fun PeriodSwitcher(
 private fun SectionTitle(title: String, subtitle: String? = null) {
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-        if (subtitle != null) Text(subtitle, fontSize = 12.sp, color = muted)
+        if (subtitle != null) Text(subtitle, fontSize = 12.sp, color = jessiReadableText(muted))
     }
 }
 
@@ -1452,15 +1452,15 @@ private fun Tag(text: String, good: Boolean = false) {
         shape = RoundedCornerShape(30.dp)
     ) {
         Text(text, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            color = if (good) mint else muted, fontSize = 10.sp)
+            color = jessiReadableText(if (good) mint else muted), fontSize = 10.sp)
     }
 }
 
 @Composable
 private fun MoneyLine(label: String, value: Long, color: Color = Color.Unspecified, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, color = muted, fontSize = 12.sp)
-        Text(toman(value), color = if (color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else color, fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, color = jessiReadableText(muted), fontSize = 12.sp)
+        Text(toman(value), color = jessiReadableText(if (color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else color), fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -1485,12 +1485,12 @@ private fun DashboardCompactMetric(
             horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             Icon(icon, contentDescription = null, tint = tone,
                 modifier = Modifier.size(18.dp))
-            Text(label, fontSize = 10.sp, color = muted, maxLines = 1,
+            Text(label, fontSize = 10.sp, color = jessiReadableText(muted), maxLines = 1,
                 overflow = TextOverflow.Ellipsis)
         }
         Text(value, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurface)
+            color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
     }
 }
 
@@ -1554,10 +1554,10 @@ private fun Dashboard(
             Text(if (balanceVisible) digitsFa(NumberFormat.getIntegerInstance(Locale.US).format(total))
                     else "••••••••",
                 fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onSurface, maxLines = 1,
+                color = jessiReadableText(MaterialTheme.colorScheme.onSurface), maxLines = 1,
                 overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.width(6.dp))
-            Text("تومان", fontSize = 12.sp, color = muted)
+            Text("تومان", fontSize = 12.sp, color = jessiReadableText(muted))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             FinanceSummaryChip("درآمد", income, income = true,
@@ -1586,7 +1586,7 @@ private fun Dashboard(
                 Text("بانک اهداف", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Text(
                     if (balanceVisible) toman(savedForGoals) else "••••••",
-                    fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = financePurple,
+                    fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = jessiReadableText(financePurple),
                     maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
             }
@@ -1597,7 +1597,7 @@ private fun Dashboard(
             }
         }
         Text("پس‌انداز کنارگذاشته‌شده • جدا از موجودی حساب‌ها",
-            color = muted, fontSize = 10.sp)
+            color = jessiReadableText(muted), fontSize = 10.sp)
     }
 
     val jalaliMonthNames = listOf("فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
@@ -1612,7 +1612,7 @@ private fun Dashboard(
             FinanceIconTile(Icons.Filled.EventNote, financePurple)
             Column(Modifier.weight(1f)) {
                 Text("اقساط و بدهی‌های ماه آینده", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
-                Text("سررسیدهای " + monthCaption, fontSize = 11.sp, color = muted)
+                Text("سررسیدهای " + monthCaption, fontSize = 11.sp, color = jessiReadableText(muted))
             }
             TextButton(onClick = { onSelectTab(Tab.DEBTS) },
                 contentPadding = PaddingValues(horizontal = 4.dp)) {
@@ -1648,9 +1648,9 @@ private fun Dashboard(
             Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null,
                 tint = financePurple, modifier = Modifier.size(22.dp))
             Column(Modifier.weight(1f)) {
-                Text("جمع پرداخت‌های ماه آینده", color = muted, fontSize = 11.sp)
+                Text("جمع پرداخت‌های ماه آینده", color = jessiReadableText(muted), fontSize = 11.sp)
                 Text(if (balanceVisible) toman(nextMonthDue.totalToman) else "••••••",
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = jessiReadableText(MaterialTheme.colorScheme.onSurface),
                     fontSize = 17.sp, fontWeight = FontWeight.ExtraBold,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -1659,7 +1659,7 @@ private fun Dashboard(
         }
         if (nextMonthDue.payments.isEmpty()) {
             Text("برای ماه آینده هیچ قسط یا بدهی سررسیدداری ثبت نشده ✦",
-                fontSize = 11.sp, color = muted)
+                fontSize = 11.sp, color = jessiReadableText(muted))
         } else {
             Text("سررسیدهای ماه آینده", fontWeight = FontWeight.Bold, fontSize = 12.sp)
             nextMonthDue.payments.take(5).forEach { item ->
@@ -1676,7 +1676,7 @@ private fun Dashboard(
                         Text(item.debt.person, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text((if (item.isInstallment) "قسط" else "بدهی") + " • " +
-                            JalaliDates.format(item.dueDate), color = muted, fontSize = 10.sp)
+                            JalaliDates.format(item.dueDate), color = jessiReadableText(muted), fontSize = 10.sp)
                     }
                     Text(if (balanceVisible) toman(item.amountToman) else "••••••",
                         fontWeight = FontWeight.Bold, fontSize = 11.sp,
@@ -1686,11 +1686,11 @@ private fun Dashboard(
             if (nextMonthDue.payments.size > 5) {
                 Text("و " + digitsFa((nextMonthDue.payments.size - 5).toString()) +
                     " سررسید دیگر در بخش اقساط و بدهی‌ها",
-                    fontSize = 10.sp, color = muted)
+                    fontSize = 10.sp, color = jessiReadableText(muted))
             }
         }
         Text("محاسبه بر اساس تاریخ سررسید و مبلغ پرداخت‌نشده است؛ عنوان «قسط» شرط نیست.",
-            fontSize = 10.sp, color = muted)
+            fontSize = 10.sp, color = jessiReadableText(muted))
     }
 
     // Keep the full prior features, but below the photographed dashboard layout.
@@ -1708,7 +1708,7 @@ private fun Dashboard(
                     Column(Modifier.weight(1f)) {
                         Text(if (row.kind == "IN") "واریز احتمالی" else "برداشت احتمالی",
                             fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        Text("${reviewAmountLabel(row)} • ${row.sender}", fontSize = 11.sp, color = muted)
+                        Text("${reviewAmountLabel(row)} • ${row.sender}", fontSize = 11.sp, color = jessiReadableText(muted))
                     }
                     TextButton(onClick = { onReview(row) }) { Text("بررسی") }
                 }
@@ -1723,9 +1723,9 @@ private fun Dashboard(
                     .sumOf { it.amountToman }
                 val fraction = (spent.toFloat() / budget.monthlyLimitToman.coerceAtLeast(1)).coerceIn(0f, 1f)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(budget.category, color = muted, fontSize = 12.sp)
+                    Text(budget.category, color = jessiReadableText(muted), fontSize = 12.sp)
                     Text(digitsFa((fraction * 100).toInt().toString()) + "٪",
-                        color = if (spent > budget.monthlyLimitToman) danger else mint, fontSize = 12.sp)
+                        color = jessiReadableText(if (spent > budget.monthlyLimitToman) danger else mint), fontSize = 12.sp)
                 }
                 LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth(),
                     color = mint, trackColor = secondary)
@@ -1737,15 +1737,15 @@ private fun Dashboard(
             Text("دسترسی‌های پیامک بانکی", fontWeight = FontWeight.Bold)
             if (!smsMonitoringEnabled || !reviewNotificationsEnabled) {
                 Text("بررسی پیامک یا اعلان‌ها از تنظیمات جسی غیرفعال شده.",
-                    fontSize = 12.sp, color = muted)
+                    fontSize = 12.sp, color = jessiReadableText(muted))
                 TextButton(onClick = onOpenSettings) { Text("تنظیمات پیامک و اعلان") }
             }
             if (!smsPermitted) {
-                Text("برای شناسایی پیامک‌های بانکی جدید، مجوز SMS را فعال کن.", fontSize = 12.sp, color = muted)
+                Text("برای شناسایی پیامک‌های بانکی جدید، مجوز SMS را فعال کن.", fontSize = 12.sp, color = jessiReadableText(muted))
                 TextButton(onClick = requestPermission) { Text("فعال‌کردن SMS") }
             }
             if (!notificationsPermitted) {
-                Text("برای اعلان بررسی تراکنش، مجوز اعلان را فعال کن.", fontSize = 12.sp, color = muted)
+                Text("برای اعلان بررسی تراکنش، مجوز اعلان را فعال کن.", fontSize = 12.sp, color = jessiReadableText(muted))
                 TextButton(onClick = requestNotificationPermission) { Text("فعال‌کردن اعلان") }
             }
         }
@@ -1766,7 +1766,7 @@ private fun Dashboard(
         }
         val recent = current.filter { it.kind != "TRANSFER_IN" }.take(4)
         if (recent.isEmpty()) {
-            Text("تراکنشی در این دوره ثبت نشده.", color = muted, fontSize = 12.sp)
+            Text("تراکنشی در این دوره ثبت نشده.", color = jessiReadableText(muted), fontSize = 12.sp)
         } else {
             recent.forEachIndexed { i, tx ->
                 if (i > 0) HorizontalDivider(
@@ -1807,18 +1807,18 @@ private fun DashboardRecentTransaction(
             Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text((accounts.firstOrNull { it.id == row.accountId }?.title ?: "حساب نامشخص") +
-                " • " + Jalali.of(row.createdAt), color = muted, fontSize = 10.sp)
+                " • " + Jalali.of(row.createdAt), color = jessiReadableText(muted), fontSize = 10.sp)
         }
         Text((if (incoming) "+" else "−") + digitsFa(
             NumberFormat.getIntegerInstance(Locale.US).format(row.amountToman)
-        ), color = if (incoming) mint else danger,
+        ), color = jessiReadableText(if (incoming) mint else danger),
             fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
 private fun EmptyNote(message: String) {
-    Tile(Modifier.fillMaxWidth()) { Text(message, fontSize = 13.sp, color = muted) }
+    Tile(Modifier.fillMaxWidth()) { Text(message, fontSize = 13.sp, color = jessiReadableText(muted)) }
 }
 
 @Composable
@@ -1858,15 +1858,15 @@ private fun FinanceSectionHero(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-                Text(description, color = muted, fontSize = 11.sp, lineHeight = 16.sp)
+                Text(description, color = jessiReadableText(muted), fontSize = 11.sp, lineHeight = 16.sp)
             }
         }
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(mainStat, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = jessiReadableText(MaterialTheme.colorScheme.onSurface),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false))
-            Text(statLabel, fontSize = 11.sp, color = muted, modifier = Modifier.padding(bottom = 3.dp))
+            Text(statLabel, fontSize = 11.sp, color = jessiReadableText(muted), modifier = Modifier.padding(bottom = 3.dp))
         }
     }
 }
@@ -1918,7 +1918,7 @@ private fun FinanceActionRow(
                 Icon(Icons.Outlined.DeleteOutline, contentDescription = null,
                     tint = danger, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(3.dp))
-                Text("حذف", color = danger, fontSize = 11.sp)
+                Text("حذف", color = jessiReadableText(danger), fontSize = 11.sp)
             }
         }
     }
@@ -1944,11 +1944,11 @@ private fun AccountsPage(accounts: List<Account>, txs: List<Transaction>, onEdit
                     Text(acc.title, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Text(listOf(acc.bank, if (acc.last4.isNotBlank())
                         "•••• " + digitsFa(acc.last4) else "").filter { it.isNotBlank() }
-                        .joinToString(" • "), color = muted, fontSize = 11.sp)
+                        .joinToString(" • "), color = jessiReadableText(muted), fontSize = 11.sp)
                 }
                 Surface(color = financeAqua.copy(alpha = .12f), shape = RoundedCornerShape(30.dp)) {
                     Text("حساب", Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
-                        color = financeAqua, fontSize = 11.sp)
+                        color = jessiReadableText(financeAqua), fontSize = 11.sp)
                 }
             }
             Row(
@@ -1960,8 +1960,8 @@ private fun AccountsPage(accounts: List<Account>, txs: List<Transaction>, onEdit
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("موجودی", color = muted, fontSize = 11.sp)
-                Text(toman(amount), color = financeAqua, fontSize = 17.sp,
+                Text("موجودی", color = jessiReadableText(muted), fontSize = 11.sp)
+                Text(toman(amount), color = jessiReadableText(financeAqua), fontSize = 17.sp,
                     fontWeight = FontWeight.ExtraBold, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             }
@@ -2034,16 +2034,16 @@ private fun TransactionTile(
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text((accounts.firstOrNull { it.id == row.accountId }?.title ?: "حساب نامشخص")
                     + " • " + Jalali.of(row.createdAt),
-                    color = muted, fontSize = 11.sp)
+                    color = jessiReadableText(muted), fontSize = 11.sp)
             }
             Column(horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text((if (credit) "+" else "−") + toman(row.amountToman),
-                    color = tone, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
+                    color = jessiReadableText(tone), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
                     maxLines = 1)
                 Text(if (row.kind in listOf("GOAL_OUT", "GOAL_IN")) "بانک اهداف"
                     else if (transfer) "انتقال" else if (credit) "ورودی" else "خروجی",
-                    color = muted, fontSize = 10.sp)
+                    color = jessiReadableText(muted), fontSize = 10.sp)
             }
         }
         if (row.source == SmsReviewPolicy.TEST_SOURCE) {
@@ -2053,11 +2053,11 @@ private fun TransactionTile(
             ) {
                 Text("آزمایشی • در آمار و مانده حساب محاسبه شده",
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    color = financePurple, fontSize = 10.sp)
+                    color = jessiReadableText(financePurple), fontSize = 10.sp)
             }
         }
         if (row.note.isNotBlank()) {
-            Text(row.note, color = muted, fontSize = 11.sp,
+            Text(row.note, color = jessiReadableText(muted), fontSize = 11.sp,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         if (edit != null || delete != null) {
@@ -2092,7 +2092,7 @@ private fun DebtsPage(
                     Text(row.person, fontWeight = FontWeight.Bold, fontSize = 14.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(if (row.installmentMonths > 0) "بازپرداخت اقساطی" else "تسویه عادی",
-                        color = muted, fontSize = 11.sp)
+                        color = jessiReadableText(muted), fontSize = 11.sp)
                 }
                 Tag(if (mine) "بدهکارم" else "طلبکارم", !mine)
             }
@@ -2100,14 +2100,14 @@ private fun DebtsPage(
                 tone.copy(alpha = .085f), RoundedCornerShape(11.dp)).padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("مانده قابل تسویه", fontSize = 11.sp, color = muted)
-                    Text(toman(remaining), color = if (mine) MaterialTheme.colorScheme.onSurface else mint,
+                    Text("مانده قابل تسویه", fontSize = 11.sp, color = jessiReadableText(muted))
+                    Text(toman(remaining), color = jessiReadableText(if (mine) MaterialTheme.colorScheme.onSurface else mint),
                         fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
                 }
                 if (remaining == 0L) Tag("تسویه شده", true)
             }
             Text("کل: " + toman(row.totalToman) + " • پرداخت‌شده: " +
-                toman(row.paidToman), color = muted, fontSize = 11.sp)
+                toman(row.paidToman), color = jessiReadableText(muted), fontSize = 11.sp)
             val progress = (row.paidToman.toFloat() /
                 row.totalToman.coerceAtLeast(1L)).coerceIn(0f, 1f)
             LinearProgressIndicator(
@@ -2121,9 +2121,9 @@ private fun DebtsPage(
                 val next = Installments.nextDate(row)
                 Row(horizontalArrangement = Arrangement.spacedBy(9.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Text(digitsFa(done.toString()) + " پرداخت‌شده", fontSize = 11.sp, color = mint)
-                    Text("•", color = muted)
-                    Text(digitsFa(left.toString()) + " باقی‌مانده", fontSize = 11.sp, color = muted)
+                    Text(digitsFa(done.toString()) + " پرداخت‌شده", fontSize = 11.sp, color = jessiReadableText(mint))
+                    Text("•", color = jessiReadableText(muted))
+                    Text(digitsFa(left.toString()) + " باقی‌مانده", fontSize = 11.sp, color = jessiReadableText(muted))
                 }
                 if (next != null) {
                     val dueEpoch = JalaliDates.toEpoch(next)
@@ -2139,7 +2139,7 @@ private fun DebtsPage(
                         Icon(Icons.Outlined.Event, contentDescription = null,
                             tint = if (overdue) danger else tone, modifier = Modifier.size(17.dp))
                         Text("قسط بعد: " + JalaliDates.format(next) + " • " + status,
-                            color = if (overdue) danger else muted, fontSize = 11.sp)
+                            color = jessiReadableText(if (overdue) danger else muted), fontSize = 11.sp)
                     }
                     Text("مبلغ قسط بعدی: " + toman(Installments.nextAmount(row)),
                         fontSize = 12.sp, fontWeight = FontWeight.Medium)
@@ -2151,10 +2151,10 @@ private fun DebtsPage(
                     horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     Icon(Icons.Outlined.Event, contentDescription = null,
                         tint = tone, modifier = Modifier.size(16.dp))
-                    Text("سررسید: " + row.dueDateJalali, fontSize = 11.sp, color = muted)
+                    Text("سررسید: " + row.dueDateJalali, fontSize = 11.sp, color = jessiReadableText(muted))
                 }
             }
-            if (row.note.isNotBlank()) Text(row.note, fontSize = 11.sp, color = muted)
+            if (row.note.isNotBlank()) Text(row.note, fontSize = 11.sp, color = jessiReadableText(muted))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .27f))
             FinanceActionRow(
                 edit = { onEdit(row) },
@@ -2191,7 +2191,7 @@ private fun BudgetsPage(
                 FinanceIconTile(Icons.Filled.DonutLarge, usedColor)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(b.category, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Text("سقف هزینه این دوره", color = muted, fontSize = 11.sp)
+                    Text("سقف هزینه این دوره", color = jessiReadableText(muted), fontSize = 11.sp)
                 }
                 Surface(
                     color = usedColor.copy(alpha = .13f),
@@ -2199,17 +2199,17 @@ private fun BudgetsPage(
                 ) {
                     Text(digitsFa(percent.toString()) + "٪",
                         Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        fontWeight = FontWeight.ExtraBold, color = usedColor, fontSize = 12.sp)
+                        fontWeight = FontWeight.ExtraBold, color = jessiReadableText(usedColor), fontSize = 12.sp)
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text("مصرف‌شده", color = muted, fontSize = 11.sp)
+                    Text("مصرف‌شده", color = jessiReadableText(muted), fontSize = 11.sp)
                     Text(toman(spent), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
                 Column(horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text("سقف تعیین‌شده", color = muted, fontSize = 11.sp)
+                    Text("سقف تعیین‌شده", color = jessiReadableText(muted), fontSize = 11.sp)
                     Text(toman(b.monthlyLimitToman), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
@@ -2221,8 +2221,7 @@ private fun BudgetsPage(
                 if (percent >= 100) "سقف هزینه این دسته رد شده"
                 else if (percent >= 80) "نزدیک سقف هزینه هستی"
                 else "در محدوده بودجه",
-                fontSize = 11.sp, color = if (percent >= 80) usedColor else muted
-            )
+                fontSize = 11.sp, color = jessiReadableText(if (percent >= 80) usedColor else muted))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .27f))
             FinanceActionRow(edit = { onEdit(b) }, delete = { onDelete(b) })
         }
@@ -2249,7 +2248,7 @@ private fun TextEntry(
 private fun <T> SelectItem(label: String, selected: T?, items: List<T>, display: (T) -> String, onPick: (T) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Column {
-        Text(label, fontSize = 12.sp, color = muted)
+        Text(label, fontSize = 12.sp, color = jessiReadableText(muted))
         Box {
             OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
                 Text(selected?.let(display) ?: "انتخاب کنید", modifier = Modifier.weight(1f))
@@ -2272,7 +2271,7 @@ private fun EntryDialog(title: String, valid: Boolean, dismiss: () -> Unit, onSa
         containerColor = if (LocalJessiDark.current) Color(0xFF1B1B45) else Color.White,
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text(title, color = mint, fontWeight = FontWeight.ExtraBold)
+                Text(title, color = jessiReadableText(mint), fontWeight = FontWeight.ExtraBold)
                 Box(Modifier.width(58.dp).height(3.dp)
                     .background(Brush.horizontalGradient(listOf(financeAqua, financePurple)),
                         RoundedCornerShape(5.dp)))
@@ -2301,7 +2300,7 @@ private fun AccountDialog(initial: Account?, dismiss: () -> Unit, save: (Account
         TextEntry("نام بانک", bank, { bank = it })
         TextEntry("چهار رقم آخر کارت/حساب (اختیاری)", last4, { last4 = it }, number = true, grouped = false)
         TextEntry("موجودی اولیه به تومان", opening, { opening = it }, number = true)
-        Text("موجودی فعلی = موجودی اولیه + واریزها − برداشت‌ها. برای جلوگیری از دوباره‌شماری، موجودی اولیه را در زمان شروع ثبت کن.", fontSize = 11.sp, color = muted)
+        Text("موجودی فعلی = موجودی اولیه + واریزها − برداشت‌ها. برای جلوگیری از دوباره‌شماری، موجودی اولیه را در زمان شروع ثبت کن.", fontSize = 11.sp, color = jessiReadableText(muted))
     }
 }
 
@@ -2339,17 +2338,17 @@ private fun TransactionDialog(
                 }
             }
         }
-        if (accounts.isEmpty()) Text("ابتدا از بخش حساب‌ها یک حساب بساز.", color = danger, fontSize = 12.sp)
+        if (accounts.isEmpty()) Text("ابتدا از بخش حساب‌ها یک حساب بساز.", color = jessiReadableText(danger), fontSize = 12.sp)
         else SelectItem("حساب", accountId?.let { id -> accounts.firstOrNull { it.id == id } }, accounts, { it.title }, { accountId = it.id })
         if (transfer && accounts.isNotEmpty()) {
             SelectItem("حساب مقصد", targetAccountId?.let { id -> accounts.firstOrNull { it.id == id } }, accounts, { it.title }, { targetAccountId = it.id })
-            Text("انتقال بین حساب‌ها درآمد یا هزینه محسوب نمی‌شود.", fontSize = 11.sp, color = muted)
+            Text("انتقال بین حساب‌ها درآمد یا هزینه محسوب نمی‌شود.", fontSize = 11.sp, color = jessiReadableText(muted))
         }
         TextEntry("مبلغ به تومان", amountStr, { amountStr = it }, number = true)
         if (type == "OUT") SelectItem("دسته‌بندی", category, categories, { it }, { category = it })
         if (type == "IN") {
             SelectItem("نوع درآمد", category, incomeCategories, { it }, { category = it })
-            if (category == "حقوق") Text("این واریز در حالت «از حقوق» دوره جدید مالی رو آغاز می‌کنه.", color = mint, fontSize = 11.sp)
+            if (category == "حقوق") Text("این واریز در حالت «از حقوق» دوره جدید مالی رو آغاز می‌کنه.", color = jessiReadableText(mint), fontSize = 11.sp)
         }
         TextEntry("توضیح (اختیاری)", note, { note = it })
     }
@@ -2403,7 +2402,7 @@ private fun DebtDialog(initial: Debt?, dismiss: () -> Unit, save: (Debt) -> Unit
                     monthsUntilDue = (monthsUntilDue - 1).coerceAtLeast(0)
                     firstDue = JalaliDates.format(JalaliDates.addMonths(Jalali.of(System.currentTimeMillis()), monthsUntilDue))
                 }, enabled = monthsUntilDue > 0) { Text("−") }
-                Text(digitsFa(monthsUntilDue.toString()), color = mint)
+                Text(digitsFa(monthsUntilDue.toString()), color = jessiReadableText(mint))
                 OutlinedButton(onClick = {
                     monthsUntilDue = (monthsUntilDue + 1).coerceAtMost(36)
                     firstDue = JalaliDates.format(JalaliDates.addMonths(Jalali.of(System.currentTimeMillis()), monthsUntilDue))
@@ -2412,7 +2411,7 @@ private fun DebtDialog(initial: Debt?, dismiss: () -> Unit, save: (Debt) -> Unit
             JalaliDateInput("تاریخ اولین سررسید شمسی", firstDue, onChange = { firstDue = it })
             if (amount != null && months != null && months > 0) {
                 Text("مبلغ تقریبی هر قسط: ${toman(amount / months)} • مانده با ثبت پرداخت کم می‌شه.",
-                    fontSize = 11.sp, color = mint)
+                    fontSize = 11.sp, color = jessiReadableText(mint))
             }
         } else {
             JalaliDateInput("تاریخ سررسید شمسی", due, optional = true, onChange = { due = it })
@@ -2431,7 +2430,7 @@ private fun BudgetDialog(initial: Budget?, existing: List<Budget>, dismiss: () -
     }) {
         SelectItem("دسته‌بندی هزینه", category, categories, { it }, { category = it })
         TextEntry("سقف ماهانه (تومان)", amountStr, { amountStr = it }, number = true)
-        Text("سقف‌ها در ابتدای هر دوره انتخابی مجدداً محاسبه می‌شوند؛ مانده حساب صفر نمی‌شود.", fontSize = 11.sp, color = muted)
+        Text("سقف‌ها در ابتدای هر دوره انتخابی مجدداً محاسبه می‌شوند؛ مانده حساب صفر نمی‌شود.", fontSize = 11.sp, color = jessiReadableText(muted))
     }
 }
 
@@ -2446,12 +2445,12 @@ private fun RepayDialog(debt: Debt, accounts: List<Account>, dismiss: () -> Unit
     EntryDialog(if (debt.direction == "I_OWE") "ثبت بازپرداخت" else "ثبت وصول طلب", amount != null && amount > 0 && amount <= balance && accountId != null, dismiss, {
         onPay(amount!!, accountId!!)
     }) {
-        Text("مانده: ${toman(balance)}", color = mint)
-        if (debt.installmentMonths > 0) Text("مبلغ قسط بعد: ${toman(Installments.nextAmount(debt))}", color = mint, fontSize = 12.sp)
-        if (accounts.isEmpty()) Text("برای ثبت پرداخت، ابتدا یک حساب بساز.", color = danger)
+        Text("مانده: ${toman(balance)}", color = jessiReadableText(mint))
+        if (debt.installmentMonths > 0) Text("مبلغ قسط بعد: ${toman(Installments.nextAmount(debt))}", color = jessiReadableText(mint), fontSize = 12.sp)
+        if (accounts.isEmpty()) Text("برای ثبت پرداخت، ابتدا یک حساب بساز.", color = jessiReadableText(danger))
         else SelectItem("حساب مرتبط", accountId?.let { id -> accounts.firstOrNull { it.id == id } }, accounts, { it.title }, { accountId = it.id })
         TextEntry("مبلغ پرداخت یا دریافت (تومان)", amountStr, { amountStr = it }, number = true)
-        Text("این مبلغ هم در مانده حساب اعمال می‌شود؛ اما به عنوان هزینه روزمره یا درآمد ماهانه دسته‌بندی نمی‌شود.", fontSize = 11.sp, color = muted)
+        Text("این مبلغ هم در مانده حساب اعمال می‌شود؛ اما به عنوان هزینه روزمره یا درآمد ماهانه دسته‌بندی نمی‌شود.", fontSize = 11.sp, color = jessiReadableText(muted))
     }
 }
 
@@ -2489,21 +2488,21 @@ private fun ReviewDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (isSimulation) {
-                    Text("نمونه آزمایشی • ثبت اختیاری", color = financePurple,
+                    Text("نمونه آزمایشی • ثبت اختیاری", color = jessiReadableText(financePurple),
                         fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     Text("در صورت تأیید، تراکنش آزمایشی مانند تراکنش عادی روی موجودی حساب، " +
                         "بودجه‌ها و نمودارهای درآمد و هزینه تأثیر می‌گذارد و با برچسب آزمایشی قابل شناسایی و حذف است.",
-                        color = danger, fontSize = 12.sp, lineHeight = 19.sp)
+                        color = jessiReadableText(danger), fontSize = 12.sp, lineHeight = 19.sp)
                 }
-                Text(if (row.kind == "IN") "واریز احتمالی" else "برداشت احتمالی", color = mint)
-                if (row.bankName.isNotBlank()) Text(row.bankName, fontSize = 13.sp, color = muted)
+                Text(if (row.kind == "IN") "واریز احتمالی" else "برداشت احتمالی", color = jessiReadableText(mint))
+                if (row.bankName.isNotBlank()) Text(row.bankName, fontSize = 13.sp, color = jessiReadableText(muted))
                 Text(if (needsUnit && selectedUnit.isBlank())
                     reviewAmountLabel(row) else toman(selectedAmount),
                     fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 Text("فرستنده: ${row.sender}", fontSize = 12.sp)
                 if (needsUnit) {
                     Text("واحد پول در پیامک مشخص نیست؛ قبل از ثبت انتخاب کن:",
-                        color = danger, fontSize = 12.sp)
+                        color = jessiReadableText(danger), fontSize = 12.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         FilterChip(
                             selected = selectedUnit == "RIAL",
@@ -2518,10 +2517,10 @@ private fun ReviewDialog(
                     }
                     if (selectedUnit == "RIAL" && original % 10L != 0L) {
                         Text("مبلغ ریالی به تومانِ صحیح قابل تبدیل نیست؛ این مورد را دستی بررسی کن.",
-                            fontSize = 11.sp, color = danger)
+                            fontSize = 11.sp, color = jessiReadableText(danger))
                     }
                 }
-                if (accounts.isEmpty()) Text("اول یک حساب بساز.", color = danger)
+                if (accounts.isEmpty()) Text("اول یک حساب بساز.", color = jessiReadableText(danger))
                 else SelectItem("این تراکنش برای کدام حساب است؟",
                     accountId?.let { id -> accounts.firstOrNull { it.id == id } },
                     accounts, { it.title }, { accountId = it.id })
@@ -2530,7 +2529,7 @@ private fun ReviewDialog(
                     { it }, { category = it })
                 if (category == "حقوق" && row.kind == "IN") {
                     Text("این واریز می‌تونه دوره جدید رو در حالت «از حقوق» آغاز کنه.",
-                        color = mint, fontSize = 11.sp)
+                        color = jessiReadableText(mint), fontSize = 11.sp)
                 }
                 TextEntry("برای چی بود؟ (توضیح اختیاری)", note, { note = it }, singleLine = false)
                 if (isSimulation) {
@@ -2538,11 +2537,11 @@ private fun ReviewDialog(
                         Checkbox(checked = testRegistrationConsent,
                             onCheckedChange = { testRegistrationConsent = it })
                         Text("می‌پذیرم این تراکنش آزمایشی در آمار و مانده حساب اعمال شود.",
-                            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                            fontSize = 11.sp, color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
                     }
                 } else {
                     Text("قبل از تأیید، مبلغ و نوع تراکنش را با پیامک اصلی تطبیق بده.",
-                        fontSize = 11.sp, color = muted)
+                        fontSize = 11.sp, color = jessiReadableText(muted))
                 }
             }
         },
@@ -2558,7 +2557,7 @@ private fun ReviewDialog(
         dismissButton = {
             Row {
                 TextButton(onClick = onReject) {
-                    Text(if (isSimulation) "حذف نمونه" else "نادیده گرفتن", color = danger)
+                    Text(if (isSimulation) "حذف نمونه" else "نادیده گرفتن", color = jessiReadableText(danger))
                 }
                 TextButton(onClick = dismiss) { Text("بعداً") }
             }

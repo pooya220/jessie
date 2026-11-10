@@ -36,12 +36,12 @@ fun FinancialTrendChart(periods: List<FinancePeriod>, selectedIndex: Int, transa
     Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("روند درآمد و هزینه", fontSize = 15.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
-            Text("۶ دوره اخیر", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                modifier = Modifier.weight(1f), color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+            Text("۶ دوره اخیر", fontSize = 10.sp, color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
         }
         if (shown.isEmpty() || (incomes + expenses).all { it == 0L }) {
             Text("هنوز تراکنشی برای نمایش روند ثبت نشده.", fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
         } else {
             val maximum = (incomes + expenses).maxOrNull()?.coerceAtLeast(1L) ?: 1L
             Canvas(Modifier.fillMaxWidth().height(96.dp)) {
@@ -64,12 +64,12 @@ fun FinancialTrendChart(periods: List<FinancePeriod>, selectedIndex: Int, transa
             Row(Modifier.fillMaxWidth()) {
                 shown.forEach { p ->
                     Text(p.shortLabel, Modifier.weight(1f), fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                        color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), textAlign = TextAlign.Center)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(15.dp)) {
-                Text("● درآمد", color = incomeColor, fontSize = 12.sp)
-                Text("● هزینه", color = expenseColor, fontSize = 12.sp)
+                Text("● درآمد", color = jessiReadableText(incomeColor), fontSize = 12.sp)
+                Text("● هزینه", color = jessiReadableText(expenseColor), fontSize = 12.sp)
             }
         }
     }
@@ -103,7 +103,7 @@ fun SpendingCategoryChart(transactions: List<Transaction>) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 if (rows.isEmpty()) {
                     Text("هنوز هزینه‌ای در این دوره ثبت نشده.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                        color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 11.sp)
                 } else {
                     rows.forEachIndexed { index, (label, amount) ->
                         Row(
@@ -112,10 +112,10 @@ fun SpendingCategoryChart(transactions: List<Transaction>) {
                         ) {
                             Box(Modifier.size(8.dp).background(colors[index], RoundedCornerShape(3.dp)))
                             Text(label, Modifier.weight(1f), fontSize = 11.sp,
-                                maxLines = 1, color = MaterialTheme.colorScheme.onSurface)
+                                maxLines = 1, color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
                             Text(digitsFa((100 * amount / total.coerceAtLeast(1L)).toString()) + "٪",
                                 fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface)
+                                color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
                         }
                     }
                 }
@@ -141,9 +141,8 @@ fun SpendingCategoryChart(transactions: List<Transaction>) {
                         ),
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = if (total > 999_999_999L) 11.sp else 13.sp,
-                        maxLines = 1, color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text("تومان", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        maxLines = 1, color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+                    Text("تومان", fontSize = 10.sp, color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
                 }
             }
         }
@@ -164,11 +163,11 @@ fun InstallmentForecastChart(debts: List<Debt>, now: Long) {
     }
     val upcoming = periods.map { p -> debts.sumOf { Installments.dueInPeriod(it, p.start, p.endExclusive) } }
     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        Text("برنامه اقساط ۶ ماه آینده", color = MaterialTheme.colorScheme.onSurface,
+        Text("برنامه اقساط ۶ ماه آینده", color = jessiReadableText(MaterialTheme.colorScheme.onSurface),
             fontSize = 15.sp, fontWeight = FontWeight.Bold)
         if (upcoming.all { it == 0L }) {
             Text("قسطی با سررسید ۶ ماه آینده ثبت نشده.", fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
         } else {
             val max = upcoming.maxOrNull()?.coerceAtLeast(1L) ?: 1L
             Canvas(Modifier.fillMaxWidth().height(70.dp)) {
@@ -184,10 +183,10 @@ fun InstallmentForecastChart(debts: List<Debt>, now: Long) {
             Row(Modifier.fillMaxWidth()) {
                 periods.forEach { p ->
                     Text(digitsFa(p.shortLabel), Modifier.weight(1f), textAlign = TextAlign.Center,
-                        fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        fontSize = 10.sp, color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
                 }
             }
-            Text("مجموع اقساط پیش‌رو: " + toman(upcoming.sum()), fontSize = 12.sp, color = negative)
+            Text("مجموع اقساط پیش‌رو: " + toman(upcoming.sum()), fontSize = 12.sp, color = jessiReadableText(negative))
         }
     }
 }

@@ -71,10 +71,10 @@ fun JessiLockScreen(
                     tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(38.dp))
                 Text("ورود امن به جسی", fontWeight = FontWeight.ExtraBold, fontSize = 21.sp)
                 Text("ابتدا اثرانگشت را تأیید کن، یا با پین وارد شو",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant),
                     fontSize = 12.sp)
                 PinInput("پین ورود (۴ تا ۶ رقم)", pin, { pin = it; error = null })
-                if (error != null) Text(error!!, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                if (error != null) Text(error!!, color = jessiReadableText(MaterialTheme.colorScheme.error), fontSize = 12.sp)
                 Button(
                     onClick = {
                         val result = security.verify(pin)
@@ -95,7 +95,7 @@ fun JessiLockScreen(
                     }
                 }
                 Text("برای امنیت اطلاعات مالی، بعد از خروج از برنامه دوباره قفل فعال می‌شود.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant),
                     fontSize = 10.sp)
             }
         }
@@ -124,7 +124,7 @@ fun JessiSecuritySettings(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("قفل ورود به برنامه", fontWeight = FontWeight.Bold, fontSize = 16.sp)
         Text("وقتی فعال باشد، بعد از بازکردن جسی ابتدا تأیید بیومتریک و در صورت نیاز پین درخواست می‌شود.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+            color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 12.sp)
         if (!enabled) {
             Button(onClick = { action = "enable" }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Outlined.Security, contentDescription = null, modifier = Modifier.size(19.dp))
@@ -132,7 +132,7 @@ fun JessiSecuritySettings(
                 Text("فعال‌کردن قفل با پین")
             }
         } else {
-            Text("قفل ورود فعال است", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
+            Text("قفل ورود فعال است", color = jessiReadableText(MaterialTheme.colorScheme.primary), fontSize = 13.sp)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Fingerprint, contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
@@ -142,7 +142,7 @@ fun JessiSecuritySettings(
                     Text(
                         if (biometricAvailable) "اول اثرانگشت، در صورت انصراف یا خطا پین"
                         else "اثر انگشت در تنظیمات گوشی فعال نیست؛ پین همیشه کار می‌کند",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp
+                        color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 10.sp
                     )
                 }
                 Switch(
@@ -163,7 +163,7 @@ fun JessiSecuritySettings(
             }
         }
         Text("پین رمزگذاریِ یک‌طرفه و با نمک تصادفی ذخیره می‌شود. پین در فایل پشتیبان مالی ذخیره نمی‌شود.",
-            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            fontSize = 11.sp, color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
     }
 
     if (action != null) {
@@ -183,7 +183,7 @@ fun JessiSecuritySettings(
                             { confirmation = it; error = null })
                     }
                     if (error != null) Text(error!!,
-                        fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                        fontSize = 12.sp, color = jessiReadableText(MaterialTheme.colorScheme.error))
                 }
             },
             confirmButton = {

@@ -28,7 +28,7 @@ fun JalaliDateInput(label: String, value: String, optional: Boolean = false, onC
             Icon(Icons.Outlined.CalendarMonth, contentDescription = null, modifier = Modifier.size(19.dp))
             Spacer(Modifier.width(8.dp))
             Text(value.ifBlank { "انتخاب تاریخ شمسی" }, modifier = Modifier.weight(1f))
-            Text("تغییر", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
+            Text("تغییر", color = jessiReadableText(MaterialTheme.colorScheme.primary), fontSize = 11.sp)
         }
         if (optional && value.isNotBlank()) {
             TextButton(onClick = { onChange("") }) { Text("بدون سررسید", fontSize = 11.sp) }
@@ -92,7 +92,7 @@ private fun JalaliCalendarPopup(
                 Row(Modifier.fillMaxWidth()) {
                     days.forEach { day ->
                         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            Text(day, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(day, fontSize = 12.sp, color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
                         }
                     }
                 }
@@ -122,8 +122,8 @@ private fun JalaliCalendarPopup(
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (valid) Text(digitsFa(dayNumber.toString()),
-                                    color = if (selected || isToday) activeColor
-                                        else MaterialTheme.colorScheme.onSurface,
+                                    color = jessiReadableText(if (selected || isToday) activeColor
+                                        else MaterialTheme.colorScheme.onSurface),
                                     fontWeight = if (selected || isToday) FontWeight.Bold
                                         else FontWeight.Normal,
                                     fontSize = 12.sp)
