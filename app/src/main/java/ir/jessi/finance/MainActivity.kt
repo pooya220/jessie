@@ -953,11 +953,48 @@ private fun SettingsPage(
     pinSecurity: PinSecurity, onSecurityChanged: () -> Unit,
     versionName: String
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        Column(Modifier.padding(vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("تنظیمات", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
-            Text("شخصی‌سازی جسی و کنترل دسترسی‌ها", fontSize = 12.sp, color = muted)
+    var section by remember { mutableStateOf("home") }
+    val titles = mapOf(
+        "appearance" to "ظاهر و پس‌زمینه",
+        "security" to "قفل ورود و امنیت",
+        "sms" to "پیامک و اعلان‌ها",
+        "diagnostics" to "آزمایش و عیب‌یابی",
+        "backup" to "پشتیبان‌گیری",
+        "period" to "دوره مالی",
+        "about" to "درباره جسی"
+    )
+    BackHandler(enabled = section != "home") { section = "home" }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (section != "home") {
+                IconButton(onClick = { section = "home" }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Outlined.ArrowForward, contentDescription = "بازگشت به تنظیمات")
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(if (section == "home") "تنظیمات" else titles[section].orEmpty(),
+                    fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                Text(if (section == "home") "هر موضوع در صفحه جداگانه و مرتب"
+                     else "جسی • تنظیمات", fontSize = 11.sp, color = muted)
+            }
         }
+        if (section == "home") {
+            SettingsNavRow(Icons.Outlined.Palette, "ظاهر و پس‌زمینه",
+                "تم، تصویر دلخواه، شدت هاله شیشه‌ای", financeAqua) { section = "appearance" }
+            SettingsNavRow(Icons.Outlined.Lock, "قفل ورود و امنیت",
+                "اثر انگشت و پین ورود", financePurple) { section = "security" }
+            SettingsNavRow(Icons.Outlined.Sms, "پیامک و اعلان‌ها",
+                "مجوزها و تنظیمات بررسی پیامک", financeBlue) { section = "sms" }
+            SettingsNavRow(Icons.Outlined.BugReport, "آزمایش و عیب‌یابی",
+                "اعلان آزمایشی و تست متن پیامک", financePurple) { section = "diagnostics" }
+            SettingsNavRow(Icons.Outlined.SaveAlt, "پشتیبان‌گیری",
+                "خروجی و بازیابی اطلاعات مالی", financeAqua) { section = "backup" }
+            SettingsNavRow(Icons.Outlined.CalendarMonth, "دوره مالی",
+                "انتخاب ماه شمسی یا دوره حقوق", financeAmber) { section = "period" }
+            SettingsNavRow(Icons.Outlined.Info, "درباره جسی",
+                "نسخه و اطلاعات نگهداری داده", financeBlue) { section = "about" }
+        }
+        if (section == "appearance") {
         Tile(Modifier.fillMaxWidth(), accent = financeAqua) {
             SettingsGroupTitle(Icons.Outlined.Palette, "ظاهر و حریم خصوصی", accent = financeAqua)
             SettingsToggle(
@@ -976,6 +1013,19 @@ private fun SettingsPage(
             )
         }
 
+            Tile(Modifier.fillMaxWidth(), accent = financeAqua) {
+                JessiBackgroundSettings(
+                    style = backgroundStyle, photoUri = backgroundPhotoUri,
+                    dim = backgroundDim, dark = darkMode,
+                    onStyleChange = onBackgroundStyle,
+                    onChooseImage = onPickBackground,
+                    onClearImage = onClearBackground,
+                    onDimChange = onBackgroundDim
+                )
+            }
+        }
+
+        if (section == "sms") {
         Tile(Modifier.fillMaxWidth(), accent = financeBlue) {
             SettingsGroupTitle(Icons.Outlined.Sms, "پیامک بانکی و اعلان‌ها", accent = financeBlue)
             SettingsToggle(
@@ -1018,6 +1068,9 @@ private fun SettingsPage(
             }
         }
 
+        }
+
+        if (section == "diagnostics") {
         Tile(Modifier.fillMaxWidth(), accent = financePurple) {
             SettingsGroupTitle(Icons.Outlined.BugReport, "عیب‌یابی دریافت پیامک", accent = financePurple)
             Text("وضعیت اعلان: " + (notificationBlocker ?: "مجوز و کانال اعلان فعال است"),
@@ -1049,6 +1102,9 @@ private fun SettingsPage(
 
         SmsParserTestSettings(onSimulateSms)
 
+        }
+
+        if (section == "backup") {
         Tile(Modifier.fillMaxWidth(), accent = financeAqua) {
             SettingsGroupTitle(Icons.Outlined.SaveAlt, "پشتیبان‌گیری و بازیابی اطلاعات", accent = financeAqua)
             Text(
@@ -1077,6 +1133,9 @@ private fun SettingsPage(
             )
         }
 
+        }
+
+        if (section == "period") {
         Tile(Modifier.fillMaxWidth(), accent = financeAmber) {
             SettingsGroupTitle(Icons.Outlined.CalendarMonth, "دوره مالی", accent = financeAmber)
             Text("شروع دوره جدید و محاسبه سقف هزینه‌ها",
@@ -1097,6 +1156,9 @@ private fun SettingsPage(
                 fontSize = 11.sp, color = muted)
         }
 
+        }
+
+        if (section == "about") {
         Tile(Modifier.fillMaxWidth(), accent = financeBlue) {
             SettingsGroupTitle(Icons.Outlined.Info, "درباره جسی", accent = financeBlue)
             Text("نسخه " + digitsFa(versionName),
@@ -1106,6 +1168,38 @@ private fun SettingsPage(
             Text("هنگام حذف برنامه، ممکن است داده‌های ذخیره‌شده حذف شوند؛ بدون پشتیبان برنامه را پاک نکن.",
                 fontSize = 11.sp, color = danger)
         }
+        }
+        if (section == "security") {
+            Tile(Modifier.fillMaxWidth(), accent = financePurple) {
+                JessiSecuritySettings(pinSecurity, onSecurityChanged)
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun SettingsNavRow(
+    icon: ImageVector, title: String, description: String,
+    accent: Color, onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        Modifier.fillMaxWidth().clip(shape)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = .57f))
+            .border(1.dp, accent.copy(alpha = .24f), shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 13.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(11.dp)
+    ) {
+        FinanceIconTile(icon, accent)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(description, fontSize = 11.sp, color = muted)
+        }
+        Icon(Icons.Outlined.ChevronLeft, contentDescription = null,
+            tint = accent, modifier = Modifier.size(20.dp))
     }
 }
 
