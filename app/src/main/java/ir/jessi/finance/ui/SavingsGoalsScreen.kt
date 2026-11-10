@@ -336,7 +336,7 @@ private fun GoalMetricTile(
 ) {
     Surface(
         modifier = modifier,
-        color = if (LocalJessiDark.current) Color(0xBE263056) else Color(0xDEFFFFFF),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = .78f),
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, tone.copy(alpha = .19f))
     ) {
