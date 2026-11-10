@@ -1,6 +1,7 @@
 package ir.jessi.finance.ui
 
 import ir.jessi.finance.data.Debt
+import ir.jessi.finance.data.FinancePeriodEngine
 import java.util.Calendar
 
 /**
@@ -101,5 +102,61 @@ object Installments {
             }
         }
         return amount
+    }
+}
+
+/** A single payment whose due date falls in the next calendar Jalali month. */
+data class UpcomingDebtPayment(
+    val debt: Debt,
+    val dueDate: Jalali.Date,
+    val amountToman: Long,
+    val isInstallment: Boolean
+)
+
+/** Only next-month scheduled obligations; never the total outstanding lifetime debt. */
+data class UpcomingDebtSummary(
+    val jalaliMonth: Jalali.Date,
+    val payments: List<UpcomingDebtPayment>
+) {
+    val installmentsToman: Long get() = payments.asSequence().filter { it.isInstallment }.sumOf { it.amountToman }
+    val ordinaryDebtsToman: Long get() = payments.asSequence().filterNot { it.isInstallment }.sumOf { it.amountToman }
+    val totalToman: Long get() = installmentsToman + ordinaryDebtsToman
+}
+
+object UpcomingDebtPlanner {
+    fun nextMonth(debts: List<Debt>, nowEpoch: Long): UpcomingDebtSummary {
+        val start = FinancePeriodEngine.nextMonthStart(FinancePeriodEngine.monthStart(nowEpoch))
+        val endExclusive = FinancePeriodEngine.nextMonthStart(start)
+        val due = buildList {
+            for (debt in debts) {
+                if (debt.direction != "I_OWE") continue
+                if (debt.totalToman - debt.paidToman <= 0L) continue
+
+                if (debt.installmentMonths > 0) {
+                    val first = JalaliDates.parse(debt.firstInstallmentJalali) ?: continue
+                    val paid = Installments.countPaid(debt)
+                    for (i in paid until debt.installmentMonths) {
+                        val date = JalaliDates.addMonths(first, i)
+                        val epoch = JalaliDates.toEpoch(date) ?: continue
+                        if (epoch < start || epoch >= endExclusive) continue
+                        // Apply partial payments to the earliest unpaid installment.
+                        val amount = (Installments.cumulative(debt, i + 1) -
+                            maxOf(Installments.cumulative(debt, i), debt.paidToman)).coerceAtLeast(0L)
+                        if (amount > 0L) {
+                            add(UpcomingDebtPayment(debt, date, amount, isInstallment = true))
+                        }
+                    }
+                } else {
+                    // Ordinary dated debts count even if they are not labelled as installments.
+                    val date = JalaliDates.parse(debt.dueDateJalali) ?: continue
+                    val epoch = JalaliDates.toEpoch(date) ?: continue
+                    if (epoch >= start && epoch < endExclusive) {
+                        add(UpcomingDebtPayment(debt, date,
+                            debt.totalToman - debt.paidToman, isInstallment = false))
+                    }
+                }
+            }
+        }.sortedBy { JalaliDates.toEpoch(it.dueDate) ?: Long.MAX_VALUE }
+        return UpcomingDebtSummary(Jalali.of(start), due)
     }
 }

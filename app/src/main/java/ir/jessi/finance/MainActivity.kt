@@ -1301,26 +1301,10 @@ private fun Dashboard(
     val current = txs.filter { currentPeriod.contains(it.createdAt) }
     val income = current.filter { it.kind == "IN" }.sumOf { it.amountToman }
     val expense = current.filter { it.kind == "OUT" }.sumOf { it.amountToman }
-    // Unpaid scheduled installments for six *calendar Jalali months*, including the current one.
-    // Reuse the exact finance engine used by the installments page; never count all outstanding
-    // debt as an upcoming monthly installment.
-    val upcomingMonths = buildList {
-        var start = FinancePeriodEngine.monthStart(nowEpoch)
-        repeat(6) {
-            val end = FinancePeriodEngine.nextMonthStart(start)
-            add(Triple(
-                Jalali.of(start),
-                debts.sumOf { debt -> Installments.dueInPeriod(debt, start, end) },
-                debts.count { debt -> Installments.dueInPeriod(debt, start, end) > 0L }
-            ))
-            start = end
-        }
-    }
-    val nextMonthInstallments = upcomingMonths[1].second
-    val nextMonthCount = upcomingMonths[1].third
-    val outstandingDebt = debts.asSequence()
-        .filter { it.direction == "I_OWE" }
-        .sumOf { (it.totalToman - it.paidToman).coerceAtLeast(0L) }
+    // Next Jalali month's actual payment obligations: scheduled installments and
+    // ordinary dated debts, regardless of their name or note. Exclude claims and
+    // undated or fully-settled records. Do not include the total lifetime balance.
+    val nextMonthDue = UpcomingDebtPlanner.nextMonth(debts, nowEpoch)
     val heroGradient = if (dark)
         Brush.linearGradient(listOf(Color(0xFF30235C), Color(0xFF172B4D), Color(0xFF17443F)))
     else Brush.linearGradient(listOf(Color(0xFFF3ECFB), Color(0xFFEBF7FF), Color(0xFFE8F8F2)))
@@ -1406,27 +1390,19 @@ private fun Dashboard(
             color = muted, fontSize = 10.sp)
     }
 
-    val nextDebt = debts.asSequence()
-        .filter { it.direction == "I_OWE" && it.installmentMonths > 0 &&
-            Installments.remainingCount(it) > 0 }
-        .mapNotNull { debt ->
-            Installments.nextDate(debt)?.let { date ->
-                JalaliDates.toEpoch(date)?.let { epoch -> Triple(debt, date, epoch) }
-            }
-        }.minByOrNull { it.third }
     val jalaliMonthNames = listOf("فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
         "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند")
-    val maxMonthDue = upcomingMonths.maxOf { it.second }.coerceAtLeast(1L)
+    val monthCaption = jalaliMonthNames[nextMonthDue.jalaliMonth.month - 1] +
+        " " + digitsFa(nextMonthDue.jalaliMonth.year.toString())
 
-    // One cohesive Dark Aurora card: outstanding debt, next-month amount and a real
-    // six-Jalali-month breakdown. The same amount is no longer repeated in another card.
+    // Dashboard debt panel is intentionally scoped ONLY to the next Jalali month.
     Tile(Modifier.fillMaxWidth(), accent = financePurple) {
         Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             FinanceIconTile(Icons.Filled.EventNote, financePurple)
             Column(Modifier.weight(1f)) {
-                Text("اقساط و بدهی", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
-                Text("نمای پرداخت‌های برنامه‌ریزی‌شده", fontSize = 10.sp, color = muted)
+                Text("اقساط و بدهی‌های ماه آینده", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                Text("سررسیدهای " + monthCaption, fontSize = 11.sp, color = muted)
             }
             TextButton(onClick = { onSelectTab(Tab.DEBTS) },
                 contentPadding = PaddingValues(horizontal = 4.dp)) {
@@ -1435,89 +1411,75 @@ private fun Dashboard(
                     modifier = Modifier.size(17.dp))
             }
         }
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(9.dp)
-        ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             DashboardCompactMetric(
                 label = "اقساط ماه آینده",
-                value = if (balanceVisible) toman(nextMonthInstallments) else "••••••",
+                value = if (balanceVisible) toman(nextMonthDue.installmentsToman) else "••••••",
                 icon = Icons.Outlined.CalendarMonth,
                 tone = financePurple,
                 modifier = Modifier.weight(1f)
             )
             DashboardCompactMetric(
-                label = "کل مانده بدهی",
-                value = if (balanceVisible) toman(outstandingDebt) else "••••••",
-                icon = Icons.Outlined.AccountBalanceWallet,
+                label = "بدهی‌های سررسیددار",
+                value = if (balanceVisible) toman(nextMonthDue.ordinaryDebtsToman) else "••••••",
+                icon = Icons.Outlined.ReceiptLong,
                 tone = financeAqua,
                 modifier = Modifier.weight(1f)
             )
         }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.BarChart, contentDescription = null,
-                tint = financeAqua, modifier = Modifier.size(17.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("تفکیک اقساط ۶ ماه", fontSize = 12.sp,
-                fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Tag(digitsFa(nextMonthCount.toString()) + " مورد ماه آینده", nextMonthCount > 0)
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
-            upcomingMonths.forEachIndexed { index, month ->
-                val (date, due, _) = month
-                val highlighted = index == 1
-                val tone = if (highlighted) financePurple else financeAqua
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Column(Modifier.width(80.dp)) {
-                        Text(jalaliMonthNames[date.month - 1], fontSize = 12.sp,
-                            fontWeight = if (highlighted) FontWeight.ExtraBold else FontWeight.Medium)
-                        Text(if (index == 0) "این ماه" else if (highlighted) "ماه آینده"
-                            else digitsFa(date.year.toString()),
-                            fontSize = 10.sp, color = if (highlighted) tone else muted)
-                    }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text(if (balanceVisible) toman(due) else "••••••", fontSize = 12.sp,
-                            fontWeight = if (highlighted) FontWeight.ExtraBold else FontWeight.SemiBold,
-                            color = if (highlighted) tone else MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        LinearProgressIndicator(
-                            progress = { if (balanceVisible) (due.toFloat() / maxMonthDue).coerceIn(0f, 1f) else 0f },
-                            modifier = Modifier.fillMaxWidth().height(5.dp)
-                                .clip(RoundedCornerShape(9.dp)),
-                            color = tone,
-                            trackColor = if (dark) Color.White.copy(alpha = .09f)
-                                else tone.copy(alpha = .11f)
-                        )
-                    }
-                }
-            }
-        }
-        if (nextDebt != null) {
-            val (debt, date, _) = nextDebt
-            Row(
-                Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(financePurple.copy(alpha = if (dark) .14f else .08f))
-                    .padding(horizontal = 10.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(7.dp)
-            ) {
-                Icon(Icons.Outlined.EventAvailable, contentDescription = null,
-                    tint = financePurple, modifier = Modifier.size(16.dp))
-                Text("سررسید نزدیک", color = muted, fontSize = 10.sp)
-                Text(debt.person + " • " + JalaliDates.format(date),
-                    modifier = Modifier.weight(1f), textAlign = TextAlign.End,
-                    fontSize = 11.sp, fontWeight = FontWeight.Bold,
+        Row(
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(15.dp))
+                .background(financePurple.copy(alpha = if (dark) .16f else .08f))
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null,
+                tint = financePurple, modifier = Modifier.size(22.dp))
+            Column(Modifier.weight(1f)) {
+                Text("جمع پرداخت‌های ماه آینده", color = muted, fontSize = 11.sp)
+                Text(if (balanceVisible) toman(nextMonthDue.totalToman) else "••••••",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 19.sp, fontWeight = FontWeight.ExtraBold,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-        } else if (outstandingDebt == 0L) {
-            Text("بدهی فعالی ثبت نشده ✦", fontSize = 11.sp, color = muted)
+            Tag(digitsFa(nextMonthDue.payments.size.toString()) + " سررسید",
+                nextMonthDue.payments.isNotEmpty())
         }
-        Text("مبالغ ماهانه فقط اقساط برنامه‌ریزی‌شده پرداخت‌نشده هستند، نه کل مانده بدهی.",
+        if (nextMonthDue.payments.isEmpty()) {
+            Text("برای ماه آینده هیچ قسط یا بدهی سررسیدداری ثبت نشده ✦",
+                fontSize = 11.sp, color = muted)
+        } else {
+            Text("سررسیدهای ماه آینده", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            nextMonthDue.payments.take(5).forEach { item ->
+                Row(Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(
+                        if (item.isInstallment) Icons.Outlined.CalendarToday
+                            else Icons.Outlined.EventAvailable,
+                        contentDescription = null,
+                        tint = if (item.isInstallment) financePurple else financeAqua,
+                        modifier = Modifier.size(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(item.debt.person, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text((if (item.isInstallment) "قسط" else "بدهی") + " • " +
+                            JalaliDates.format(item.dueDate), color = muted, fontSize = 10.sp)
+                    }
+                    Text(if (balanceVisible) toman(item.amountToman) else "••••••",
+                        fontWeight = FontWeight.Bold, fontSize = 11.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            if (nextMonthDue.payments.size > 5) {
+                Text("و " + digitsFa((nextMonthDue.payments.size - 5).toString()) +
+                    " سررسید دیگر در بخش اقساط و بدهی‌ها",
+                    fontSize = 10.sp, color = muted)
+            }
+        }
+        Text("محاسبه بر اساس تاریخ سررسید و مبلغ پرداخت‌نشده است؛ عنوان «قسط» شرط نیست.",
             fontSize = 10.sp, color = muted)
     }
 
