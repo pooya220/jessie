@@ -159,19 +159,7 @@ jobs:
           arch: x86_64
           profile: pixel_5
           disable-animations: true
-          script: |
-            set -euo pipefail
-            APK=app/build/outputs/apk/debug/app-debug.apk
-            adb install -r "$APK"
-            adb shell pm path ir.jessi.finance | grep 'package:'
-            adb shell am start -W -n ir.jessi.finance/.MainActivity
-            sleep 8
-            if adb logcat -d -s AndroidRuntime:E | grep -E 'FATAL EXCEPTION|Process: ir.jessi.finance'; then
-              echo "Jessie crashed after installation" >&2
-              exit 1
-            fi
-            adb shell pidof ir.jessi.finance | grep -E '[0-9]+'
-            echo "Jessi 0.11 original-package cold installation and launch OK; this does not validate update from 0.10."
+          script: bash scripts/test_android_original_package.sh
 
       - name: Release only the official verified APK
         if: steps.signing.outputs.method != 'temporary'
