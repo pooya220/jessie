@@ -1,4 +1,4 @@
-name: Jessie Android v0.11 APK and permanent-signing verification
+name: Jessie permanent-signed official APK
 
 on:
   push:
@@ -54,9 +54,8 @@ jobs:
             echo "method=private-key" >> "$GITHUB_OUTPUT"
             echo "The owner's private signing bundle is available to CI." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "method=temporary" >> "$GITHUB_OUTPUT"
-            echo "::warning::No original signing key is available. The output will use the original package ID but a different temporary signing key. It CANNOT update an existing Jessie installation. Back up data before migration."
-            echo "Original-package temporary-signed APK: NOT an in-place update. Existing installs remain untouched." >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Permanent signing key is not available. Set GitHub secret JESSI_SIGNING_BUNDLE. Never publish temporary-signed Jessie APKs."
+            exit 1
           fi
 
       - name: Apply the precomputed permanent signature
@@ -105,7 +104,6 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/signed/Jessi.apk
 
       - name: Verify signature matches previous official releases
-        if: steps.signing.outputs.method != 'temporary'
         shell: bash
         run: |
           set -euo pipefail
@@ -113,10 +111,10 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --min-sdk-version 26 "$APK"
           CERT_SHA=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/.*Signer #1 certificate SHA-256 digest: //p' | head -1 | tr '[:upper:]' '[:lower:]')
-          EXPECTED=0c8b4868394b2b1a5e8e3c29c95b9e4556bfbcfa4a1966f4260a880cb8fdb6d5
-          [[ "$CERT_SHA" == "$EXPECTED" ]] || { echo "::error::Signing certificate differs from v0.10.0"; exit 1; }
+          EXPECTED=e5595361238d05ea6aa34199d19530dc5610a47202a930dcba61e748b47e6559
+          [[ "$CERT_SHA" == "$EXPECTED" ]] || { echo "::error::Signing certificate differs from the NEW permanent Jessie signing identity"; exit 1; }
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep "^package: name='ir.jessi.finance' "
-          echo "Same app ID and permanent signing certificate verified." >> "$GITHUB_STEP_SUMMARY"
+          echo "New permanent signing certificate and original package ID verified." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Enable KVM for emulator
         run: |
@@ -124,8 +122,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Test install over previous official v0.10.0 and launch
-        if: steps.signing.outputs.method != 'temporary'
+      - name: Test install and upgrade with the new permanent signing identity
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
@@ -133,35 +130,9 @@ jobs:
           arch: x86_64
           profile: pixel_5
           disable-animations: true
-          script: bash scripts/test_android_install.sh
+          script: bash scripts/test_android_permanent.sh
 
-      - name: Verify temporary signer and original package identity
-        if: steps.signing.outputs.method == 'temporary'
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK=app/build/outputs/apk/debug/app-debug.apk
-          test -s "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --min-sdk-version 26 "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep "^package: name='ir.jessi.finance' "
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep "versionCode='17'"
-          CERT_SHA=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/.*Signer #1 certificate SHA-256 digest: //p' | head -1 | tr '[:upper:]' '[:lower:]')
-          EXPECTED=0c8b4868394b2b1a5e8e3c29c95b9e4556bfbcfa4a1966f4260a880cb8fdb6d5
-          [[ "$CERT_SHA" != "$EXPECTED" ]] || { echo "::error::Unexpected signer, check release path"; exit 1; }
-          echo "Original app ID verified. Temporary signature verified and documented; NOT compatible with in-place upgrades." >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Test temporary-signed original-package APK on Android 13
-        if: steps.signing.outputs.method == 'temporary'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 33
-          target: google_apis
-          arch: x86_64
-          profile: pixel_5
-          disable-animations: true
-          script: bash scripts/test_android_original_package.sh
-
-      - name: Release only the official verified APK
+      - name: Release only the NEW permanently signed official APK
         if: steps.signing.outputs.method != 'temporary'
         shell: bash
         env:
@@ -178,26 +149,7 @@ jobs:
           cp app/build/outputs/apk/signed/Jessi.apk "$FILE"
           gh release create "$TAG" "$FILE" \
             --target "$GITHUB_SHA" \
-            --title "جسی ${VERSION}" \
-            --notes "نسخه رسمی با شناسه ir.jessi.finance و گواهی امضای یکسان با v0.10.0. نصب و آپدیت درجا از نسخه قبلی روی Android 13 تست شده؛ قبل از هر آپدیت مهم، از اطلاعات مالی پشتیبان بگیرید."
+            --title "جسی ${VERSION} — امضای دائمی" \
+            --notes "جسی با شناسه اصلی ir.jessi.finance و کلید امضای دائمی جدید. از 0.10.0 و 0.11.0 با امضای متفاوت، آپدیت مستقیم ممکن نیست؛ ابتدا بکاپ و بازیابی یک‌باره لازم است. از 0.11.1 به بعد تمامی نسخه‌ها باید با همین کلید ثابت منتشر شوند. نصب و اجرای نسخه جدید روی شبیه‌ساز Android 13 تأیید شده است."
           echo "Published signed Jessie v${VERSION}." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Publish Jessi 0.11 installable APK with explicit signature warning
-        if: steps.signing.outputs.method == 'temporary'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          VERSION="${{ steps.signing.outputs.version }}"
-          TAG="v${VERSION}"
-          FILE="Jessi-v${VERSION}.apk"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release already exists; refusing overwrite."
-            exit 0
-          fi
-          cp app/build/outputs/apk/debug/app-debug.apk "$FILE"
-          gh release create "$TAG" "$FILE" --target "$GITHUB_SHA" \
-            --title "جسی ${VERSION} — APK با شناسه اصلی" \
-            --notes "نسخه 0.11 با نام جسی و شناسه اصلی ir.jessi.finance است، اما به علت در دسترس نبودن کلید امضای دائمی، با کلید موقت امضا شده است. این فایل روی نسخه رسمی 0.10 به صورت آپدیت مستقیم نصب نمی‌شود. برنامه اصلی را بدون گرفتن نسخه پشتیبان داده‌های مالی حذف نکنید. برای مهاجرت ابتدا داخل جسی فعلی از تنظیمات پشتیبان تهیه کرده، سپس پس از اطمینان از سلامت فایل پشتیبان اقدام به نصب مجدد و بازیابی کنید. پس از بازیابی، اطلاعات را بررسی کنید. تست نصب تازه و اجرا روی شبیه‌ساز اندروید 13 انجام شده است؛ تست آپدیت درجا موفق یا ادعا نشده است. این مسیر امضا برای آپدیت‌های آینده مناسب نیست؛ امضای اصلی باید بازیابی شود."
-          echo "Published v${VERSION} original-package APK with documented temporary-signature limitation." >> "$GITHUB_STEP_SUMMARY"
