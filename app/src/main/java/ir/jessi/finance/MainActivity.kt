@@ -1257,6 +1257,34 @@ private fun MoneyLine(label: String, value: Long, color: Color = Color.Unspecifi
 private fun isThisMonth(epoch: Long): Boolean = Jalali.of(epoch).monthKey == Jalali.of(System.currentTimeMillis()).monthKey
 
 @Composable
+private fun DashboardCompactMetric(
+    label: String, value: String, icon: ImageVector, tone: Color,
+    modifier: Modifier = Modifier
+) {
+    val dark = LocalJessiDark.current
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        modifier.clip(shape).background(Brush.linearGradient(
+            listOf(tone.copy(alpha = if (dark) .23f else .13f),
+                if (dark) Color(0xFF18243A) else Color.White.copy(alpha = .75f))
+        )).border(1.dp, tone.copy(alpha = if (dark) .34f else .20f), shape)
+            .padding(11.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Icon(icon, contentDescription = null, tint = tone,
+                modifier = Modifier.size(18.dp))
+            Text(label, fontSize = 10.sp, color = muted, maxLines = 1,
+                overflow = TextOverflow.Ellipsis)
+        }
+        Text(value, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+@Composable
 private fun Dashboard(
     accounts: List<Account>, txs: List<Transaction>, debts: List<Debt>, budgets: List<Budget>, reviews: List<SmsReview>,
     goals: List<SavingsGoal>, goalMovements: List<GoalMovement>,
@@ -1273,17 +1301,26 @@ private fun Dashboard(
     val current = txs.filter { currentPeriod.contains(it.createdAt) }
     val income = current.filter { it.kind == "IN" }.sumOf { it.amountToman }
     val expense = current.filter { it.kind == "OUT" }.sumOf { it.amountToman }
-    // Calendar-based, next Jalali month (not a rolling 30 days or all unpaid debt).
-    val nextMonthStart = FinancePeriodEngine.nextMonthStart(
-        FinancePeriodEngine.monthStart(nowEpoch))
-    val nextMonthEnd = FinancePeriodEngine.nextMonthStart(nextMonthStart)
-    val nextMonthInstallments = debts.sumOf {
-        Installments.dueInPeriod(it, nextMonthStart, nextMonthEnd)
+    // Unpaid scheduled installments for six *calendar Jalali months*, including the current one.
+    // Reuse the exact finance engine used by the installments page; never count all outstanding
+    // debt as an upcoming monthly installment.
+    val upcomingMonths = buildList {
+        var start = FinancePeriodEngine.monthStart(nowEpoch)
+        repeat(6) {
+            val end = FinancePeriodEngine.nextMonthStart(start)
+            add(Triple(
+                Jalali.of(start),
+                debts.sumOf { debt -> Installments.dueInPeriod(debt, start, end) },
+                debts.count { debt -> Installments.dueInPeriod(debt, start, end) > 0L }
+            ))
+            start = end
+        }
     }
-    val nextMonthLabel = Jalali.of(nextMonthStart)
-    val nextMonthInstallmentCount = debts.count {
-        Installments.dueInPeriod(it, nextMonthStart, nextMonthEnd) > 0L
-    }
+    val nextMonthInstallments = upcomingMonths[1].second
+    val nextMonthCount = upcomingMonths[1].third
+    val outstandingDebt = debts.asSequence()
+        .filter { it.direction == "I_OWE" }
+        .sumOf { (it.totalToman - it.paidToman).coerceAtLeast(0L) }
     val heroGradient = if (dark)
         Brush.linearGradient(listOf(Color(0xFF30235C), Color(0xFF172B4D), Color(0xFF17443F)))
     else Brush.linearGradient(listOf(Color(0xFFF3ECFB), Color(0xFFEBF7FF), Color(0xFFE8F8F2)))
@@ -1345,30 +1382,28 @@ private fun Dashboard(
 
     val savedForGoals = goals.sumOf { SavingsGoalMath.saved(goalMovements, it.id) }
     Tile(Modifier.fillMaxWidth(), accent = financePurple) {
-        Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             FinanceIconTile(Icons.Filled.Savings, financePurple)
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("بانک اهداف", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text("دانشگاه، خرید و پس‌انداز ماهانه",
-                    color = muted, fontSize = 11.sp)
+                Text(
+                    if (balanceVisible) toman(savedForGoals) else "••••••",
+                    fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = financePurple,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
             }
             TextButton(onClick = { onSelectTab(Tab.GOALS) }) {
-                Text("مشاهده")
+                Text("اهداف", fontSize = 11.sp)
                 Icon(Icons.Outlined.ChevronLeft, contentDescription = null,
                     modifier = Modifier.size(16.dp))
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("پس‌انداز کنارگذاشته‌شده", modifier = Modifier.weight(1f),
-                color = muted, fontSize = 11.sp)
-            Text(if (balanceVisible) toman(savedForGoals) else "••••••",
-                fontWeight = FontWeight.ExtraBold, color = financePurple, fontSize = 15.sp)
-        }
-        Text(
-            "این مبلغ جدا از مانده حساب‌هاست و به عنوان هزینه حساب نمی‌شود.",
-            color = muted, fontSize = 10.sp
-        )
+        Text("پس‌انداز کنارگذاشته‌شده • جدا از موجودی حساب‌ها",
+            color = muted, fontSize = 10.sp)
     }
 
     val nextDebt = debts.asSequence()
@@ -1379,71 +1414,111 @@ private fun Dashboard(
                 JalaliDates.toEpoch(date)?.let { epoch -> Triple(debt, date, epoch) }
             }
         }.minByOrNull { it.third }
+    val jalaliMonthNames = listOf("فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+        "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند")
+    val maxMonthDue = upcomingMonths.maxOf { it.second }.coerceAtLeast(1L)
 
-    Tile(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.EventNote, contentDescription = null, tint = mint,
-                modifier = Modifier.size(19.dp))
-            Spacer(Modifier.width(7.dp))
-            Text("اقساط و بدهی", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            TextButton(onClick = { onSelectTab(Tab.DEBTS) }, contentPadding = PaddingValues(4.dp)) {
-                Text("مشاهده", fontSize = 11.sp)
-                Icon(Icons.Outlined.ChevronLeft, contentDescription = null, modifier = Modifier.size(17.dp))
+    // One cohesive Dark Aurora card: outstanding debt, next-month amount and a real
+    // six-Jalali-month breakdown. The same amount is no longer repeated in another card.
+    Tile(Modifier.fillMaxWidth(), accent = financePurple) {
+        Row(verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            FinanceIconTile(Icons.Filled.EventNote, financePurple)
+            Column(Modifier.weight(1f)) {
+                Text("اقساط و بدهی", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                Text("نمای پرداخت‌های برنامه‌ریزی‌شده", fontSize = 10.sp, color = muted)
+            }
+            TextButton(onClick = { onSelectTab(Tab.DEBTS) },
+                contentPadding = PaddingValues(horizontal = 4.dp)) {
+                Text("جزئیات", fontSize = 11.sp)
+                Icon(Icons.Outlined.ChevronLeft, contentDescription = null,
+                    modifier = Modifier.size(17.dp))
             }
         }
-        if (nextDebt == null) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Outlined.EventAvailable, contentDescription = null, tint = mint)
-                Text("هنوز قسط فعالی نداری؛ از بخش اقساط اضافه کن.",
-                    color = muted, fontSize = 12.sp)
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            DashboardCompactMetric(
+                label = "اقساط ماه آینده",
+                value = toman(nextMonthInstallments),
+                icon = Icons.Outlined.CalendarMonth,
+                tone = financePurple,
+                modifier = Modifier.weight(1f)
+            )
+            DashboardCompactMetric(
+                label = "کل مانده بدهی",
+                value = toman(outstandingDebt),
+                icon = Icons.Outlined.AccountBalanceWallet,
+                tone = financeAqua,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.BarChart, contentDescription = null,
+                tint = financeAqua, modifier = Modifier.size(17.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("تفکیک اقساط ۶ ماه", fontSize = 12.sp,
+                fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Tag(digitsFa(nextMonthCount.toString()) + " مورد ماه آینده", nextMonthCount > 0)
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
+            upcomingMonths.forEachIndexed { index, month ->
+                val (date, due, _) = month
+                val highlighted = index == 1
+                val tone = if (highlighted) financePurple else financeAqua
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Column(Modifier.width(80.dp)) {
+                        Text(jalaliMonthNames[date.month - 1], fontSize = 12.sp,
+                            fontWeight = if (highlighted) FontWeight.ExtraBold else FontWeight.Medium)
+                        Text(if (index == 0) "این ماه" else if (highlighted) "ماه آینده"
+                            else digitsFa(date.year.toString()),
+                            fontSize = 10.sp, color = if (highlighted) tone else muted)
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(toman(due), fontSize = 12.sp,
+                            fontWeight = if (highlighted) FontWeight.ExtraBold else FontWeight.SemiBold,
+                            color = if (highlighted) tone else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        LinearProgressIndicator(
+                            progress = { (due.toFloat() / maxMonthDue).coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth().height(5.dp)
+                                .clip(RoundedCornerShape(9.dp)),
+                            color = tone,
+                            trackColor = if (dark) Color.White.copy(alpha = .09f)
+                                else tone.copy(alpha = .11f)
+                        )
+                    }
+                }
             }
-        } else {
+        }
+        if (nextDebt != null) {
             val (debt, date, _) = nextDebt
             Row(
-                Modifier.fillMaxWidth().background(secondary.copy(alpha = .75f), RoundedCornerShape(15.dp))
-                    .padding(12.dp), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(financePurple.copy(alpha = if (dark) .14f else .08f))
+                    .padding(horizontal = 10.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
-                Surface(color = mint.copy(alpha = .13f), shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Outlined.CreditCard, contentDescription = null, tint = mint,
-                        modifier = Modifier.padding(9.dp).size(23.dp))
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(debt.person, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("قسط ماهانه: " + toman(Installments.nextAmount(debt)), fontSize = 11.sp, color = muted)
-                    Text("سررسید بعدی: " + JalaliDates.format(date), fontSize = 11.sp, color = muted)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(digitsFa(Installments.remainingCount(debt).toString()),
-                        color = mint, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("قسط باقی", color = muted, fontSize = 10.sp)
-                }
+                Icon(Icons.Outlined.EventAvailable, contentDescription = null,
+                    tint = financePurple, modifier = Modifier.size(16.dp))
+                Text("سررسید نزدیک", color = muted, fontSize = 10.sp)
+                Text(debt.person + " • " + JalaliDates.format(date),
+                    modifier = Modifier.weight(1f), textAlign = TextAlign.End,
+                    fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+        } else if (outstandingDebt == 0L) {
+            Text("بدهی فعالی ثبت نشده ✦", fontSize = 11.sp, color = muted)
         }
-    }
-
-    Tile(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.History, contentDescription = null, tint = muted,
-                modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("تراکنش‌های اخیر", modifier = Modifier.weight(1f),
-                fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            TextButton(onClick = { onSelectTab(Tab.TXS) }, contentPadding = PaddingValues(4.dp)) {
-                Text("مشاهده همه", fontSize = 11.sp)
-                Icon(Icons.Outlined.ChevronLeft, contentDescription = null, modifier = Modifier.size(16.dp))
-            }
-        }
-        val recent = current.filter { it.kind != "TRANSFER_IN" }.take(4)
-        if (recent.isEmpty()) {
-            Text("تراکنشی در این دوره ثبت نشده.", color = muted, fontSize = 12.sp)
-        } else {
-            recent.forEachIndexed { i, tx ->
-                if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .4f))
-                DashboardRecentTransaction(tx, accounts, txs)
-            }
-        }
+        Text("مبالغ ماهانه فقط اقساط برنامه‌ریزی‌شده پرداخت‌نشده هستند، نه کل مانده بدهی.",
+            fontSize = 10.sp, color = muted)
     }
 
     // Keep the full prior features, but below the photographed dashboard layout.
@@ -1468,24 +1543,6 @@ private fun Dashboard(
             }
         }
     }
-    Tile(Modifier.fillMaxWidth(), accent = financePurple) {
-        Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            FinanceIconTile(Icons.Filled.CalendarMonth, financePurple)
-            Column(Modifier.weight(1f)) {
-                Text("جمع اقساط ماه آینده", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text("ماه " + digitsFa(nextMonthLabel.month.toString()) + " / " +
-                    digitsFa(nextMonthLabel.year.toString()) + " شمسی",
-                    fontSize = 11.sp, color = muted)
-            }
-            Tag(digitsFa(nextMonthInstallmentCount.toString()) + " مورد", true)
-        }
-        MoneyLine("مجموع قسط‌های قابل پرداخت ماه بعد",
-            nextMonthInstallments, financePurple)
-        Text("فقط اقساط برنامه‌ریزی‌شده و هنوز پرداخت‌نشده این ماه محاسبه می‌شوند؛ نه کل مانده بدهی.",
-            fontSize = 11.sp, color = muted)
-    }
-    Tile(Modifier.fillMaxWidth()) { InstallmentForecastChart(debts, nowEpoch) }
     if (budgets.isNotEmpty()) {
         Tile(Modifier.fillMaxWidth()) {
             Text("بودجه‌های این دوره", fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -1521,6 +1578,32 @@ private fun Dashboard(
             }
         }
     }
+    // Keep recent transactions at the very bottom of the dashboard.
+    Tile(Modifier.fillMaxWidth(), accent = financeAqua) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.History, contentDescription = null, tint = financeAqua,
+                modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("تراکنش‌های اخیر", modifier = Modifier.weight(1f),
+                fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            TextButton(onClick = { onSelectTab(Tab.TXS) }, contentPadding = PaddingValues(4.dp)) {
+                Text("مشاهده همه", fontSize = 11.sp)
+                Icon(Icons.Outlined.ChevronLeft, contentDescription = null,
+                    modifier = Modifier.size(16.dp))
+            }
+        }
+        val recent = current.filter { it.kind != "TRANSFER_IN" }.take(4)
+        if (recent.isEmpty()) {
+            Text("تراکنشی در این دوره ثبت نشده.", color = muted, fontSize = 12.sp)
+        } else {
+            recent.forEachIndexed { i, tx ->
+                if (i > 0) HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = .4f))
+                DashboardRecentTransaction(tx, accounts, txs)
+            }
+        }
+    }
+
 }
 
 @Composable
