@@ -3,10 +3,10 @@ set -euo pipefail
 APK="app/build/outputs/apk/signed/Jessi.apk"
 echo "=== Android API ==="
 adb shell getprop ro.build.version.sdk
-echo "=== Installing previous official v0.9.0 APK ==="
-OLD_APK="/tmp/jessi-previous-0.9.0.apk"
+echo "=== Installing previous official v0.10.0 APK ==="
+OLD_APK="/tmp/jessi-previous-0.10.0.apk"
 curl --fail --location --retry 3 --retry-delay 2 --silent --show-error \
-  "https://github.com/pooya220/jessie/releases/download/v0.9.0/Jessi-v0.9.0.apk" \
+  "https://github.com/pooya220/jessie/releases/download/v0.10.0/Jessi-v0.10.0.apk" \
   -o "$OLD_APK"
 test -s "$OLD_APK"
 adb install -r "$OLD_APK"
