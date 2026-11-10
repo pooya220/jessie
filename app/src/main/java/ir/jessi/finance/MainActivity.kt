@@ -577,11 +577,6 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
             }
         }
     ) { padding ->
-        val pageWash = if (darkMode) Brush.verticalGradient(
-            listOf(Color(0xFF0A1030), Color(0xFF10143B), Color(0xFF090F2C))
-        ) else Brush.verticalGradient(
-            listOf(Color(0xFFF7FBFA), Color(0xFFF7FAFF), Color(0xFFFCFAFF))
-        )
         Column(
             Modifier.fillMaxSize().padding(padding)
                 .verticalScroll(rememberScrollState()).padding(horizontal = 14.dp),
@@ -1425,11 +1420,11 @@ private fun Tile(
         if (dark) financePurple else financeAqua
     } else accent
     val shape = RoundedCornerShape(18.dp)
-    val base = if (dark) Color(0xFF12182F) else Color(0xFFF7FBFF)
+    val base = if (dark) Color(0xAC12182F) else Color(0xCEF7FBFF)
     val aurora = if (dark) Brush.linearGradient(listOf(
-        Color(0xFF30255A), Color(0xFF142B47), Color(0xFF173244), Color(0xFF151930)
+        Color(0xC230255A), Color(0xC0142B47), Color(0xBD173244), Color(0xBC151930)
     )) else Brush.linearGradient(listOf(
-        Color(0xFFF1EAFB), Color(0xFFF1FAFF), Color(0xFFECF9F6), Color(0xFFFDFBFF)
+        Color(0xCFF1EAFB), Color(0xD5F1FAFF), Color(0xCDECF9F6), Color(0xCFFDFBFF)
     ))
     val glow = Brush.radialGradient(listOf(
         tint.copy(alpha = if (dark) .23f else .095f),
@@ -1521,8 +1516,8 @@ private fun Dashboard(
     // undated or fully-settled records. Do not include the total lifetime balance.
     val nextMonthDue = UpcomingDebtPlanner.nextMonth(debts, nowEpoch)
     val heroGradient = if (dark)
-        Brush.linearGradient(listOf(Color(0xFF30235C), Color(0xFF172B4D), Color(0xFF17443F)))
-    else Brush.linearGradient(listOf(Color(0xFFF3ECFB), Color(0xFFEBF7FF), Color(0xFFE8F8F2)))
+        Brush.linearGradient(listOf(Color(0xE630235C), Color(0xDD172B4D), Color(0xDD17443F)))
+    else Brush.linearGradient(listOf(Color(0xE9F3ECFB), Color(0xE6EBF7FF), Color(0xE6E8F8F2)))
     val heroShape = RoundedCornerShape(19.dp)
 
     // Dashboard follows the reference top-to-bottom, using real account and period data.
@@ -1836,17 +1831,17 @@ private fun FinanceSectionHero(
     val shape = RoundedCornerShape(18.dp)
     val gradient = if (dark) Brush.linearGradient(
         listOf(
-            highlight.copy(alpha = .30f), Color(0xFF302057),
-            Color(0xFF14364B), Color(0xFF111A34)
+            highlight.copy(alpha = .30f), Color(0xD2302057),
+            Color(0xCF14364B), Color(0xD5111A34)
         )
     ) else Brush.linearGradient(
         listOf(
-            highlight.copy(alpha = .12f), Color(0xFFF4F0FD), Color(0xFFECF8FD)
+            highlight.copy(alpha = .12f), Color(0xDFF4F0FD), Color(0xE5ECF8FD)
         )
     )
     Column(
         Modifier.fillMaxWidth().clip(shape)
-            .background(if (dark) Color(0xFF11172E) else Color(0xFFF9FBFF))
+            .background(if (dark) Color(0xB711172E) else Color(0xCFF9FBFF))
             .background(gradient)
             .border(1.dp, highlight.copy(alpha = if (dark) .49f else .24f), shape)
             .padding(12.dp),

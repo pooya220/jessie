@@ -12,8 +12,8 @@ android {
         applicationId = "ir.jessi.finance"
         minSdk = 26
         targetSdk = 35
-        versionCode = 21
-        versionName = "0.11.4"
+        versionCode = 22
+        versionName = "0.11.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -55,6 +55,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.fragment:fragment:1.8.6")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
