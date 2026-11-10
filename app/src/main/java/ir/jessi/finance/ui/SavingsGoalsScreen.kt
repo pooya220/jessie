@@ -336,7 +336,7 @@ private fun GoalMetricTile(
 ) {
     Surface(
         modifier = modifier,
-        color = tone.copy(alpha = .12f),
+        color = if (LocalJessiDark.current) Color(0xBE263056) else Color(0xDEFFFFFF),
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, tone.copy(alpha = .19f))
     ) {
@@ -357,16 +357,16 @@ private fun GoalSurface(
     tone: Color, dark: Boolean, content: @Composable ColumnScope.() -> Unit
 ) {
     val shape = RoundedCornerShape(20.dp)
-    val base = if (dark) Color(0xFF191A42) else Color.White
+    val base = if (dark) Color(0xC91C2448) else Color(0xE6FFFFFF)
     val gradient = Brush.linearGradient(listOf(
-        tone.copy(alpha = if (dark) .19f else .08f),
-        Color.Transparent,
+        Color.White.copy(alpha = if (dark) .13f else .67f),
+        tone.copy(alpha = if (dark) .16f else .07f),
         Color.Transparent
     ))
     Surface(
         color = base, modifier = Modifier.fillMaxWidth(),
-        shape = shape, shadowElevation = if (dark) 2.dp else 3.dp,
-        border = BorderStroke(1.dp, tone.copy(alpha = if (dark) .45f else .24f))
+        shape = shape, shadowElevation = if (dark) 7.dp else 8.dp,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = if (dark) .24f else .94f))
     ) {
         Column(Modifier.background(gradient).padding(15.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
@@ -423,17 +423,19 @@ fun SavingsGoalFormDialog(
                     }
                 }
                 OutlinedTextField(
-                    value = monthly, onValueChange = { monthly = it },
+                    value = monthly, onValueChange = { monthly = normalizeNumericInput(it) },
                     label = { Text("برنامه پس‌انداز ماهانه (تومان)") },
                     placeholder = { Text("مثلاً ۳۰۰۰۰۰۰") },
                     singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = GroupedNumberVisualTransformation,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
                 OutlinedTextField(
-                    value = target, onValueChange = { target = it },
+                    value = target, onValueChange = { target = normalizeNumericInput(it) },
                     label = { Text("مبلغ نهایی هدف (تومان؛ اختیاری)") },
                     placeholder = { Text("مثلاً ۳۰۰۰۰۰۰۰") },
                     singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = GroupedNumberVisualTransformation,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
                 Text("برای پس‌انداز ماهانه دائمی، مبلغ نهایی رو خالی بذار.",
@@ -521,10 +523,11 @@ fun GoalMoneyDialog(
                     }
                 }
                 OutlinedTextField(
-                    value = amountText, onValueChange = { amountText = it },
+                    value = amountText, onValueChange = { amountText = normalizeNumericInput(it) },
                     label = { Text("مبلغ (تومان)") },
                     singleLine = true, enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = GroupedNumberVisualTransformation,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
                 Text(

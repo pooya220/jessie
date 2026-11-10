@@ -12,11 +12,13 @@ android {
         applicationId = "ir.jessi.finance"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "0.10.0"
+        versionCode = 17
+        versionName = "0.11.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
+        // Preview installs next to the stable signed app; it never overwrites financial data.
+        debug { applicationIdSuffix = ".preview" }
         release { isMinifyEnabled = false }
     }
     compileOptions {

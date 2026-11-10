@@ -41,7 +41,7 @@ jobs:
       - name: Upload intermediary APK for offline signing ONLY
         uses: actions/upload-artifact@v4
         with:
-          name: Jessi-INTERNAL-For-Signing-Only
+          name: Jessi-Preview-v0.11.0-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 5
@@ -84,7 +84,6 @@ jobs:
           echo "Stable signature and identity verified." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Enable KVM for emulator
-        if: steps.signed.outputs.ready == 'true'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
@@ -100,6 +99,36 @@ jobs:
           profile: pixel_5
           disable-animations: true
           script: bash scripts/test_android_install.sh
+
+      - name: Verify preview install and app startup on Android 13
+        if: steps.signed.outputs.ready != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          profile: pixel_5
+          disable-animations: true
+          script: bash scripts/test_android_preview.sh
+
+      - name: Publish safe side-by-side preview APK
+        if: steps.signed.outputs.ready != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.signed.outputs.version }}"
+          TAG="v${VERSION}-preview"
+          FILE="Jessi-v${VERSION}-preview.apk"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Preview release already exists; do not overwrite."
+            exit 0
+          fi
+          cp app/build/outputs/apk/debug/app-debug.apk "$FILE"
+          gh release create "$TAG" "$FILE" --target "$GITHUB_SHA" --prerelease \
+            --title "جسی ${VERSION} — نسخه آزمایشی" \
+            --notes "نسخه آزمایشی با شناسه ir.jessi.finance.preview؛ کنار برنامه اصلی نصب می‌شود و داده‌های نسخه اصلی را تغییر نمی‌دهد. برای انتقال آزمایشی اطلاعات، ابتدا از نسخه اصلی فایل پشتیبان بگیرید و در این نسخه از تنظیمات بازیابی کنید. این فایل جایگزین مستقیم نسخه امضاشده اصلی نیست."
 
       - name: Release the verified APK only
         if: steps.signed.outputs.ready == 'true'

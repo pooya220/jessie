@@ -145,9 +145,9 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Tab(val label: String, val icon: String) {
-    HOME("خانه", "⌂"), DEBTS("اقساط", "⇆"),
-    GOALS("اهداف", "◈"), BUDGETS("بودجه", "◉"),
-    TXS("تراکنش‌ها", "≋"), ACCOUNTS("حساب‌ها", "▣")
+    // Exactly five bottom destinations, with home in the center.
+    ACCOUNTS("حساب‌ها", "▣"), TXS("تراکنش‌ها", "≋"),
+    HOME("خانه", "⌂"), DEBTS("اقساط", "⇆"), GOALS("اهداف", "◈")
 }
 private sealed interface Editor {
     data class AccountForm(val value: Account? = null) : Editor
@@ -236,6 +236,8 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
         }
     }
     var tabName by rememberSaveable { mutableStateOf(Tab.HOME.name) }
+    // Budget management is retained within the Accounts destination.
+    var accountsShowBudgets by rememberSaveable { mutableStateOf(false) }
     val tab = Tab.valueOf(tabName)
     var editor by remember { mutableStateOf<Editor?>(null) }
     val ioScope = rememberCoroutineScope()
@@ -353,37 +355,58 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
             }
         },
         bottomBar = {
+            val glassShape = RoundedCornerShape(25.dp)
             NavigationBar(
-                containerColor = if (darkMode) Color(0xFF111537) else Color.White,
-                tonalElevation = 4.dp,
-                modifier = Modifier.height(75.dp)
+                containerColor = if (darkMode) Color(0xE21A2146) else Color(0xEFFFFFFF),
+                tonalElevation = 0.dp,
+                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                    .height(77.dp).clip(glassShape)
+                    .border(1.dp, if (darkMode) Color.White.copy(alpha = .22f)
+                        else Color(0xFFDAEBF0), glassShape)
             ) {
                 Tab.entries.forEach { item ->
+                    val selected = tab == item && !showSettings
                     val navigationIcon: ImageVector = when (item) {
                         Tab.HOME -> Icons.Outlined.Home
                         Tab.DEBTS -> Icons.Outlined.CreditCard
-                        Tab.BUDGETS -> Icons.Outlined.PieChartOutline
                         Tab.TXS -> Icons.Outlined.ReceiptLong
                         Tab.ACCOUNTS -> Icons.Outlined.AccountBalanceWallet
                         Tab.GOALS -> Icons.Outlined.Savings
                     }
                     val accent = when (item) {
-                        Tab.HOME -> mint
+                        Tab.HOME -> financeAqua
                         Tab.ACCOUNTS -> financeAqua
                         Tab.TXS -> financeBlue
                         Tab.DEBTS -> financePurple
-                        Tab.BUDGETS -> financeAmber
-                        Tab.GOALS -> financePurple
+                        Tab.GOALS -> financeAmber
                     }
                     NavigationBarItem(
-                        selected = tab == item,
+                        selected = selected,
                         onClick = { tabName = item.name; showSettings = false },
-                        icon = { Icon(navigationIcon, contentDescription = item.label, modifier = Modifier.size(22.dp)) },
-                        label = { Text(item.label, fontSize = 9.sp, maxLines = 1) },
+                        icon = {
+                            val shape = RoundedCornerShape(if (item == Tab.HOME) 16.dp else 12.dp)
+                            Box(
+                                Modifier.size(if (item == Tab.HOME) 41.dp else 37.dp)
+                                    .clip(shape)
+                                    .background(if (selected) accent.copy(alpha = if (darkMode) .27f else .14f)
+                                        else Color.Transparent)
+                                    .border(1.dp, if (selected) accent.copy(alpha = .63f)
+                                        else Color.Transparent, shape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(navigationIcon, contentDescription = item.label,
+                                    modifier = Modifier.size(if (item == Tab.HOME) 25.dp else 22.dp))
+                            }
+                        },
+                        label = {
+                            Text(item.label, fontSize = 10.sp,
+                                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
+                                maxLines = 1)
+                        },
                         alwaysShowLabel = true,
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = accent, selectedTextColor = accent,
-                            indicatorColor = accent.copy(alpha = if (darkMode) .19f else .13f),
+                            indicatorColor = Color.Transparent,
                             unselectedIconColor = muted, unselectedTextColor = muted
                         )
                     )
@@ -394,10 +417,9 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
             if (tab != Tab.HOME && !showSettings) {
                 FloatingActionButton(onClick = {
                     editor = when (tab) {
-                        Tab.ACCOUNTS -> Editor.AccountForm()
+                        Tab.ACCOUNTS -> if (accountsShowBudgets) Editor.BudgetForm() else Editor.AccountForm()
                         Tab.TXS -> Editor.TxForm()
                         Tab.DEBTS -> Editor.DebtForm()
-                        Tab.BUDGETS -> Editor.BudgetForm()
                         Tab.GOALS -> Editor.GoalForm()
                         Tab.HOME -> null
                     }
@@ -405,7 +427,6 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                     Tab.ACCOUNTS -> financeAqua
                     Tab.TXS -> financeBlue
                     Tab.DEBTS -> financePurple
-                    Tab.BUDGETS -> financeAmber
                     Tab.GOALS -> financePurple
                     else -> mint
                 }) {
@@ -553,7 +574,6 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                     notificationsPermitted = notificationsPermitted,
                     requestNotificationPermission = { if (Build.VERSION.SDK_INT >= 33) notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
                     onReview = { editor = Editor.Review(it) },
-                    onNewTx = { editor = Editor.TxForm() },
                     onSelectTab = { tabName = it.name; showSettings = false },
                     balanceVisible = balanceVisible,
                     onBalanceVisibilityChange = { value ->
@@ -564,10 +584,34 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                     reviewNotificationsEnabled = reviewNotificationsEnabled,
                     onOpenSettings = { showSettings = true }
                 )
-                Tab.ACCOUNTS -> AccountsPage(accounts, txs,
-                    onEdit = { editor = Editor.AccountForm(it) },
-                    onDelete = { row -> editor = Editor.Delete("حساب «${row.title}» حذف شود؟ تنها حساب بدون تراکنش قابل حذف است.") { vm.deleteAccount(row.id) } }
-                )
+                Tab.ACCOUNTS -> {
+                    Row(Modifier.fillMaxWidth().padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = !accountsShowBudgets,
+                            onClick = { accountsShowBudgets = false },
+                            label = { Text("حساب‌های بانکی") },
+                            leadingIcon = if (!accountsShowBudgets) ({
+                                Icon(Icons.Outlined.Check, contentDescription = null, Modifier.size(17.dp))
+                            }) else null)
+                        FilterChip(selected = accountsShowBudgets,
+                            onClick = { accountsShowBudgets = true },
+                            label = { Text("بودجه‌بندی") },
+                            leadingIcon = if (accountsShowBudgets) ({
+                                Icon(Icons.Outlined.Check, contentDescription = null, Modifier.size(17.dp))
+                            }) else null)
+                    }
+                    if (accountsShowBudgets) {
+                        BudgetsPage(budgets, periodTransactions,
+                            onEdit = { editor = Editor.BudgetForm(it) },
+                            onDelete = { row -> editor = Editor.Delete("سقف «${row.category}» حذف شود؟") { vm.deleteBudget(row.id) } }
+                        )
+                    } else {
+                        AccountsPage(accounts, txs,
+                            onEdit = { editor = Editor.AccountForm(it) },
+                            onDelete = { row -> editor = Editor.Delete("حساب «${row.title}» حذف شود؟ تنها حساب بدون تراکنش قابل حذف است.") { vm.deleteAccount(row.id) } }
+                        )
+                    }
+                }
                 Tab.TXS -> TransactionsPage(periodTransactions, accounts,
                     onEdit = { editor = Editor.TxForm(it) },
                     onDelete = { row -> editor = Editor.Delete("این تراکنش حذف شود؟") { vm.deleteTransaction(row) } }
@@ -601,10 +645,6 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                             }
                         }
                     }
-                )
-                Tab.BUDGETS -> BudgetsPage(budgets, periodTransactions,
-                    onEdit = { editor = Editor.BudgetForm(it) },
-                    onDelete = { row -> editor = Editor.Delete("سقف «${row.category}» حذف شود؟") { vm.deleteBudget(row.id) } }
                 )
             }
             }
@@ -1019,29 +1059,6 @@ private fun FinanceSummaryChip(title: String, value: Long, income: Boolean, modi
 }
 
 @Composable
-private fun DashboardAction(
-    icon: ImageVector, title: String, modifier: Modifier = Modifier, onClick: () -> Unit
-) {
-    val dark = LocalJessiDark.current
-    Surface(
-        onClick = onClick, modifier = modifier.height(71.dp),
-        color = if (dark) Color(0xFF201B4C) else Color(0xFFF1F8F7),
-        shape = RoundedCornerShape(15.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .46f))
-    ) {
-        Column(
-            Modifier.padding(vertical = 9.dp, horizontal = 2.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            Icon(icon, contentDescription = title, tint = mint, modifier = Modifier.size(23.dp))
-            Text(title, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Bold, maxLines = 1)
-        }
-    }
-}
-
-@Composable
 private fun PeriodSwitcher(
     mode: String, period: FinancePeriod, selectedIndex: Int, count: Int,
     salaryAvailable: Boolean, onModeChange: (String) -> Unit,
@@ -1139,32 +1156,27 @@ private fun Tile(
     val tint = if (accent == Color.Unspecified) {
         if (dark) financePurple else financeAqua
     } else accent
-    val shape = RoundedCornerShape(20.dp)
-    val backdrop = if (dark) Color(0xFF17193C) else Color.White
-    val overlay = Brush.linearGradient(
+    val glassShape = RoundedCornerShape(21.dp)
+    val frostedBase = if (dark) Color(0xCD1A2246) else Color(0xE8FFFFFF)
+    val glossyLight = Brush.linearGradient(
         listOf(
-            tint.copy(alpha = if (dark) {
-                if (accent == Color.Unspecified) .09f else .19f
-            } else {
-                if (accent == Color.Unspecified) .025f else .085f
-            }),
+            Color.White.copy(alpha = if (dark) .15f else .70f),
+            tint.copy(alpha = if (dark) .16f else .075f),
             Color.Transparent
         )
     )
     Surface(
-        modifier = modifier,
-        color = backdrop,
-        shape = shape,
-        border = BorderStroke(
-            1.dp,
-            if (accent == Color.Unspecified)
-                MaterialTheme.colorScheme.outline.copy(alpha = if (dark) .6f else .8f)
-            else tint.copy(alpha = if (dark) .44f else .26f)
-        ),
-        shadowElevation = if (dark) 2.dp else 3.dp
+        modifier = modifier, color = frostedBase, shape = glassShape,
+        border = BorderStroke(1.dp,
+            if (dark) Color.White.copy(alpha = .24f)
+            else Color.White.copy(alpha = .95f)),
+        shadowElevation = if (dark) 7.dp else 8.dp
     ) {
         Column(
-            Modifier.background(overlay).padding(15.dp),
+            Modifier.background(Brush.verticalGradient(listOf(
+                if (dark) Color(0x362D4179) else Color(0x42E6F4FF),
+                Color.Transparent
+            ))).background(glossyLight).padding(15.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             content = content
         )
@@ -1199,7 +1211,7 @@ private fun Dashboard(
     currentPeriod: FinancePeriod, periods: List<FinancePeriod>, selectedPeriodIndex: Int, nowEpoch: Long,
     smsPermitted: Boolean, requestPermission: () -> Unit,
     notificationsPermitted: Boolean, requestNotificationPermission: () -> Unit,
-    onReview: (SmsReview) -> Unit, onNewTx: () -> Unit, onSelectTab: (Tab) -> Unit,
+    onReview: (SmsReview) -> Unit, onSelectTab: (Tab) -> Unit,
     balanceVisible: Boolean, onBalanceVisibilityChange: (Boolean) -> Unit,
     smsMonitoringEnabled: Boolean, reviewNotificationsEnabled: Boolean,
     onOpenSettings: () -> Unit
@@ -1209,6 +1221,17 @@ private fun Dashboard(
     val current = txs.filter { currentPeriod.contains(it.createdAt) }
     val income = current.filter { it.kind == "IN" }.sumOf { it.amountToman }
     val expense = current.filter { it.kind == "OUT" }.sumOf { it.amountToman }
+    // Calendar-based, next Jalali month (not a rolling 30 days or all unpaid debt).
+    val nextMonthStart = FinancePeriodEngine.nextMonthStart(
+        FinancePeriodEngine.monthStart(nowEpoch))
+    val nextMonthEnd = FinancePeriodEngine.nextMonthStart(nextMonthStart)
+    val nextMonthInstallments = debts.sumOf {
+        Installments.dueInPeriod(it, nextMonthStart, nextMonthEnd)
+    }
+    val nextMonthLabel = Jalali.of(nextMonthStart)
+    val nextMonthInstallmentCount = debts.count {
+        Installments.dueInPeriod(it, nextMonthStart, nextMonthEnd) > 0L
+    }
     val heroGradient = if (dark)
         Brush.linearGradient(listOf(Color(0xFF123E6A), Color(0xFF28205E), Color(0xFF461D75)))
     else Brush.linearGradient(listOf(Color(0xFFEAF8F2), Color(0xFFF4FBFF), Color(0xFFF9F7FF)))
@@ -1266,13 +1289,6 @@ private fun Dashboard(
     }
     Tile(Modifier.fillMaxWidth()) {
         FinancialTrendChart(periods, selectedPeriodIndex, txs)
-    }
-
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        DashboardAction(Icons.Outlined.AddCircleOutline, "تراکنش جدید", Modifier.weight(1f), onNewTx)
-        DashboardAction(Icons.Outlined.EventNote, "اقساط و بدهی", Modifier.weight(1f)) { onSelectTab(Tab.DEBTS) }
-        DashboardAction(Icons.Outlined.Savings, "بانک اهداف", Modifier.weight(1f)) { onSelectTab(Tab.GOALS) }
-        DashboardAction(Icons.Outlined.AccountBalanceWallet, "حساب‌ها", Modifier.weight(1f)) { onSelectTab(Tab.ACCOUNTS) }
     }
 
     val savedForGoals = goals.sumOf { SavingsGoalMath.saved(goalMovements, it.id) }
@@ -1400,16 +1416,22 @@ private fun Dashboard(
             }
         }
     }
-    if (debts.any { it.totalToman > it.paidToman }) {
-        Tile(Modifier.fillMaxWidth()) {
-            Text("خلاصه بدهی و طلب", fontWeight = FontWeight.Bold)
-            Row {
-                MoneyLine("بدهی باقی‌مانده", debts.filter { it.direction == "I_OWE" }
-                    .sumOf { it.totalToman - it.paidToman }, danger, Modifier.weight(1f))
-                MoneyLine("طلب باقی‌مانده", debts.filter { it.direction == "OWED_TO_ME" }
-                    .sumOf { it.totalToman - it.paidToman }, mint, Modifier.weight(1f))
+    Tile(Modifier.fillMaxWidth(), accent = financePurple) {
+        Row(verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+            FinanceIconTile(Icons.Outlined.CalendarMonth, financePurple)
+            Column(Modifier.weight(1f)) {
+                Text("جمع اقساط ماه آینده", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text("ماه " + digitsFa(nextMonthLabel.month.toString()) + " / " +
+                    digitsFa(nextMonthLabel.year.toString()) + " شمسی",
+                    fontSize = 11.sp, color = muted)
             }
+            Tag(digitsFa(nextMonthInstallmentCount.toString()) + " مورد", true)
         }
+        MoneyLine("مجموع قسط‌های قابل پرداخت ماه بعد",
+            nextMonthInstallments, financePurple)
+        Text("فقط اقساط برنامه‌ریزی‌شده و هنوز پرداخت‌نشده این ماه محاسبه می‌شوند؛ نه کل مانده بدهی.",
+            fontSize = 11.sp, color = muted)
     }
     Tile(Modifier.fillMaxWidth()) { InstallmentForecastChart(debts, nowEpoch) }
     if (budgets.isNotEmpty()) {
@@ -1511,7 +1533,7 @@ private fun FinanceSectionHero(
     )
     Column(
         Modifier.fillMaxWidth().clip(shape)
-            .background(if (dark) Color(0xFF171C46) else Color.White)
+            .background(if (dark) Color(0xCF171C46) else Color(0xE8FFFFFF))
             .background(gradient)
             .border(1.dp, highlight.copy(alpha = if (dark) .48f else .20f), shape)
             .padding(16.dp),
@@ -1890,11 +1912,17 @@ private fun BudgetsPage(
 }
 
 @Composable
-private fun TextEntry(label: String, value: String, onChange: (String) -> Unit, number: Boolean = false, singleLine: Boolean = true) {
+private fun TextEntry(
+    label: String, value: String, onChange: (String) -> Unit,
+    number: Boolean = false, singleLine: Boolean = true, grouped: Boolean = true
+) {
     OutlinedTextField(
-        value = value, onValueChange = onChange,
+        value = value,
+        onValueChange = { onChange(if (number) normalizeNumericInput(it) else it) },
         label = { Text(label) }, singleLine = singleLine,
         modifier = Modifier.fillMaxWidth(),
+        visualTransformation = if (number && grouped) GroupedNumberVisualTransformation
+            else androidx.compose.ui.text.input.VisualTransformation.None,
         keyboardOptions = KeyboardOptions(keyboardType = if (number) KeyboardType.Number else KeyboardType.Text)
     )
 }
@@ -1953,7 +1981,7 @@ private fun AccountDialog(initial: Account?, dismiss: () -> Unit, save: (Account
     }) {
         TextEntry("نام حساب (مثلاً سینا)", title, { title = it })
         TextEntry("نام بانک", bank, { bank = it })
-        TextEntry("چهار رقم آخر کارت/حساب (اختیاری)", last4, { last4 = it }, number = true)
+        TextEntry("چهار رقم آخر کارت/حساب (اختیاری)", last4, { last4 = it }, number = true, grouped = false)
         TextEntry("موجودی اولیه به تومان", opening, { opening = it }, number = true)
         Text("موجودی فعلی = موجودی اولیه + واریزها − برداشت‌ها. برای جلوگیری از دوباره‌شماری، موجودی اولیه را در زمان شروع ثبت کن.", fontSize = 11.sp, color = muted)
     }
