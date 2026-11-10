@@ -1441,14 +1441,14 @@ private fun Dashboard(
         ) {
             DashboardCompactMetric(
                 label = "اقساط ماه آینده",
-                value = toman(nextMonthInstallments),
+                value = if (balanceVisible) toman(nextMonthInstallments) else "••••••",
                 icon = Icons.Outlined.CalendarMonth,
                 tone = financePurple,
                 modifier = Modifier.weight(1f)
             )
             DashboardCompactMetric(
                 label = "کل مانده بدهی",
-                value = toman(outstandingDebt),
+                value = if (balanceVisible) toman(outstandingDebt) else "••••••",
                 icon = Icons.Outlined.AccountBalanceWallet,
                 tone = financeAqua,
                 modifier = Modifier.weight(1f)
@@ -1480,12 +1480,12 @@ private fun Dashboard(
                             fontSize = 10.sp, color = if (highlighted) tone else muted)
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text(toman(due), fontSize = 12.sp,
+                        Text(if (balanceVisible) toman(due) else "••••••", fontSize = 12.sp,
                             fontWeight = if (highlighted) FontWeight.ExtraBold else FontWeight.SemiBold,
                             color = if (highlighted) tone else MaterialTheme.colorScheme.onSurface,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                         LinearProgressIndicator(
-                            progress = { (due.toFloat() / maxMonthDue).coerceIn(0f, 1f) },
+                            progress = { if (balanceVisible) (due.toFloat() / maxMonthDue).coerceIn(0f, 1f) else 0f },
                             modifier = Modifier.fillMaxWidth().height(5.dp)
                                 .clip(RoundedCornerShape(9.dp)),
                             color = tone,
