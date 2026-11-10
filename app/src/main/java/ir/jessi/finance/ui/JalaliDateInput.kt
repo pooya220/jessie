@@ -23,15 +23,15 @@ import java.util.Calendar
 fun JalaliDateInput(label: String, value: String, optional: Boolean = false, onChange: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        Text(label, fontWeight = FontWeight.Medium, fontSize = 12.sp)
+        Text(label, fontWeight = FontWeight.Medium, fontSize = 12.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Outlined.CalendarMonth, contentDescription = null, modifier = Modifier.size(19.dp))
             Spacer(Modifier.width(8.dp))
-            Text(value.ifBlank { "انتخاب تاریخ شمسی" }, modifier = Modifier.weight(1f))
+            Text(value.ifBlank { "انتخاب تاریخ شمسی" }, modifier = Modifier.weight(1f), color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             Text("تغییر", color = jessiReadableText(MaterialTheme.colorScheme.primary), fontSize = 11.sp)
         }
         if (optional && value.isNotBlank()) {
-            TextButton(onClick = { onChange("") }) { Text("بدون سررسید", fontSize = 11.sp) }
+            TextButton(onClick = { onChange("") }) { Text("بدون سررسید", fontSize = 11.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
         }
     }
     if (expanded) {
@@ -67,7 +67,7 @@ private fun JalaliCalendarPopup(
     val current = Jalali.of(System.currentTimeMillis())
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("انتخاب تاریخ شمسی", fontWeight = FontWeight.Bold) },
+        title = { Text("انتخاب تاریخ شمسی", fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
@@ -81,7 +81,7 @@ private fun JalaliCalendarPopup(
                         Icon(Icons.Outlined.ChevronRight, contentDescription = "ماه بعد")
                     }
                     Text(months[month - 1] + " " + digitsFa(year.toString()),
-                        fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        fontWeight = FontWeight.Bold, fontSize = 16.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     IconButton(onClick = {
                         val d = JalaliDates.addMonths(Jalali.Date(year, month, 1), -1)
                         if (d.year >= 1300) { year = d.year; month = d.month }
@@ -134,12 +134,12 @@ private fun JalaliCalendarPopup(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSelect(current) }) { Text("امروز") }
+            TextButton(onClick = { onSelect(current) }) { Text("امروز", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
         },
         dismissButton = {
             Row {
-                if (allowClear) TextButton(onClick = { onSelect(null) }) { Text("پاک‌کردن") }
-                TextButton(onClick = onDismiss) { Text("انصراف") }
+                if (allowClear) TextButton(onClick = { onSelect(null) }) { Text("پاک‌کردن", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
+                TextButton(onClick = onDismiss) { Text("انصراف", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
             }
         }
     )

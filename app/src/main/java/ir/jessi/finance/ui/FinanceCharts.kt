@@ -93,7 +93,7 @@ fun SpendingCategoryChart(transactions: List<Transaction>) {
         Color(0xFFF16FC3), Color(0xFFB478FD))
     val track = MaterialTheme.colorScheme.outline.copy(alpha = .3f)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("تفکیک هزینه‌ها", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        Text("تفکیک هزینه‌ها", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,

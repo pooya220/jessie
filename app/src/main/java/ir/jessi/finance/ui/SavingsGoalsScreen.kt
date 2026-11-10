@@ -105,13 +105,13 @@ fun SavingsGoalsScreen(
                     modifier = Modifier.padding(8.dp).size(21.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text("بانک اهداف", fontWeight = FontWeight.ExtraBold, fontSize = 17.sp)
+                Text("بانک اهداف", fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 Text("پس‌انداز برای دانشگاه، خرید و هر چیزی که برات مهمه",
                     fontSize = 11.sp, color = jessiReadableText(textMuted))
             }
         }
         Text(toman(totalSaved), fontWeight = FontWeight.ExtraBold, fontSize = 22.sp,
-            maxLines = 1, overflow = TextOverflow.Ellipsis)
+            maxLines = 1, overflow = TextOverflow.Ellipsis, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
         Text("جمع پول کنارگذاشته‌شده • جدا از موجودی حساب‌ها",
             color = jessiReadableText(textMuted), fontSize = 11.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -130,7 +130,7 @@ fun SavingsGoalsScreen(
             colors = ButtonDefaults.buttonColors(containerColor = purple)) {
             Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(7.dp))
-            Text("ساخت هدف جدید", fontWeight = FontWeight.Bold)
+            Text("ساخت هدف جدید", fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
         }
     }
 
@@ -141,7 +141,7 @@ fun SavingsGoalsScreen(
                 Icon(Icons.Outlined.Flag, contentDescription = null, tint = aqua,
                     modifier = Modifier.size(30.dp))
                 Column {
-                    Text("اولین هدف پس‌اندازت رو بساز", fontWeight = FontWeight.Bold)
+                    Text("اولین هدف پس‌اندازت رو بساز", fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     Text("مثلاً «دانشگاه» با ماهی ۳ میلیون تومان یا «خرید لپ‌تاپ» با مبلغ نهایی مشخص.",
                         color = jessiReadableText(textMuted), fontSize = 12.sp)
                 }
@@ -150,7 +150,7 @@ fun SavingsGoalsScreen(
     }
     if (goals.any { it.archived }) {
         FilterChip(selected = showArchived, onClick = { showArchived = !showArchived },
-            label = { Text("نمایش اهداف بایگانی‌شده") },
+            label = { Text("نمایش اهداف بایگانی‌شده", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
             leadingIcon = {
                 Icon(Icons.Outlined.Archive, contentDescription = null,
                     modifier = Modifier.size(18.dp))
@@ -176,7 +176,7 @@ fun SavingsGoalsScreen(
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(goal.title, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     Text(goalCategoryText(goal.category),
                         fontSize = 11.sp, color = jessiReadableText(textMuted))
                 }
@@ -201,7 +201,7 @@ fun SavingsGoalsScreen(
                     Column(horizontalAlignment = Alignment.End) {
                         Text("هدف نهایی", color = jessiReadableText(textMuted), fontSize = 11.sp)
                         Text(toman(goal.targetToman), fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold)
+                            fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     }
                 }
             }
@@ -246,11 +246,11 @@ fun SavingsGoalsScreen(
                         Icon(Icons.Outlined.Add, contentDescription = null,
                             modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("واریز")
+                        Text("واریز", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     }
                     OutlinedButton(onClick = { onWithdraw(goal) },
                         enabled = saved > 0L && accounts.isNotEmpty(),
-                        modifier = Modifier.weight(1f)) { Text("برداشت") }
+                        modifier = Modifier.weight(1f)) { Text("برداشت", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
                 }
             }
             if (goalEntries.isNotEmpty()) {
@@ -260,7 +260,7 @@ fun SavingsGoalsScreen(
                         modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(if (expandedHistory) "بستن ریز واریزها" else
-                        "تاریخچه " + digitsFa(goalEntries.size.toString()) + " جابه‌جایی")
+                        "تاریخچه " + digitsFa(goalEntries.size.toString()) + " جابه‌جایی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 }
                 if (expandedHistory) {
                     goalEntries.sortedWith(compareByDescending<GoalMovement> { it.createdAt }
@@ -280,7 +280,7 @@ fun SavingsGoalsScreen(
                             )
                             Column(Modifier.weight(1f)) {
                                 Text(if (deposit) "واریز به هدف" else "برداشت از هدف",
-                                    fontSize = 11.sp)
+                                    fontSize = 11.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                                 Text(
                                     (accounts.firstOrNull { it.id == movement.accountId }?.title
                                         ?: "حساب") + " • " + Jalali.of(movement.createdAt),
@@ -304,13 +304,13 @@ fun SavingsGoalsScreen(
                 TextButton(onClick = { onEdit(goal) }) {
                     Icon(Icons.Outlined.Edit, contentDescription = null,
                         modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp)); Text("ویرایش")
+                    Spacer(Modifier.width(4.dp)); Text("ویرایش", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 }
                 Spacer(Modifier.weight(1f))
                 if (goal.archived) {
-                    TextButton(onClick = { onArchive(goal) }) { Text("بازگردانی از آرشیو") }
+                    TextButton(onClick = { onArchive(goal) }) { Text("بازگردانی از آرشیو", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
                 } else if (saved == 0L && goalEntries.isNotEmpty()) {
-                    TextButton(onClick = { onArchive(goal) }) { Text("بایگانی") }
+                    TextButton(onClick = { onArchive(goal) }) { Text("بایگانی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
                 }
                 if (goalEntries.isEmpty()) {
                     TextButton(onClick = { onDelete(goal) }) {
@@ -372,6 +372,7 @@ private fun GoalSurface(
     ))
     Surface(
         color = base, modifier = Modifier.fillMaxWidth(),
+        contentColor = if (dark) Color.White else MaterialTheme.colorScheme.onSurface,
         shape = shape, shadowElevation = if (dark) 4.dp else 2.dp,
         border = BorderStroke(1.dp, tone.copy(alpha = if (dark) .47f else .23f))
     ) {
@@ -408,12 +409,12 @@ fun SavingsGoalFormDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(24.dp),
         title = { Text(if (initial == null) "هدف جدید" else "ویرایش هدف",
-            fontWeight = FontWeight.ExtraBold) },
+            fontWeight = FontWeight.ExtraBold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
         text = {
             Column(Modifier.heightIn(max = 485.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(11.dp)) {
                 OutlinedTextField(value = title, onValueChange = { title = it.take(120) },
-                    label = { Text("عنوان هدف؛ مثلاً دانشگاه") },
+                    label = { Text("عنوان هدف؛ مثلاً دانشگاه", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
                 Text("نوع هدف", color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 12.sp)
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -426,21 +427,21 @@ fun SavingsGoalFormDialog(
                         "OTHER" to "پس‌انداز"
                     ).forEach { (code, label) ->
                         FilterChip(selected = kind == code, onClick = { kind = code },
-                            label = { Text(label, fontSize = 11.sp) })
+                            label = { Text(label, fontSize = 11.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) })
                     }
                 }
                 OutlinedTextField(
                     value = monthly, onValueChange = { monthly = normalizeNumericInput(it) },
-                    label = { Text("برنامه پس‌انداز ماهانه (تومان)") },
-                    placeholder = { Text("مثلاً ۳۰۰۰۰۰۰") },
+                    label = { Text("برنامه پس‌انداز ماهانه (تومان)", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
+                    placeholder = { Text("مثلاً ۳۰۰۰۰۰۰", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
                     singleLine = true, modifier = Modifier.fillMaxWidth(),
                     visualTransformation = GroupedNumberVisualTransformation,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
                 OutlinedTextField(
                     value = target, onValueChange = { target = normalizeNumericInput(it) },
-                    label = { Text("مبلغ نهایی هدف (تومان؛ اختیاری)") },
-                    placeholder = { Text("مثلاً ۳۰۰۰۰۰۰۰") },
+                    label = { Text("مبلغ نهایی هدف (تومان؛ اختیاری)", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
+                    placeholder = { Text("مثلاً ۳۰۰۰۰۰۰۰", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
                     singleLine = true, modifier = Modifier.fillMaxWidth(),
                     visualTransformation = GroupedNumberVisualTransformation,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -450,7 +451,7 @@ fun SavingsGoalFormDialog(
                 JalaliDateInput("تاریخ رسیدن به هدف (اختیاری)",
                     deadline, optional = true, onChange = { deadline = it })
                 OutlinedTextField(value = note, onValueChange = { note = it },
-                    label = { Text("توضیحات (اختیاری)") },
+                    label = { Text("توضیحات (اختیاری)", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
                     minLines = 2, maxLines = 3, modifier = Modifier.fillMaxWidth())
                 Text("ساخت هدف پولی منتقل نمی‌کند؛ برای کنارگذاشتن پول از دکمه واریز استفاده کن.",
                     color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 11.sp)
@@ -467,9 +468,9 @@ fun SavingsGoalFormDialog(
                     createdAt = initial?.createdAt ?: System.currentTimeMillis(),
                     archived = initial?.archived ?: false
                 ))
-            }, enabled = valid) { Text("ذخیره هدف") }
+            }, enabled = valid) { Text("ذخیره هدف", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) } }
     )
 }
 
@@ -507,7 +508,7 @@ fun GoalMoneyDialog(
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(if (deposit) "واریز به هدف" else "برداشت از هدف",
-                    fontWeight = FontWeight.ExtraBold)
+                    fontWeight = FontWeight.ExtraBold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 Text(goal.title, fontSize = 13.sp,
                     color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
             }
@@ -517,13 +518,13 @@ fun GoalMoneyDialog(
                 Box {
                     OutlinedButton(onClick = { expanded = true },
                         modifier = Modifier.fillMaxWidth(), enabled = !busy) {
-                        Text(account?.title ?: "انتخاب حساب بانکی", modifier = Modifier.weight(1f))
+                        Text(account?.title ?: "انتخاب حساب بانکی", modifier = Modifier.weight(1f), color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                         Icon(Icons.Outlined.ExpandMore, contentDescription = null)
                     }
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         accounts.forEach { item ->
                             DropdownMenuItem(
-                                text = { Text(item.title) },
+                                text = { Text(item.title, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
                                 onClick = { accountId = item.id; expanded = false }
                             )
                         }
@@ -531,7 +532,7 @@ fun GoalMoneyDialog(
                 }
                 OutlinedTextField(
                     value = amountText, onValueChange = { amountText = normalizeNumericInput(it) },
-                    label = { Text("مبلغ (تومان)") },
+                    label = { Text("مبلغ (تومان)", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
                     singleLine = true, enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
                     visualTransformation = GroupedNumberVisualTransformation,
@@ -566,10 +567,10 @@ fun GoalMoneyDialog(
                         if (!success) busy = false
                     }
                 }
-            ) { Text(if (deposit) "تأیید واریز" else "تأیید برداشت") }
+            ) { Text(if (deposit) "تأیید واریز" else "تأیید برداشت", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !busy) { Text("انصراف") }
+            TextButton(onClick = onDismiss, enabled = !busy) { Text("انصراف", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
         }
     )
 }

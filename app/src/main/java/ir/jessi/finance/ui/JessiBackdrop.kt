@@ -125,7 +125,7 @@ fun JessiBackgroundSettings(
         Triple("minimal", "ساده", "پس‌زمینه خلوت")
     )
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("پس‌زمینه و جلوه شیشه‌ای", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        Text("پس‌زمینه و جلوه شیشه‌ای", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
         Text("تم رنگی یا عکس دلخواهت رو انتخاب کن. کارت‌ها نیمه‌شفاف‌اند و هاله پس‌زمینه از پشتشان پیدا می‌شود.",
             color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 11.sp)
         options.chunked(2).forEach { pair ->
@@ -148,7 +148,7 @@ fun JessiBackgroundSettings(
                             Box(Modifier.fillMaxWidth().height(44.dp)
                                 .clip(RoundedCornerShape(9.dp))
                                 .background(Brush.horizontalGradient(palette(id, dark))))
-                            Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                             Text(subtitle, fontSize = 9.sp,
                                 color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
                         }
@@ -160,24 +160,24 @@ fun JessiBackgroundSettings(
             Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null,
                 modifier = Modifier.size(19.dp))
             Spacer(Modifier.width(8.dp))
-            Text(if (photoUri.isBlank()) "انتخاب عکس از گوشی" else "تغییر تصویر پس‌زمینه")
+            Text(if (photoUri.isBlank()) "انتخاب عکس از گوشی" else "تغییر تصویر پس‌زمینه", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
         }
         if (photoUri.isNotBlank()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 FilterChip(
                     selected = style == "photo",
                     onClick = { onStyleChange("photo") },
-                    label = { Text("تصویر شخصی") }
+                    label = { Text("تصویر شخصی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
                 )
                 Spacer(Modifier.width(8.dp))
                 TextButton(onClick = onClearImage) {
                     Icon(Icons.Outlined.DeleteOutline, contentDescription = null,
                         modifier = Modifier.size(18.dp))
-                    Text("حذف تصویر")
+                    Text("حذف تصویر", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 }
             }
         }
-        Text("شدت پوشش شیشه‌ای پس‌زمینه", fontSize = 12.sp)
+        Text("شدت پوشش شیشه‌ای پس‌زمینه", fontSize = 12.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
         Slider(value = dim, onValueChange = onDimChange, valueRange = 0f..0.78f)
         Text("تصویر انتخابی فقط در همین گوشی استفاده می‌شود و به سرور ارسال نمی‌شود.",
             color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 10.sp)

@@ -33,7 +33,7 @@ private fun PinInput(
     OutlinedTextField(
         value = value,
         onValueChange = { onChange(it.filter { digit -> digit in '0'..'9' }.take(6)) },
-        label = { Text(title) },
+        label = { Text(title, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
         modifier = modifier.fillMaxWidth(),
         singleLine = true,
         visualTransformation = PasswordVisualTransformation(),
@@ -69,7 +69,7 @@ fun JessiLockScreen(
             ) {
                 Icon(Icons.Outlined.Lock, contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(38.dp))
-                Text("ورود امن به جسی", fontWeight = FontWeight.ExtraBold, fontSize = 21.sp)
+                Text("ورود امن به جسی", fontWeight = FontWeight.ExtraBold, fontSize = 21.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 Text("ابتدا اثرانگشت را تأیید کن، یا با پین وارد شو",
                     color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant),
                     fontSize = 12.sp)
@@ -83,7 +83,7 @@ fun JessiLockScreen(
                     },
                     enabled = pin.length in 4..6,
                     modifier = Modifier.fillMaxWidth()
-                ) { Text("ورود با پین") }
+                ) { Text("ورود با پین", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
                 if (biometricAvailable && security.biometricsEnabled()) {
                     OutlinedButton(
                         onClick = onTryBiometrics, modifier = Modifier.fillMaxWidth()
@@ -91,7 +91,7 @@ fun JessiLockScreen(
                         Icon(Icons.Outlined.Fingerprint, contentDescription = null,
                             modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("تلاش دوباره با اثرانگشت")
+                        Text("تلاش دوباره با اثرانگشت", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     }
                 }
                 Text("برای امنیت اطلاعات مالی، بعد از خروج از برنامه دوباره قفل فعال می‌شود.",
@@ -122,14 +122,14 @@ fun JessiSecuritySettings(
     var error by remember(action) { mutableStateOf<String?>(null) }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("قفل ورود به برنامه", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text("قفل ورود به برنامه", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
         Text("وقتی فعال باشد، بعد از بازکردن جسی ابتدا تأیید بیومتریک و در صورت نیاز پین درخواست می‌شود.",
             color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 12.sp)
         if (!enabled) {
             Button(onClick = { action = "enable" }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Outlined.Security, contentDescription = null, modifier = Modifier.size(19.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("فعال‌کردن قفل با پین")
+                Text("فعال‌کردن قفل با پین", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             }
         } else {
             Text("قفل ورود فعال است", color = jessiReadableText(MaterialTheme.colorScheme.primary), fontSize = 13.sp)
@@ -138,7 +138,7 @@ fun JessiSecuritySettings(
                     tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("ورود با اثرانگشت", fontSize = 13.sp)
+                    Text("ورود با اثرانگشت", fontSize = 13.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     Text(
                         if (biometricAvailable) "اول اثرانگشت، در صورت انصراف یا خطا پین"
                         else "اثر انگشت در تنظیمات گوشی فعال نیست؛ پین همیشه کار می‌کند",
@@ -156,10 +156,10 @@ fun JessiSecuritySettings(
             OutlinedButton(onClick = { action = "change" }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Outlined.LockReset, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("تغییر پین")
+                Text("تغییر پین", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             }
             TextButton(onClick = { action = "disable" }) {
-                Text("غیرفعال‌کردن قفل (با پین فعلی)")
+                Text("غیرفعال‌کردن قفل (با پین فعلی)", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             }
         }
         Text("پین رمزگذاریِ یک‌طرفه و با نمک تصادفی ذخیره می‌شود. پین در فایل پشتیبان مالی ذخیره نمی‌شود.",
@@ -173,7 +173,7 @@ fun JessiSecuritySettings(
                 "enable" -> "ساخت پین ورود"
                 "change" -> "تغییر پین ورود"
                 else -> "غیرفعال‌کردن قفل"
-            }) },
+            }, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (action != "enable") PinInput("پین فعلی", oldPin, { oldPin = it; error = null })
@@ -209,10 +209,10 @@ fun JessiSecuritySettings(
                             onChanged()
                         }
                     }
-                ) { Text("تأیید") }
+                ) { Text("تأیید", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
             },
             dismissButton = {
-                TextButton(onClick = { action = null }) { Text("انصراف") }
+                TextButton(onClick = { action = null }) { Text("انصراف", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
             }
         )
     }

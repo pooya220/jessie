@@ -165,6 +165,10 @@ class MainActivity : FragmentActivity() {
                 LocalJessiDark provides darkMode
             ) {
                 MaterialTheme(colorScheme = if (darkMode) darkColors else lightColors) {
+                    CompositionLocalProvider(
+                        androidx.compose.material3.LocalContentColor provides
+                            (if (darkMode) Color.White else MaterialTheme.colorScheme.onSurface)
+                    ) {
                     if (securityEnabled && appLocked.value) {
                         JessiLockScreen(
                             security = pinSecurity,
@@ -191,6 +195,7 @@ class MainActivity : FragmentActivity() {
                         },
                         onReviewOpened = { notificationReviewId.longValue = -1L }
                     )
+                    }
                 }
             }
         }
@@ -383,6 +388,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
             modifier = Modifier.fillMaxSize())
     Scaffold(
         containerColor = Color.Transparent,
+        contentColor = if (darkMode) Color.White else MaterialTheme.colorScheme.onSurface,
         topBar = {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
@@ -403,7 +409,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                 }
                 Spacer(Modifier.width(9.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("جسی", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("جسی", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     Text("مدیریت مالی شخصی", color = jessiReadableText(muted), fontSize = 10.sp)
                 }
                 IconButton(
@@ -537,7 +543,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                                     verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                     Text(item.label, fontSize = 10.sp,
                                         fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
-                                        maxLines = 1)
+                                        maxLines = 1, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                                     if (selected) {
                                         Box(Modifier.width(14.dp).height(3.dp)
                                             .background(accent, RoundedCornerShape(2.dp)))
@@ -753,13 +759,13 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(selected = !accountsShowBudgets,
                             onClick = { accountsShowBudgets = false },
-                            label = { Text("حساب‌های بانکی") },
+                            label = { Text("حساب‌های بانکی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
                             leadingIcon = if (!accountsShowBudgets) ({
                                 Icon(Icons.Outlined.Check, contentDescription = null, Modifier.size(17.dp))
                             }) else null)
                         FilterChip(selected = accountsShowBudgets,
                             onClick = { accountsShowBudgets = true },
-                            label = { Text("بودجه‌بندی") },
+                            label = { Text("بودجه‌بندی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
                             leadingIcon = if (accountsShowBudgets) ({
                                 Icon(Icons.Outlined.Check, contentDescription = null, Modifier.size(17.dp))
                             }) else null)
@@ -822,11 +828,11 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
         val candidate = restorePreview!!
         AlertDialog(
             onDismissRequest = { if (!backupBusy) restorePreview = null },
-            title = { Text("بازیابی اطلاعات جسی") },
+            title = { Text("بازیابی اطلاعات جسی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("فایل معتبر است و این موارد را دارد:", fontWeight = FontWeight.Bold)
-                    Text(candidate.summary(), fontSize = 12.sp)
+                    Text("فایل معتبر است و این موارد را دارد:", fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
+                    Text(candidate.summary(), fontSize = 12.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     Text("توجه: با تأیید، تمام اطلاعات مالی فعلی با محتویات این فایل جایگزین می‌شود. " +
                         "بازیابی با داده‌های فعلی ادغام نمی‌شود.",
                         color = jessiReadableText(danger), fontSize = 12.sp)
@@ -852,11 +858,11 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                             } finally { backupBusy = false }
                         }
                     }
-                }, enabled = !backupBusy) { Text("جایگزینی اطلاعات") }
+                }, enabled = !backupBusy) { Text("جایگزینی اطلاعات", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
             },
             dismissButton = {
                 TextButton(onClick = { restorePreview = null }, enabled = !backupBusy) {
-                    Text("انصراف")
+                    Text("انصراف", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 }
             }
         )
@@ -922,7 +928,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
             },
             onReject = { vm.dismissReview(e.value.id); editor = null }
         )
-        is Editor.Delete -> AlertDialog(onDismissRequest = { editor = null }, title = { Text("تأیید حذف") }, text = { Text(e.title) }, confirmButton = { TextButton(onClick = { e.action(); editor = null }) { Text("حذف", color = jessiReadableText(danger)) } }, dismissButton = { TextButton(onClick = { editor = null }) { Text("انصراف") } })
+        is Editor.Delete -> AlertDialog(onDismissRequest = { editor = null }, title = { Text("تأیید حذف", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }, text = { Text(e.title, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }, confirmButton = { TextButton(onClick = { e.action(); editor = null }) { Text("حذف", color = jessiReadableText(danger)) } }, dismissButton = { TextButton(onClick = { editor = null }) { Text("انصراف", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) } })
         null -> Unit
     }
 }
@@ -971,7 +977,7 @@ private fun SettingsPage(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(if (section == "home") "تنظیمات" else titles[section].orEmpty(),
-                    fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                    fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 Text(if (section == "home") "هر موضوع در صفحه جداگانه و مرتب"
                      else "جسی • تنظیمات", fontSize = 11.sp, color = jessiReadableText(muted))
             }
@@ -1042,27 +1048,27 @@ private fun SettingsPage(
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .35f))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("دسترسی SMS", fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                    Text("دسترسی SMS", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     Text(if (smsPermitted) "اجازه داده شده" else "اجازه داده نشده",
                         fontSize = 11.sp, color = jessiReadableText(if (smsPermitted) mint else danger))
                 }
-                if (!smsPermitted) TextButton(onClick = onSmsPermission) { Text("درخواست مجوز") }
+                if (!smsPermitted) TextButton(onClick = onSmsPermission) { Text("درخواست مجوز", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
                 else Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = mint)
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("دسترسی اعلان‌ها", fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                    Text("دسترسی اعلان‌ها", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     Text(if (notificationsPermitted) "اجازه داده شده" else "اجازه داده نشده",
                         fontSize = 11.sp, color = jessiReadableText(if (notificationsPermitted) mint else danger))
                 }
-                if (!notificationsPermitted) TextButton(onClick = onNotificationPermission) { Text("درخواست مجوز") }
+                if (!notificationsPermitted) TextButton(onClick = onNotificationPermission) { Text("درخواست مجوز", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
                 else Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = mint)
             }
             OutlinedButton(onClick = onSystemSettings, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Outlined.OpenInNew, contentDescription = null,
                     modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(7.dp))
-                Text("مدیریت مجوزها در تنظیمات اندروید")
+                Text("مدیریت مجوزها در تنظیمات اندروید", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             }
         }
 
@@ -1073,14 +1079,14 @@ private fun SettingsPage(
             SettingsGroupTitle(Icons.Outlined.BugReport, "عیب‌یابی دریافت پیامک", accent = financePurple)
             Text("وضعیت اعلان: " + (notificationBlocker ?: "مجوز و کانال اعلان فعال است"),
                 fontSize = 12.sp, color = jessiReadableText(if (notificationBlocker == null) mint else danger))
-            Text("وضعیت آخرین پیامک در جسی:", fontWeight = FontWeight.Medium, fontSize = 12.sp)
+            Text("وضعیت آخرین پیامک در جسی:", fontWeight = FontWeight.Medium, fontSize = 12.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             Text(diagnosticSummary, fontSize = 11.sp, color = jessiReadableText(muted), lineHeight = 17.sp)
             Text("پیامک‌های منتظر بررسی: " + digitsFa(pendingReviews.toString()),
                 fontSize = 12.sp, color = jessiReadableText(muted))
             OutlinedButton(onClick = onTestNotification, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Outlined.NotificationsActive, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("ارسال اعلان آزمایشی")
+                Text("ارسال اعلان آزمایشی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             }
             OutlinedButton(
                 onClick = onResendPending, enabled = pendingReviews > 0,
@@ -1088,12 +1094,12 @@ private fun SettingsPage(
             ) {
                 Icon(Icons.Outlined.Replay, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("اعلان دوباره برای پیامک‌های منتظر")
+                Text("اعلان دوباره برای پیامک‌های منتظر", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             }
             TextButton(onClick = onNotificationSettings) {
-                Text("تنظیمات کانال اعلان پیامک در اندروید")
+                Text("تنظیمات کانال اعلان پیامک در اندروید", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             }
-            TextButton(onClick = onRefreshDiagnostics) { Text("به‌روزرسانی وضعیت") }
+            TextButton(onClick = onRefreshDiagnostics) { Text("به‌روزرسانی وضعیت", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
             Text("این عیب‌یابی متن پیامک، شماره حساب یا مبلغ رو ذخیره نمی‌کنه.",
                 color = jessiReadableText(muted), fontSize = 10.sp)
         }
@@ -1113,14 +1119,14 @@ private fun SettingsPage(
             ) {
                 Icon(Icons.Outlined.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("ذخیره فایل پشتیبان")
+                Text("ذخیره فایل پشتیبان", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             }
             OutlinedButton(
                 onClick = onImportBackup, enabled = !backupBusy, modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Outlined.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("انتخاب فایل و بازیابی")
+                Text("انتخاب فایل و بازیابی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             }
             if (backupBusy) CircularProgressIndicator(modifier = Modifier.size(23.dp))
             Text(
@@ -1140,12 +1146,12 @@ private fun SettingsPage(
                 FilterChip(
                     selected = periodMode == FinancePeriodEngine.MONTHLY,
                     onClick = { onPeriodChange(FinancePeriodEngine.MONTHLY) },
-                    label = { Text("اول هر ماه شمسی") }
+                    label = { Text("اول هر ماه شمسی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
                 )
                 FilterChip(
                     selected = periodMode == FinancePeriodEngine.SALARY,
                     onClick = { onPeriodChange(FinancePeriodEngine.SALARY) },
-                    label = { Text("پس از تأیید حقوق") }
+                    label = { Text("پس از تأیید حقوق", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
                 )
             }
             Text("تعویض دوره هیچ تراکنش یا بدهی را پاک نمی‌کند.",
@@ -1158,7 +1164,7 @@ private fun SettingsPage(
         Tile(Modifier.fillMaxWidth(), accent = financeBlue) {
             SettingsGroupTitle(Icons.Outlined.Info, "درباره جسی", accent = financeBlue)
             Text("نسخه " + digitsFa(versionName),
-                fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             Text("اطلاعات حساب‌ها و تراکنش‌ها در حافظه همین گوشی نگهداری می‌شوند. متن کامل پیامک بانکی ذخیره نمی‌شود.",
                 fontSize = 12.sp, color = jessiReadableText(muted))
             Text("هنگام حذف برنامه، ممکن است داده‌های ذخیره‌شده حذف شوند؛ بدون پشتیبان برنامه را پاک نکن.",
@@ -1191,7 +1197,7 @@ private fun SettingsNavRow(
     ) {
         FinanceIconTile(icon, accent)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             Text(description, fontSize = 11.sp, color = jessiReadableText(muted))
         }
         Icon(Icons.Outlined.ChevronLeft, contentDescription = null,
@@ -1213,13 +1219,13 @@ private fun SmsParserTestSettings(onSimulateSms: (String, String) -> Unit) {
         OutlinedTextField(
             value = sender,
             onValueChange = { sender = it; tested = false },
-            label = { Text("فرستنده (اختیاری)") },
+            label = { Text("فرستنده (اختیاری)", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
             singleLine = true, modifier = Modifier.fillMaxWidth()
         )
         OutlinedTextField(
             value = body,
             onValueChange = { body = it; tested = false },
-            label = { Text("متن پیامک") },
+            label = { Text("متن پیامک", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
             minLines = 3, maxLines = 8, modifier = Modifier.fillMaxWidth()
         )
         Button(
@@ -1228,7 +1234,7 @@ private fun SmsParserTestSettings(onSimulateSms: (String, String) -> Unit) {
         ) {
             Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(19.dp))
             Spacer(Modifier.width(8.dp))
-            Text("تست تشخیص پیامک")
+            Text("تست تشخیص پیامک", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
         }
         if (tested) {
             val found = result
@@ -1239,23 +1245,23 @@ private fun SmsParserTestSettings(onSimulateSms: (String, String) -> Unit) {
                     color = jessiReadableText(muted), fontSize = 11.sp)
             } else {
                 Text("پیامک شناسایی شد", color = jessiReadableText(mint), fontWeight = FontWeight.Bold)
-                Text("بانک: " + found.bankName.ifBlank { "نامشخص" }, fontSize = 12.sp)
+                Text("بانک: " + found.bankName.ifBlank { "نامشخص" }, fontSize = 12.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 Text("نوع: " + if (found.kind == "IN") "واریز" else "برداشت",
-                    fontSize = 12.sp)
+                    fontSize = 12.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 Text(
                     "مبلغ: " + if (found.amountUnit == BankSmsParser.UNKNOWN) {
                         digitsFa(NumberFormat.getIntegerInstance(Locale.US).format(found.amountRaw)) +
                             " (واحد نامشخص؛ هنگام بررسی باید انتخاب شود)"
                     } else toman(found.amountToman),
                     fontSize = 12.sp, fontWeight = FontWeight.Bold
-                )
+                , color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 OutlinedButton(
                     onClick = { onSimulateSms(body, sender) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Outlined.Send, contentDescription = null, modifier = Modifier.size(19.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("ساخت نمونه و بازکردن فرم ثبت")
+                    Text("ساخت نمونه و بازکردن فرم ثبت", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 }
                 Text(
                     "نمونه به صف بررسی اضافه می‌شه؛ سپس می‌تونی با تأیید جداگانه، " +
@@ -1277,7 +1283,7 @@ private fun SettingsGroupTitle(icon: ImageVector, text: String, accent: Color = 
             Icon(icon, contentDescription = null, tint = accent,
                 modifier = Modifier.padding(8.dp).size(21.dp))
         }
-        Text(text, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        Text(text, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
     }
 }
 
@@ -1292,7 +1298,7 @@ private fun SettingsToggle(
     ) {
         Icon(icon, contentDescription = null, tint = muted, modifier = Modifier.size(22.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             Text(description, color = jessiReadableText(muted), fontSize = 10.sp, lineHeight = 15.sp)
         }
         Switch(checked = checked, onCheckedChange = onChange,
@@ -1376,18 +1382,18 @@ private fun PeriodSwitcher(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(if (mode == FinancePeriodEngine.SALARY) "از حقوق" else "ماه شمسی",
-                        fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     Icon(Icons.Outlined.ExpandMore, contentDescription = null,
                         tint = muted, modifier = Modifier.size(19.dp))
                 }
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 DropdownMenuItem(
-                    text = { Text("ماه شمسی") },
+                    text = { Text("ماه شمسی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
                     onClick = { onModeChange(FinancePeriodEngine.MONTHLY); expanded = false }
                 )
                 DropdownMenuItem(
-                    text = { Text("از هر حقوق جدید") },
+                    text = { Text("از هر حقوق جدید", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
                     onClick = { onModeChange(FinancePeriodEngine.SALARY); expanded = false }
                 )
             }
@@ -1402,7 +1408,7 @@ private fun PeriodSwitcher(
 @Composable
 private fun SectionTitle(title: String, subtitle: String? = null) {
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+        Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
         if (subtitle != null) Text(subtitle, fontSize = 12.sp, color = jessiReadableText(muted))
     }
 }
@@ -1432,6 +1438,7 @@ private fun Tile(
     ), radius = 540f)
     Surface(
         modifier = modifier, color = base, shape = shape,
+        contentColor = if (dark) Color.White else MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp,
             if (dark) tint.copy(alpha = .35f) else tint.copy(alpha = .19f)),
         shadowElevation = if (dark) 4.dp else 2.dp
@@ -1539,7 +1546,7 @@ private fun Dashboard(
             }
             Spacer(Modifier.width(9.dp))
             Text("موجودی کل حساب‌ها", modifier = Modifier.weight(1f),
-                fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                fontSize = 13.sp, fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             IconButton(onClick = { onBalanceVisibilityChange(!balanceVisible) }, modifier = Modifier.size(36.dp)) {
                 Icon(if (balanceVisible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
                     contentDescription = if (balanceVisible) "پنهان کردن موجودی" else "نمایش موجودی",
@@ -1583,7 +1590,7 @@ private fun Dashboard(
         ) {
             FinanceIconTile(Icons.Filled.Savings, financePurple)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("بانک اهداف", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("بانک اهداف", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 Text(
                     if (balanceVisible) toman(savedForGoals) else "••••••",
                     fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = jessiReadableText(financePurple),
@@ -1591,7 +1598,7 @@ private fun Dashboard(
                 )
             }
             TextButton(onClick = { onSelectTab(Tab.GOALS) }) {
-                Text("اهداف", fontSize = 11.sp)
+                Text("اهداف", fontSize = 11.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 Icon(Icons.Outlined.ChevronLeft, contentDescription = null,
                     modifier = Modifier.size(16.dp))
             }
@@ -1611,12 +1618,12 @@ private fun Dashboard(
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             FinanceIconTile(Icons.Filled.EventNote, financePurple)
             Column(Modifier.weight(1f)) {
-                Text("اقساط و بدهی‌های ماه آینده", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                Text("اقساط و بدهی‌های ماه آینده", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 Text("سررسیدهای " + monthCaption, fontSize = 11.sp, color = jessiReadableText(muted))
             }
             TextButton(onClick = { onSelectTab(Tab.DEBTS) },
                 contentPadding = PaddingValues(horizontal = 4.dp)) {
-                Text("جزئیات", fontSize = 11.sp)
+                Text("جزئیات", fontSize = 11.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 Icon(Icons.Outlined.ChevronLeft, contentDescription = null,
                     modifier = Modifier.size(17.dp))
             }
@@ -1661,7 +1668,7 @@ private fun Dashboard(
             Text("برای ماه آینده هیچ قسط یا بدهی سررسیدداری ثبت نشده ✦",
                 fontSize = 11.sp, color = jessiReadableText(muted))
         } else {
-            Text("سررسیدهای ماه آینده", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text("سررسیدهای ماه آینده", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             nextMonthDue.payments.take(5).forEach { item ->
                 Row(Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1674,13 +1681,13 @@ private fun Dashboard(
                         modifier = Modifier.size(16.dp))
                     Column(Modifier.weight(1f)) {
                         Text(item.debt.person, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                         Text((if (item.isInstallment) "قسط" else "بدهی") + " • " +
                             JalaliDates.format(item.dueDate), color = jessiReadableText(muted), fontSize = 10.sp)
                     }
                     Text(if (balanceVisible) toman(item.amountToman) else "••••••",
                         fontWeight = FontWeight.Bold, fontSize = 11.sp,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 }
             }
             if (nextMonthDue.payments.size > 5) {
@@ -1700,24 +1707,24 @@ private fun Dashboard(
                 Icon(Icons.Outlined.Markunread, tint = mint, contentDescription = null)
                 Spacer(Modifier.width(7.dp))
                 Text("پیامک‌های منتظر بررسی", modifier = Modifier.weight(1f),
-                    fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    fontWeight = FontWeight.Bold, fontSize = 14.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 Tag(digitsFa(reviews.size.toString()), true)
             }
             reviews.take(5).forEach { row ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(if (row.kind == "IN") "واریز احتمالی" else "برداشت احتمالی",
-                            fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                         Text("${reviewAmountLabel(row)} • ${row.sender}", fontSize = 11.sp, color = jessiReadableText(muted))
                     }
-                    TextButton(onClick = { onReview(row) }) { Text("بررسی") }
+                    TextButton(onClick = { onReview(row) }) { Text("بررسی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
                 }
             }
         }
     }
     if (budgets.isNotEmpty()) {
         Tile(Modifier.fillMaxWidth()) {
-            Text("بودجه‌های این دوره", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text("بودجه‌های این دوره", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             budgets.take(4).forEach { budget ->
                 val spent = current.filter { it.kind == "OUT" && it.category == budget.category }
                     .sumOf { it.amountToman }
@@ -1734,19 +1741,19 @@ private fun Dashboard(
     }
     if (!smsPermitted || !notificationsPermitted || !smsMonitoringEnabled || !reviewNotificationsEnabled) {
         Tile(Modifier.fillMaxWidth()) {
-            Text("دسترسی‌های پیامک بانکی", fontWeight = FontWeight.Bold)
+            Text("دسترسی‌های پیامک بانکی", fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             if (!smsMonitoringEnabled || !reviewNotificationsEnabled) {
                 Text("بررسی پیامک یا اعلان‌ها از تنظیمات جسی غیرفعال شده.",
                     fontSize = 12.sp, color = jessiReadableText(muted))
-                TextButton(onClick = onOpenSettings) { Text("تنظیمات پیامک و اعلان") }
+                TextButton(onClick = onOpenSettings) { Text("تنظیمات پیامک و اعلان", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
             }
             if (!smsPermitted) {
                 Text("برای شناسایی پیامک‌های بانکی جدید، مجوز SMS را فعال کن.", fontSize = 12.sp, color = jessiReadableText(muted))
-                TextButton(onClick = requestPermission) { Text("فعال‌کردن SMS") }
+                TextButton(onClick = requestPermission) { Text("فعال‌کردن SMS", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
             }
             if (!notificationsPermitted) {
                 Text("برای اعلان بررسی تراکنش، مجوز اعلان را فعال کن.", fontSize = 12.sp, color = jessiReadableText(muted))
-                TextButton(onClick = requestNotificationPermission) { Text("فعال‌کردن اعلان") }
+                TextButton(onClick = requestNotificationPermission) { Text("فعال‌کردن اعلان", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
             }
         }
     }
@@ -1757,9 +1764,9 @@ private fun Dashboard(
                 modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(6.dp))
             Text("تراکنش‌های اخیر", modifier = Modifier.weight(1f),
-                fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                fontWeight = FontWeight.Bold, fontSize = 15.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             TextButton(onClick = { onSelectTab(Tab.TXS) }, contentPadding = PaddingValues(4.dp)) {
-                Text("مشاهده همه", fontSize = 11.sp)
+                Text("مشاهده همه", fontSize = 11.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 Icon(Icons.Outlined.ChevronLeft, contentDescription = null,
                     modifier = Modifier.size(16.dp))
             }
@@ -1805,7 +1812,7 @@ private fun DashboardRecentTransaction(
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                maxLines = 1, overflow = TextOverflow.Ellipsis, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             Text((accounts.firstOrNull { it.id == row.accountId }?.title ?: "حساب نامشخص") +
                 " • " + Jalali.of(row.createdAt), color = jessiReadableText(muted), fontSize = 10.sp)
         }
@@ -1857,7 +1864,7 @@ private fun FinanceSectionHero(
                     modifier = Modifier.padding(8.dp).size(21.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                Text(title, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 Text(description, color = jessiReadableText(muted), fontSize = 11.sp, lineHeight = 16.sp)
             }
         }
@@ -1902,7 +1909,7 @@ private fun FinanceActionRow(
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = mint.copy(alpha = .15f), contentColor = mint
                 )) {
-                Text(primaryLabel, fontSize = 11.sp)
+                Text(primaryLabel, fontSize = 11.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             }
         }
         Spacer(Modifier.weight(1f))
@@ -1910,7 +1917,7 @@ private fun FinanceActionRow(
             TextButton(onClick = edit) {
                 Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("ویرایش", fontSize = 11.sp)
+                Text("ویرایش", fontSize = 11.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             }
         }
         if (delete != null) {
@@ -1941,7 +1948,7 @@ private fun AccountsPage(accounts: List<Account>, txs: List<Transaction>, onEdit
                 horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FinanceIconTile(Icons.Filled.AccountBalanceWallet, financeAqua)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(acc.title, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(acc.title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     Text(listOf(acc.bank, if (acc.last4.isNotBlank())
                         "•••• " + digitsFa(acc.last4) else "").filter { it.isNotBlank() }
                         .joinToString(" • "), color = jessiReadableText(muted), fontSize = 11.sp)
@@ -2031,7 +2038,7 @@ private fun TransactionTile(
             FinanceIconTile(icon, tone)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(description, fontWeight = FontWeight.Bold, fontSize = 13.sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 Text((accounts.firstOrNull { it.id == row.accountId }?.title ?: "حساب نامشخص")
                     + " • " + Jalali.of(row.createdAt),
                     color = jessiReadableText(muted), fontSize = 11.sp)
@@ -2090,7 +2097,7 @@ private fun DebtsPage(
                     else Icons.Filled.Handshake, tone)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(row.person, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     Text(if (row.installmentMonths > 0) "بازپرداخت اقساطی" else "تسویه عادی",
                         color = jessiReadableText(muted), fontSize = 11.sp)
                 }
@@ -2142,7 +2149,7 @@ private fun DebtsPage(
                             color = jessiReadableText(if (overdue) danger else muted), fontSize = 11.sp)
                     }
                     Text("مبلغ قسط بعدی: " + toman(Installments.nextAmount(row)),
-                        fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        fontSize = 12.sp, fontWeight = FontWeight.Medium, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 }
                 val dueHere = Installments.dueInPeriod(row, period.start, period.endExclusive)
                 if (dueHere > 0L) Tag("سررسید این دوره • " + toman(dueHere))
@@ -2190,7 +2197,7 @@ private fun BudgetsPage(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FinanceIconTile(Icons.Filled.DonutLarge, usedColor)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(b.category, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(b.category, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                     Text("سقف هزینه این دوره", color = jessiReadableText(muted), fontSize = 11.sp)
                 }
                 Surface(
@@ -2205,12 +2212,12 @@ private fun BudgetsPage(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("مصرف‌شده", color = jessiReadableText(muted), fontSize = 11.sp)
-                    Text(toman(spent), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text(toman(spent), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 }
                 Column(horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("سقف تعیین‌شده", color = jessiReadableText(muted), fontSize = 11.sp)
-                    Text(toman(b.monthlyLimitToman), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text(toman(b.monthlyLimitToman), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 }
             }
             LinearProgressIndicator(progress = { ratio.coerceIn(0f, 1f) },
@@ -2236,7 +2243,7 @@ private fun TextEntry(
     OutlinedTextField(
         value = value,
         onValueChange = { onChange(if (number) normalizeNumericInput(it) else it) },
-        label = { Text(label) }, singleLine = singleLine,
+        label = { Text(label, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }, singleLine = singleLine,
         modifier = Modifier.fillMaxWidth(),
         visualTransformation = if (number && grouped) GroupedNumberVisualTransformation
             else androidx.compose.ui.text.input.VisualTransformation.None,
@@ -2251,12 +2258,12 @@ private fun <T> SelectItem(label: String, selected: T?, items: List<T>, display:
         Text(label, fontSize = 12.sp, color = jessiReadableText(muted))
         Box {
             OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(selected?.let(display) ?: "انتخاب کنید", modifier = Modifier.weight(1f))
-                Text("⌄")
+                Text(selected?.let(display) ?: "انتخاب کنید", modifier = Modifier.weight(1f), color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
+                Text("⌄", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 items.forEach { item ->
-                    DropdownMenuItem(text = { Text(display(item)) }, onClick = { onPick(item); expanded = false })
+                    DropdownMenuItem(text = { Text(display(item), color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }, onClick = { onPick(item); expanded = false })
                 }
             }
         }
@@ -2280,8 +2287,8 @@ private fun EntryDialog(title: String, valid: Boolean, dismiss: () -> Unit, onSa
         text = {
             Column(Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp), content = body)
         },
-        confirmButton = { Button(onClick = onSave, enabled = valid) { Text("ذخیره") } },
-        dismissButton = { TextButton(onClick = dismiss) { Text("انصراف") } }
+        confirmButton = { Button(onClick = onSave, enabled = valid) { Text("ذخیره", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("انصراف", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) } }
     )
 }
 
@@ -2334,7 +2341,7 @@ private fun TransactionDialog(
                     FilterChip(selected = type == code, onClick = {
                         type = code
                         if (type == "IN" && category !in incomeCategories) category = "درآمد"
-                    }, label = { Text(label, fontSize = 11.sp) })
+                    }, label = { Text(label, fontSize = 11.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) })
                 }
             }
         }
@@ -2385,28 +2392,28 @@ private fun DebtDialog(initial: Debt?, dismiss: () -> Unit, save: (Debt) -> Unit
             firstInstallmentJalali = if (installment) JalaliDates.format(JalaliDates.parse(firstDue)!!) else ""))
     }) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = dir == "I_OWE", onClick = { dir = "I_OWE" }, label = { Text("من بدهکارم") })
-            FilterChip(selected = dir == "OWED_TO_ME", onClick = { dir = "OWED_TO_ME" }, label = { Text("من طلبکارم") })
+            FilterChip(selected = dir == "I_OWE", onClick = { dir = "I_OWE" }, label = { Text("من بدهکارم", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) })
+            FilterChip(selected = dir == "OWED_TO_ME", onClick = { dir = "OWED_TO_ME" }, label = { Text("من طلبکارم", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) })
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = !installment, onClick = { installment = false }, label = { Text("بدهی عادی") })
-            FilterChip(selected = installment, onClick = { installment = true }, label = { Text("قسطی") })
+            FilterChip(selected = !installment, onClick = { installment = false }, label = { Text("بدهی عادی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) })
+            FilterChip(selected = installment, onClick = { installment = true }, label = { Text("قسطی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) })
         }
         TextEntry("نام شخص، بانک یا مؤسسه", name, { name = it })
         TextEntry("مبلغ کل به تومان", amountStr, { amountStr = it }, number = true)
         if (installment) {
             TextEntry("تعداد کل اقساط (ماه)", installmentCount, { installmentCount = it }, number = true)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("اولین قسط چند ماه دیگر؟", fontSize = 12.sp, modifier = Modifier.weight(1f))
+                Text("اولین قسط چند ماه دیگر؟", fontSize = 12.sp, modifier = Modifier.weight(1f), color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 OutlinedButton(onClick = {
                     monthsUntilDue = (monthsUntilDue - 1).coerceAtLeast(0)
                     firstDue = JalaliDates.format(JalaliDates.addMonths(Jalali.of(System.currentTimeMillis()), monthsUntilDue))
-                }, enabled = monthsUntilDue > 0) { Text("−") }
+                }, enabled = monthsUntilDue > 0) { Text("−", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
                 Text(digitsFa(monthsUntilDue.toString()), color = jessiReadableText(mint))
                 OutlinedButton(onClick = {
                     monthsUntilDue = (monthsUntilDue + 1).coerceAtMost(36)
                     firstDue = JalaliDates.format(JalaliDates.addMonths(Jalali.of(System.currentTimeMillis()), monthsUntilDue))
-                }, enabled = monthsUntilDue < 36) { Text("+") }
+                }, enabled = monthsUntilDue < 36) { Text("+", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
             }
             JalaliDateInput("تاریخ اولین سررسید شمسی", firstDue, onChange = { firstDue = it })
             if (amount != null && months != null && months > 0) {
@@ -2481,7 +2488,7 @@ private fun ReviewDialog(
     }
     AlertDialog(
         onDismissRequest = dismiss,
-        title = { Text("بررسی پیامک بانکی") },
+        title = { Text("بررسی پیامک بانکی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
         text = {
             Column(
                 Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()),
@@ -2498,8 +2505,8 @@ private fun ReviewDialog(
                 if (row.bankName.isNotBlank()) Text(row.bankName, fontSize = 13.sp, color = jessiReadableText(muted))
                 Text(if (needsUnit && selectedUnit.isBlank())
                     reviewAmountLabel(row) else toman(selectedAmount),
-                    fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                Text("فرستنده: ${row.sender}", fontSize = 12.sp)
+                    fontWeight = FontWeight.Bold, fontSize = 20.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
+                Text("فرستنده: ${row.sender}", fontSize = 12.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
                 if (needsUnit) {
                     Text("واحد پول در پیامک مشخص نیست؛ قبل از ثبت انتخاب کن:",
                         color = jessiReadableText(danger), fontSize = 12.sp)
@@ -2507,12 +2514,12 @@ private fun ReviewDialog(
                         FilterChip(
                             selected = selectedUnit == "RIAL",
                             onClick = { selectedUnit = "RIAL" },
-                            label = { Text("ریال") }
+                            label = { Text("ریال", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
                         )
                         FilterChip(
                             selected = selectedUnit == "TOMAN",
                             onClick = { selectedUnit = "TOMAN" },
-                            label = { Text("تومان") }
+                            label = { Text("تومان", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
                         )
                     }
                     if (selectedUnit == "RIAL" && original % 10L != 0L) {
@@ -2551,7 +2558,7 @@ private fun ReviewDialog(
                 enabled = accountId != null && selectedAmount > 0L &&
                     (!isSimulation || testRegistrationConsent)
             ) {
-                Text(if (isSimulation) "ثبت آزمایشی در آمار" else "ثبت تراکنش")
+                Text(if (isSimulation) "ثبت آزمایشی در آمار" else "ثبت تراکنش", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             }
         },
         dismissButton = {
@@ -2559,7 +2566,7 @@ private fun ReviewDialog(
                 TextButton(onClick = onReject) {
                     Text(if (isSimulation) "حذف نمونه" else "نادیده گرفتن", color = jessiReadableText(danger))
                 }
-                TextButton(onClick = dismiss) { Text("بعداً") }
+                TextButton(onClick = dismiss) { Text("بعداً", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
             }
         }
     )
