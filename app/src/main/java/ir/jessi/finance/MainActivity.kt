@@ -28,7 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Eco
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.core.view.WindowCompat
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -144,10 +145,10 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tab(val label: String, val icon: String) {
-    // Exactly five bottom destinations, with home in the center.
-    ACCOUNTS("حساب‌ها", "▣"), TXS("تراکنش‌ها", "≋"),
-    HOME("خانه", "⌂"), DEBTS("اقساط", "⇆"), GOALS("اهداف", "◈")
+private enum class Tab(val label: String) {
+    // Semantic Material icons replace the previous text glyphs.
+    ACCOUNTS("حساب‌ها"), TXS("تراکنش‌ها"),
+    HOME("خانه"), DEBTS("اقساط"), GOALS("اهداف")
 }
 private sealed interface Editor {
     data class AccountForm(val value: Account? = null) : Editor
@@ -296,15 +297,17 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    Modifier.size(40.dp).background(
-                        if (darkMode) Color(0xFF2E1C5E) else Color(0xFFDAF6E7),
-                        RoundedCornerShape(14.dp)
-                    ),
+                    Modifier.size(42.dp).clip(RoundedCornerShape(14.dp))
+                        .background(Brush.linearGradient(if (darkMode)
+                            listOf(Color(0xFF5A378F), Color(0xFF164A69))
+                            else listOf(Color(0xFFDCF4FC), Color(0xFFE9E3FF))))
+                        .border(1.dp, if (darkMode) Color.White.copy(alpha = .23f)
+                            else Color(0xFFCEDCF2), RoundedCornerShape(14.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Filled.Eco, contentDescription = "نشان جسی",
-                        tint = if (darkMode) Color(0xFFC46EFF) else Color(0xFF0CB86C),
-                        modifier = Modifier.size(26.dp))
+                    Icon(Icons.Filled.AutoAwesome, contentDescription = "نشان جسی",
+                        tint = if (darkMode) Color(0xFFBFE7FF) else Color(0xFF008F69),
+                        modifier = Modifier.size(25.dp))
                 }
                 Spacer(Modifier.width(9.dp))
                 Column(Modifier.weight(1f)) {
@@ -355,61 +358,109 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
             }
         },
         bottomBar = {
-            val glassShape = RoundedCornerShape(25.dp)
-            NavigationBar(
-                containerColor = if (darkMode) Color(0xE21A2146) else Color(0xEFFFFFFF),
-                tonalElevation = 0.dp,
-                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
-                    .height(77.dp).clip(glassShape)
-                    .border(1.dp, if (darkMode) Color.White.copy(alpha = .22f)
-                        else Color(0xFFDAEBF0), glassShape)
+            // N2: floating liquid-glass dock. The selected destination has a
+            // soft inner highlight, frosted tint and a distinct active marker.
+            val glassShape = RoundedCornerShape(27.dp)
+            val dockGlass = if (darkMode) {
+                Brush.linearGradient(listOf(
+                    Color(0xE62F365E), Color(0xE11C2342), Color(0xEA24365B)
+                ))
+            } else {
+                Brush.linearGradient(listOf(
+                    Color(0xF7FFFFFF), Color(0xE9E9F4FF), Color(0xF5FFFFFF)
+                ))
+            }
+            Box(
+                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp)
+                    .height(81.dp).shadow(13.dp, glassShape)
+                    .clip(glassShape).background(dockGlass)
+                    .border(1.dp, if (darkMode) Color(0x7AFFFFFF)
+                        else Color.White, glassShape)
             ) {
-                Tab.entries.forEach { item ->
-                    val selected = tab == item && !showSettings
-                    val navigationIcon: ImageVector = when (item) {
-                        Tab.HOME -> Icons.Outlined.Home
-                        Tab.DEBTS -> Icons.Outlined.CreditCard
-                        Tab.TXS -> Icons.Outlined.ReceiptLong
-                        Tab.ACCOUNTS -> Icons.Outlined.AccountBalanceWallet
-                        Tab.GOALS -> Icons.Outlined.Savings
-                    }
-                    val accent = when (item) {
-                        Tab.HOME -> financeAqua
-                        Tab.ACCOUNTS -> financeAqua
-                        Tab.TXS -> financeBlue
-                        Tab.DEBTS -> financePurple
-                        Tab.GOALS -> financeAmber
-                    }
-                    NavigationBarItem(
-                        selected = selected,
-                        onClick = { tabName = item.name; showSettings = false },
-                        icon = {
-                            val shape = RoundedCornerShape(if (item == Tab.HOME) 16.dp else 12.dp)
-                            Box(
-                                Modifier.size(if (item == Tab.HOME) 41.dp else 37.dp)
-                                    .clip(shape)
-                                    .background(if (selected) accent.copy(alpha = if (darkMode) .27f else .14f)
-                                        else Color.Transparent)
-                                    .border(1.dp, if (selected) accent.copy(alpha = .63f)
-                                        else Color.Transparent, shape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(navigationIcon, contentDescription = item.label,
-                                    modifier = Modifier.size(if (item == Tab.HOME) 25.dp else 22.dp))
-                            }
-                        },
-                        label = {
-                            Text(item.label, fontSize = 10.sp,
-                                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
-                                maxLines = 1)
-                        },
-                        alwaysShowLabel = true,
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = accent, selectedTextColor = accent,
-                            indicatorColor = Color.Transparent,
-                            unselectedIconColor = muted, unselectedTextColor = muted
+                // A subtle reflected top edge evokes liquid glass without
+                // blurring the icons or reducing touch accessibility.
+                Box(Modifier.fillMaxWidth().height(2.dp)
+                    .background(Brush.horizontalGradient(listOf(
+                        Color.Transparent,
+                        Color.White.copy(alpha = if (darkMode) .45f else .95f),
+                        Color.Transparent
+                    ))))
+                NavigationBar(
+                    containerColor = Color.Transparent,
+                    tonalElevation = 0.dp,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Tab.entries.forEach { item ->
+                        val selected = tab == item && !showSettings
+                        val outlineIcon: ImageVector = when (item) {
+                            Tab.ACCOUNTS -> Icons.Outlined.AccountBalanceWallet
+                            Tab.TXS -> Icons.Outlined.ReceiptLong
+                            Tab.HOME -> Icons.Outlined.Home
+                            Tab.DEBTS -> Icons.Outlined.EventNote
+                            Tab.GOALS -> Icons.Outlined.Savings
+                        }
+                        val filledIcon: ImageVector = when (item) {
+                            Tab.ACCOUNTS -> Icons.Filled.AccountBalanceWallet
+                            Tab.TXS -> Icons.Filled.ReceiptLong
+                            Tab.HOME -> Icons.Filled.Home
+                            Tab.DEBTS -> Icons.Filled.EventNote
+                            Tab.GOALS -> Icons.Filled.Savings
+                        }
+                        val accent = when (item) {
+                            Tab.ACCOUNTS -> financeAqua
+                            Tab.TXS -> financeBlue
+                            Tab.HOME -> financeAqua
+                            Tab.DEBTS -> financePurple
+                            Tab.GOALS -> financeAmber
+                        }
+                        val iconShape = RoundedCornerShape(if (item == Tab.HOME) 16.dp else 14.dp)
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = { tabName = item.name; showSettings = false },
+                            icon = {
+                                Box(
+                                    Modifier.size(if (item == Tab.HOME) 42.dp else 38.dp)
+                                        .clip(iconShape)
+                                        .background(if (selected) {
+                                            Brush.linearGradient(listOf(
+                                                accent.copy(alpha = if (darkMode) .33f else .19f),
+                                                Color.White.copy(alpha = if (darkMode) .17f else .84f)
+                                            ))
+                                        } else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)))
+                                        .border(1.dp, if (selected) {
+                                            if (darkMode) Color.White.copy(alpha = .38f)
+                                            else accent.copy(alpha = .33f)
+                                        } else Color.Transparent, iconShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        if (selected) filledIcon else outlineIcon,
+                                        contentDescription = item.label,
+                                        modifier = Modifier.size(if (item == Tab.HOME) 26.dp else 23.dp)
+                                    )
+                                }
+                            },
+                            label = {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text(item.label, fontSize = 10.sp,
+                                        fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
+                                        maxLines = 1)
+                                    if (selected) {
+                                        Box(Modifier.width(14.dp).height(3.dp)
+                                            .background(accent, RoundedCornerShape(2.dp)))
+                                    }
+                                }
+                            },
+                            alwaysShowLabel = true,
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = accent, selectedTextColor = accent,
+                                indicatorColor = Color.Transparent,
+                                unselectedIconColor = if (darkMode) Color(0xFFB7C0D9) else Color(0xFF61758A),
+                                unselectedTextColor = if (darkMode) Color(0xFFB7C0D9) else Color(0xFF61758A)
+                            )
                         )
-                    )
+                    }
                 }
             }
         },
@@ -430,7 +481,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                     Tab.GOALS -> financePurple
                     else -> mint
                 }) {
-                    Icon(Icons.Outlined.Add, contentDescription = "افزودن",
+                    Icon(Icons.Filled.Add, contentDescription = "افزودن",
                         tint = if (darkMode) Color(0xFF14152D) else Color.White,
                         modifier = Modifier.size(26.dp))
                 }
@@ -1152,31 +1203,32 @@ private fun Tile(
     accent: Color = Color.Unspecified,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    // C5 Dark Aurora: deep ink canvas, violet/cyan glow and crisp soft borders.
+    // Light mode uses a gentle Aurora variation to preserve text contrast.
     val dark = LocalJessiDark.current
     val tint = if (accent == Color.Unspecified) {
         if (dark) financePurple else financeAqua
     } else accent
-    val glassShape = RoundedCornerShape(21.dp)
-    val frostedBase = if (dark) Color(0xCD1A2246) else Color(0xE8FFFFFF)
-    val glossyLight = Brush.linearGradient(
-        listOf(
-            Color.White.copy(alpha = if (dark) .15f else .70f),
-            tint.copy(alpha = if (dark) .16f else .075f),
-            Color.Transparent
-        )
-    )
+    val shape = RoundedCornerShape(23.dp)
+    val base = if (dark) Color(0xFF12182F) else Color(0xFFF7FBFF)
+    val aurora = if (dark) Brush.linearGradient(listOf(
+        Color(0xFF30255A), Color(0xFF142B47), Color(0xFF173244), Color(0xFF151930)
+    )) else Brush.linearGradient(listOf(
+        Color(0xFFF1EAFB), Color(0xFFF1FAFF), Color(0xFFECF9F6), Color(0xFFFDFBFF)
+    ))
+    val glow = Brush.radialGradient(listOf(
+        tint.copy(alpha = if (dark) .23f else .095f),
+        Color.Transparent
+    ), radius = 540f)
     Surface(
-        modifier = modifier, color = frostedBase, shape = glassShape,
+        modifier = modifier, color = base, shape = shape,
         border = BorderStroke(1.dp,
-            if (dark) Color.White.copy(alpha = .24f)
-            else Color.White.copy(alpha = .95f)),
-        shadowElevation = if (dark) 7.dp else 8.dp
+            if (dark) tint.copy(alpha = .46f) else tint.copy(alpha = .22f)),
+        shadowElevation = if (dark) 8.dp else 5.dp
     ) {
         Column(
-            Modifier.background(Brush.verticalGradient(listOf(
-                if (dark) Color(0x362D4179) else Color(0x42E6F4FF),
-                Color.Transparent
-            ))).background(glossyLight).padding(15.dp),
+            Modifier.background(aurora).background(glow)
+                .padding(15.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             content = content
         )
@@ -1233,16 +1285,16 @@ private fun Dashboard(
         Installments.dueInPeriod(it, nextMonthStart, nextMonthEnd) > 0L
     }
     val heroGradient = if (dark)
-        Brush.linearGradient(listOf(Color(0xFF123E6A), Color(0xFF28205E), Color(0xFF461D75)))
-    else Brush.linearGradient(listOf(Color(0xFFEAF8F2), Color(0xFFF4FBFF), Color(0xFFF9F7FF)))
+        Brush.linearGradient(listOf(Color(0xFF30235C), Color(0xFF172B4D), Color(0xFF17443F)))
+    else Brush.linearGradient(listOf(Color(0xFFF3ECFB), Color(0xFFEBF7FF), Color(0xFFE8F8F2)))
     val heroShape = RoundedCornerShape(22.dp)
 
     // Dashboard follows the reference top-to-bottom, using real account and period data.
     Column(
         Modifier.fillMaxWidth().clip(heroShape).background(heroGradient)
             .border(BorderStroke(1.dp,
-                if (dark) Color(0xFF4B58C4).copy(alpha = .7f)
-                else Color(0xFFDDEEE8)), heroShape)
+                if (dark) Color(0xFFB483F7).copy(alpha = .56f)
+                else Color(0xFFC7DCEC)), heroShape)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
@@ -1251,8 +1303,8 @@ private fun Dashboard(
                 color = if (dark) Color(0xFF59318C) else Color(0xFFD9F5E5),
                 shape = RoundedCornerShape(13.dp)
             ) {
-                Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null,
-                    modifier = Modifier.padding(10.dp).size(22.dp), tint = mint)
+                Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null,
+                    modifier = Modifier.padding(10.dp).size(22.dp), tint = financeAqua)
             }
             Spacer(Modifier.width(9.dp))
             Text("موجودی کل حساب‌ها", modifier = Modifier.weight(1f),
@@ -1295,7 +1347,7 @@ private fun Dashboard(
     Tile(Modifier.fillMaxWidth(), accent = financePurple) {
         Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FinanceIconTile(Icons.Outlined.Savings, financePurple)
+            FinanceIconTile(Icons.Filled.Savings, financePurple)
             Column(Modifier.weight(1f)) {
                 Text("بانک اهداف", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Text("دانشگاه، خرید و پس‌انداز ماهانه",
@@ -1330,7 +1382,7 @@ private fun Dashboard(
 
     Tile(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.Layers, contentDescription = null, tint = mint,
+            Icon(Icons.Filled.EventNote, contentDescription = null, tint = mint,
                 modifier = Modifier.size(19.dp))
             Spacer(Modifier.width(7.dp))
             Text("اقساط و بدهی", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 15.sp)
@@ -1419,7 +1471,7 @@ private fun Dashboard(
     Tile(Modifier.fillMaxWidth(), accent = financePurple) {
         Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            FinanceIconTile(Icons.Outlined.CalendarMonth, financePurple)
+            FinanceIconTile(Icons.Filled.CalendarMonth, financePurple)
             Column(Modifier.weight(1f)) {
                 Text("جمع اقساط ماه آینده", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Text("ماه " + digitsFa(nextMonthLabel.month.toString()) + " / " +
@@ -1524,18 +1576,19 @@ private fun FinanceSectionHero(
     val shape = RoundedCornerShape(22.dp)
     val gradient = if (dark) Brush.linearGradient(
         listOf(
-            highlight.copy(alpha = .36f), Color(0xFF252259), Color(0xFF20224E)
+            highlight.copy(alpha = .30f), Color(0xFF302057),
+            Color(0xFF14364B), Color(0xFF111A34)
         )
     ) else Brush.linearGradient(
         listOf(
-            highlight.copy(alpha = .16f), Color(0xFFF0F9F8), Color(0xFFF5F1FC)
+            highlight.copy(alpha = .12f), Color(0xFFF4F0FD), Color(0xFFECF8FD)
         )
     )
     Column(
         Modifier.fillMaxWidth().clip(shape)
-            .background(if (dark) Color(0xCF171C46) else Color(0xE8FFFFFF))
+            .background(if (dark) Color(0xFF11172E) else Color(0xFFF9FBFF))
             .background(gradient)
-            .border(1.dp, highlight.copy(alpha = if (dark) .48f else .20f), shape)
+            .border(1.dp, highlight.copy(alpha = if (dark) .49f else .24f), shape)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(11.dp)
     ) {
@@ -1565,13 +1618,20 @@ private fun FinanceSectionHero(
 
 @Composable
 private fun FinanceIconTile(icon: ImageVector, tint: Color = mint) {
-    Surface(
-        color = tint.copy(alpha = if (LocalJessiDark.current) .23f else .12f),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, tint.copy(alpha = .22f))
+    val dark = LocalJessiDark.current
+    val shape = RoundedCornerShape(14.dp)
+    Box(
+        Modifier.size(43.dp).clip(shape)
+            .background(Brush.linearGradient(listOf(
+                tint.copy(alpha = if (dark) .29f else .17f),
+                if (dark) Color(0xFF343057) else Color(0xFFF7FAFF)
+            )))
+            .border(1.dp,
+                if (dark) Color.White.copy(alpha = .20f)
+                else tint.copy(alpha = .29f), shape),
+        contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = null, tint = tint,
-            modifier = Modifier.padding(10.dp).size(21.dp))
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -1614,7 +1674,7 @@ private fun AccountsPage(accounts: List<Account>, txs: List<Transaction>, onEdit
     val balance = accounts.sumOf { accountBalance(it.id, it.openingToman, txs) }
     FinanceSectionHero(
         "حساب‌های من", "نمای یکجا از حساب‌ها و موجودی ثبت‌شده",
-        Icons.Outlined.AccountBalanceWallet,
+        Icons.Filled.AccountBalanceWallet,
         toman(balance), digitsFa(accounts.size.toString()) + " حساب", accent = financeAqua
     )
     if (accounts.isEmpty()) EmptyNote("حسابی ثبت نشده. برای شروع روی + بزن و موجودی اولیه را وارد کن.")
@@ -1624,7 +1684,7 @@ private fun AccountsPage(accounts: List<Account>, txs: List<Transaction>, onEdit
         Tile(Modifier.fillMaxWidth(), accent = financeAqua) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FinanceIconTile(Icons.Outlined.AccountBalanceWallet, financeAqua)
+                FinanceIconTile(Icons.Filled.AccountBalanceWallet, financeAqua)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(acc.title, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Text(listOf(acc.bank, if (acc.last4.isNotBlank())
@@ -1662,7 +1722,7 @@ private fun TransactionsPage(txs: List<Transaction>, accounts: List<Account>, on
     val expense = txs.filter { it.kind == "OUT" }.sumOf { it.amountToman }
     FinanceSectionHero(
         "تراکنش‌ها", "گردش مالی دوره انتخاب‌شده",
-        Icons.Outlined.ReceiptLong,
+        Icons.Filled.ReceiptLong,
         digitsFa(visible.size.toString()), "تراکنش", accent = financeBlue
     )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -1702,7 +1762,7 @@ private fun TransactionTile(
         else -> danger
     }
     val icon = when {
-        row.kind in listOf("GOAL_OUT", "GOAL_IN") -> Icons.Outlined.Savings
+        row.kind in listOf("GOAL_OUT", "GOAL_IN") -> Icons.Filled.Savings
         transfer -> Icons.Outlined.SwapHoriz
         credit -> Icons.Outlined.SouthWest
         else -> Icons.Outlined.NorthEast
@@ -1758,7 +1818,7 @@ private fun DebtsPage(
         .sumOf { (it.totalToman - it.paidToman).coerceAtLeast(0) }
     FinanceSectionHero(
         "بدهی و اقساط", "پیگیری سررسیدها و پرداخت‌های باقی‌مانده",
-        Icons.Outlined.CreditCard, toman(totalOwed), "بدهی باقی‌مانده", accent = financePurple
+        Icons.Filled.EventNote, toman(totalOwed), "بدهی باقی‌مانده", accent = financePurple
     )
     if (debts.isEmpty()) EmptyNote("فعلاً بدهی یا طلبی ثبت نشده.")
     debts.forEach { row ->
@@ -1768,8 +1828,8 @@ private fun DebtsPage(
         Tile(Modifier.fillMaxWidth(), accent = tone) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FinanceIconTile(if (row.installmentMonths > 0) Icons.Outlined.CalendarMonth
-                    else Icons.Outlined.Handshake, tone)
+                FinanceIconTile(if (row.installmentMonths > 0) Icons.Filled.CalendarMonth
+                    else Icons.Filled.Handshake, tone)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(row.person, fontWeight = FontWeight.Bold, fontSize = 14.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1856,7 +1916,7 @@ private fun BudgetsPage(
     val totalLimit = budgets.sumOf { it.monthlyLimitToman }
     FinanceSectionHero(
         "بودجه‌بندی", "کنترل هزینه‌ها در دوره مالی انتخاب‌شده",
-        Icons.Outlined.PieChartOutline,
+        Icons.Filled.PieChart, 
         toman(totalLimit), "سقف کل بودجه‌ها", accent = financeAmber
     )
     if (budgets.isEmpty()) EmptyNote("برای تعریف سقف هزینه ماهانه روی + بزن.")
@@ -1870,7 +1930,7 @@ private fun BudgetsPage(
         Tile(Modifier.fillMaxWidth(), accent = usedColor) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FinanceIconTile(Icons.Outlined.DonutLarge, usedColor)
+                FinanceIconTile(Icons.Filled.DonutLarge, usedColor)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(b.category, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Text("سقف هزینه این دوره", color = muted, fontSize = 11.sp)

@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -50,11 +51,11 @@ private fun goalCategoryText(type: String) = when (type) {
     else -> "پس‌انداز"
 }
 private fun goalIcon(type: String): ImageVector = when (type) {
-    "UNIVERSITY" -> Icons.Outlined.School
-    "PURCHASE" -> Icons.Outlined.ShoppingBag
-    "TRAVEL" -> Icons.Outlined.FlightTakeoff
-    "EMERGENCY" -> Icons.Outlined.Shield
-    else -> Icons.Outlined.Savings
+    "UNIVERSITY" -> Icons.Filled.School
+    "PURCHASE" -> Icons.Filled.ShoppingBag
+    "TRAVEL" -> Icons.Filled.FlightTakeoff
+    "EMERGENCY" -> Icons.Filled.Shield
+    else -> Icons.Filled.Savings
 }
 
 @Composable
@@ -88,9 +89,9 @@ fun SavingsGoalsScreen(
 
     val shape = RoundedCornerShape(22.dp)
     val heroGradient = if (dark) Brush.linearGradient(
-        listOf(Color(0xFF152D62), Color(0xFF28205B), Color(0xFF492375))
+        listOf(Color(0xFF30245C), Color(0xFF16334F), Color(0xFF19413D))
     ) else Brush.linearGradient(
-        listOf(Color(0xFFE4F8EF), Color(0xFFEAF8FC), Color(0xFFF1EAFD))
+        listOf(Color(0xFFF1ECFC), Color(0xFFEDF8FF), Color(0xFFEAF8F2))
     )
     Column(
         Modifier.fillMaxWidth().clip(shape).background(heroGradient)
@@ -100,7 +101,7 @@ fun SavingsGoalsScreen(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             Surface(color = purple.copy(alpha = .16f), shape = RoundedCornerShape(13.dp)) {
-                Icon(Icons.Outlined.Savings, contentDescription = null, tint = purple,
+                Icon(Icons.Filled.Savings, contentDescription = null, tint = purple,
                     modifier = Modifier.padding(11.dp).size(24.dp))
             }
             Column(Modifier.weight(1f)) {
@@ -334,13 +335,18 @@ private fun GoalMetricTile(
     label: String, value: String, icon: ImageVector, tone: Color,
     modifier: Modifier = Modifier
 ) {
+    val dark = MaterialTheme.colorScheme.background.red < .3f
     Surface(
         modifier = modifier,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = .78f),
+        color = if (dark) Color(0xFF172442) else Color(0xFFF4FAFF),
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, tone.copy(alpha = .19f))
+        border = BorderStroke(1.dp, tone.copy(alpha = if (dark) .44f else .22f))
     ) {
-        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(
+            Modifier.background(Brush.linearGradient(listOf(
+                tone.copy(alpha = if (dark) .25f else .09f),
+                Color.Transparent
+            ))).padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(icon, contentDescription = null, tint = tone, modifier = Modifier.size(17.dp))
@@ -357,16 +363,18 @@ private fun GoalSurface(
     tone: Color, dark: Boolean, content: @Composable ColumnScope.() -> Unit
 ) {
     val shape = RoundedCornerShape(20.dp)
-    val base = if (dark) Color(0xC91C2448) else Color(0xE6FFFFFF)
-    val gradient = Brush.linearGradient(listOf(
-        Color.White.copy(alpha = if (dark) .13f else .67f),
-        tone.copy(alpha = if (dark) .16f else .07f),
-        Color.Transparent
+    val base = if (dark) Color(0xFF12182F) else Color(0xFFF8FBFF)
+    val gradient = if (dark) Brush.linearGradient(listOf(
+        tone.copy(alpha = .28f),
+        Color(0xFF1F254D), Color(0xFF143543), Color(0xFF14192E)
+    )) else Brush.linearGradient(listOf(
+        tone.copy(alpha = .12f),
+        Color(0xFFF4F1FC), Color(0xFFEDF9FC), Color(0xFFFAFCFF)
     ))
     Surface(
         color = base, modifier = Modifier.fillMaxWidth(),
-        shape = shape, shadowElevation = if (dark) 7.dp else 8.dp,
-        border = BorderStroke(1.dp, Color.White.copy(alpha = if (dark) .24f else .94f))
+        shape = shape, shadowElevation = if (dark) 8.dp else 5.dp,
+        border = BorderStroke(1.dp, tone.copy(alpha = if (dark) .47f else .23f))
     ) {
         Column(Modifier.background(gradient).padding(15.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
