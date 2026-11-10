@@ -44,7 +44,7 @@ fun FinancialTrendChart(periods: List<FinancePeriod>, selectedIndex: Int, transa
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             val maximum = (incomes + expenses).maxOrNull()?.coerceAtLeast(1L) ?: 1L
-            Canvas(Modifier.fillMaxWidth().height(112.dp)) {
+            Canvas(Modifier.fillMaxWidth().height(96.dp)) {
                 val column = size.width / shown.size
                 val plotHeight = size.height - 4.dp.toPx()
                 for (i in shown.indices) {
@@ -120,7 +120,7 @@ fun SpendingCategoryChart(transactions: List<Transaction>) {
                     }
                 }
             }
-            Box(Modifier.size(138.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(120.dp), contentAlignment = Alignment.Center) {
                 Canvas(Modifier.fillMaxSize().padding(9.dp)) {
                     val ring = Stroke(width = 22.dp.toPx(), cap = StrokeCap.Butt)
                     drawArc(track, -90f, 360f, false, style = ring)
@@ -171,7 +171,7 @@ fun InstallmentForecastChart(debts: List<Debt>, now: Long) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             val max = upcoming.maxOrNull()?.coerceAtLeast(1L) ?: 1L
-            Canvas(Modifier.fillMaxWidth().height(83.dp)) {
+            Canvas(Modifier.fillMaxWidth().height(70.dp)) {
                 val col = size.width / 6
                 upcoming.forEachIndexed { i, amount ->
                     val height = size.height * (amount.toFloat() / max)

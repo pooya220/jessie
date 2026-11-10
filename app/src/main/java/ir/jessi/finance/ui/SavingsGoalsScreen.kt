@@ -87,7 +87,7 @@ fun SavingsGoalsScreen(
     val textMuted = MaterialTheme.colorScheme.onSurfaceVariant
     var showArchived by rememberSaveable { mutableStateOf(false) }
 
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(18.dp)
     val heroGradient = if (dark) Brush.linearGradient(
         listOf(Color(0xFF30245C), Color(0xFF16334F), Color(0xFF19413D))
     ) else Brush.linearGradient(
@@ -96,21 +96,21 @@ fun SavingsGoalsScreen(
     Column(
         Modifier.fillMaxWidth().clip(shape).background(heroGradient)
             .border(1.dp, purple.copy(alpha = if (dark) .50f else .18f), shape)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(13.dp)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             Surface(color = purple.copy(alpha = .16f), shape = RoundedCornerShape(13.dp)) {
                 Icon(Icons.Filled.Savings, contentDescription = null, tint = purple,
-                    modifier = Modifier.padding(11.dp).size(24.dp))
+                    modifier = Modifier.padding(8.dp).size(21.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text("بانک اهداف", fontWeight = FontWeight.ExtraBold, fontSize = 19.sp)
+                Text("بانک اهداف", fontWeight = FontWeight.ExtraBold, fontSize = 17.sp)
                 Text("پس‌انداز برای دانشگاه، خرید و هر چیزی که برات مهمه",
                     fontSize = 11.sp, color = textMuted)
             }
         }
-        Text(toman(totalSaved), fontWeight = FontWeight.ExtraBold, fontSize = 25.sp,
+        Text(toman(totalSaved), fontWeight = FontWeight.ExtraBold, fontSize = 22.sp,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text("جمع پول کنارگذاشته‌شده • جدا از موجودی حساب‌ها",
             color = textMuted, fontSize = 11.sp)
@@ -168,13 +168,13 @@ fun SavingsGoalsScreen(
         var expandedHistory by rememberSaveable(goal.id) { mutableStateOf(false) }
         GoalSurface(tone, dark) {
             Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Surface(color = tone.copy(alpha = if (dark) .24f else .11f),
                     shape = RoundedCornerShape(14.dp)) {
                     Icon(goalIcon(goal.category), contentDescription = null, tint = tone,
-                        modifier = Modifier.padding(11.dp).size(22.dp))
+                        modifier = Modifier.padding(8.dp).size(20.dp))
                 }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(goal.title, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(goalCategoryText(goal.category),
@@ -194,7 +194,7 @@ fun SavingsGoalsScreen(
                 Column(Modifier.weight(1f)) {
                     Text("پس‌انداز فعلی", color = textMuted, fontSize = 11.sp)
                     Text(toman(saved), fontWeight = FontWeight.ExtraBold,
-                        fontSize = 20.sp, color = tone,
+                        fontSize = 18.sp, color = tone,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 if (hasTarget) {
@@ -207,7 +207,7 @@ fun SavingsGoalsScreen(
             }
             LinearProgressIndicator(
                 progress = { progress },
-                modifier = Modifier.fillMaxWidth().height(9.dp)
+                modifier = Modifier.fillMaxWidth().height(6.dp)
                     .clip(RoundedCornerShape(10.dp)),
                 color = tone, trackColor = tone.copy(alpha = if (dark) .18f else .12f)
             )
@@ -215,7 +215,7 @@ fun SavingsGoalsScreen(
                 val progressColor = if (monthSaved >= planned) aqua else tone
                 Row(Modifier.fillMaxWidth()
                     .background(progressColor.copy(alpha = .09f), RoundedCornerShape(12.dp))
-                    .padding(10.dp),
+                    .padding(8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("این ماه: " + toman(monthSaved), fontSize = 11.sp,
                         color = progressColor, fontWeight = FontWeight.Medium)
@@ -339,14 +339,14 @@ private fun GoalMetricTile(
     Surface(
         modifier = modifier,
         color = if (dark) Color(0xFF172442) else Color(0xFFF4FAFF),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, tone.copy(alpha = if (dark) .44f else .22f))
     ) {
         Column(
             Modifier.background(Brush.linearGradient(listOf(
                 tone.copy(alpha = if (dark) .25f else .09f),
                 Color.Transparent
-            ))).padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            ))).padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(icon, contentDescription = null, tint = tone, modifier = Modifier.size(17.dp))
@@ -362,7 +362,7 @@ private fun GoalMetricTile(
 private fun GoalSurface(
     tone: Color, dark: Boolean, content: @Composable ColumnScope.() -> Unit
 ) {
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(17.dp)
     val base = if (dark) Color(0xFF12182F) else Color(0xFFF8FBFF)
     val gradient = if (dark) Brush.linearGradient(listOf(
         tone.copy(alpha = .28f),
@@ -373,11 +373,11 @@ private fun GoalSurface(
     ))
     Surface(
         color = base, modifier = Modifier.fillMaxWidth(),
-        shape = shape, shadowElevation = if (dark) 8.dp else 5.dp,
+        shape = shape, shadowElevation = if (dark) 4.dp else 2.dp,
         border = BorderStroke(1.dp, tone.copy(alpha = if (dark) .47f else .23f))
     ) {
-        Column(Modifier.background(gradient).padding(15.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+        Column(Modifier.background(gradient).padding(11.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
     }
 }
 

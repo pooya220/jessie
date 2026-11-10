@@ -495,8 +495,8 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
         )
         Column(
             Modifier.fillMaxSize().padding(padding).background(pageWash)
-                .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .verticalScroll(rememberScrollState()).padding(horizontal = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (showSettings) {
                 SettingsPage(
@@ -1203,13 +1203,13 @@ private fun Tile(
     accent: Color = Color.Unspecified,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    // C5 Dark Aurora: deep ink canvas, violet/cyan glow and crisp soft borders.
+    // Compact C5 Dark Aurora: restrained glow, lighter elevation and tighter content rhythm.
     // Light mode uses a gentle Aurora variation to preserve text contrast.
     val dark = LocalJessiDark.current
     val tint = if (accent == Color.Unspecified) {
         if (dark) financePurple else financeAqua
     } else accent
-    val shape = RoundedCornerShape(23.dp)
+    val shape = RoundedCornerShape(18.dp)
     val base = if (dark) Color(0xFF12182F) else Color(0xFFF7FBFF)
     val aurora = if (dark) Brush.linearGradient(listOf(
         Color(0xFF30255A), Color(0xFF142B47), Color(0xFF173244), Color(0xFF151930)
@@ -1223,13 +1223,13 @@ private fun Tile(
     Surface(
         modifier = modifier, color = base, shape = shape,
         border = BorderStroke(1.dp,
-            if (dark) tint.copy(alpha = .46f) else tint.copy(alpha = .22f)),
-        shadowElevation = if (dark) 8.dp else 5.dp
+            if (dark) tint.copy(alpha = .35f) else tint.copy(alpha = .19f)),
+        shadowElevation = if (dark) 4.dp else 2.dp
     ) {
         Column(
             Modifier.background(aurora).background(glow)
-                .padding(15.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(11.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
             content = content
         )
     }
@@ -1241,8 +1241,8 @@ private fun Tag(text: String, good: Boolean = false) {
         color = if (good) mint.copy(alpha = .13f) else secondary,
         shape = RoundedCornerShape(30.dp)
     ) {
-        Text(text, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-            color = if (good) mint else muted, fontSize = 11.sp)
+        Text(text, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            color = if (good) mint else muted, fontSize = 10.sp)
     }
 }
 
@@ -1262,14 +1262,14 @@ private fun DashboardCompactMetric(
     modifier: Modifier = Modifier
 ) {
     val dark = LocalJessiDark.current
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(13.dp)
     Column(
         modifier.clip(shape).background(Brush.linearGradient(
             listOf(tone.copy(alpha = if (dark) .23f else .13f),
                 if (dark) Color(0xFF18243A) else Color.White.copy(alpha = .75f))
         )).border(1.dp, tone.copy(alpha = if (dark) .34f else .20f), shape)
-            .padding(11.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp)
+            .padding(9.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -1308,7 +1308,7 @@ private fun Dashboard(
     val heroGradient = if (dark)
         Brush.linearGradient(listOf(Color(0xFF30235C), Color(0xFF172B4D), Color(0xFF17443F)))
     else Brush.linearGradient(listOf(Color(0xFFF3ECFB), Color(0xFFEBF7FF), Color(0xFFE8F8F2)))
-    val heroShape = RoundedCornerShape(22.dp)
+    val heroShape = RoundedCornerShape(19.dp)
 
     // Dashboard follows the reference top-to-bottom, using real account and period data.
     Column(
@@ -1316,8 +1316,8 @@ private fun Dashboard(
             .border(BorderStroke(1.dp,
                 if (dark) Color(0xFFB483F7).copy(alpha = .56f)
                 else Color(0xFFC7DCEC)), heroShape)
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(9.dp)
+            .padding(11.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(
@@ -1325,7 +1325,7 @@ private fun Dashboard(
                 shape = RoundedCornerShape(13.dp)
             ) {
                 Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null,
-                    modifier = Modifier.padding(10.dp).size(22.dp), tint = financeAqua)
+                    modifier = Modifier.padding(8.dp).size(20.dp), tint = financeAqua)
             }
             Spacer(Modifier.width(9.dp))
             Text("موجودی کل حساب‌ها", modifier = Modifier.weight(1f),
@@ -1343,7 +1343,7 @@ private fun Dashboard(
         ) {
             Text(if (balanceVisible) digitsFa(NumberFormat.getIntegerInstance(Locale.US).format(total))
                     else "••••••••",
-                fontSize = 29.sp, fontWeight = FontWeight.ExtraBold,
+                fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface, maxLines = 1,
                 overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.width(6.dp))
@@ -1431,7 +1431,7 @@ private fun Dashboard(
             Modifier.fillMaxWidth()
                 .clip(RoundedCornerShape(15.dp))
                 .background(financePurple.copy(alpha = if (dark) .16f else .08f))
-                .padding(horizontal = 12.dp, vertical = 12.dp),
+                .padding(horizontal = 10.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -1441,7 +1441,7 @@ private fun Dashboard(
                 Text("جمع پرداخت‌های ماه آینده", color = muted, fontSize = 11.sp)
                 Text(if (balanceVisible) toman(nextMonthDue.totalToman) else "••••••",
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 19.sp, fontWeight = FontWeight.ExtraBold,
+                    fontSize = 17.sp, fontWeight = FontWeight.ExtraBold,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Tag(digitsFa(nextMonthDue.payments.size.toString()) + " سررسید",
@@ -1618,7 +1618,7 @@ private fun FinanceSectionHero(
 ) {
     val dark = LocalJessiDark.current
     val highlight = if (accent == Color.Unspecified) mint else accent
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(18.dp)
     val gradient = if (dark) Brush.linearGradient(
         listOf(
             highlight.copy(alpha = .30f), Color(0xFF302057),
@@ -1634,25 +1634,25 @@ private fun FinanceSectionHero(
             .background(if (dark) Color(0xFF11172E) else Color(0xFFF9FBFF))
             .background(gradient)
             .border(1.dp, highlight.copy(alpha = if (dark) .49f else .24f), shape)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(11.dp)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Surface(
                 color = highlight.copy(alpha = if (dark) .21f else .12f),
                 shape = RoundedCornerShape(13.dp)
             ) {
                 Icon(icon, contentDescription = null, tint = highlight,
-                    modifier = Modifier.padding(11.dp).size(24.dp))
+                    modifier = Modifier.padding(8.dp).size(21.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
-                Text(description, color = muted, fontSize = 11.sp, lineHeight = 17.sp)
+                Text(title, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                Text(description, color = muted, fontSize = 11.sp, lineHeight = 16.sp)
             }
         }
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(mainStat, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp,
+            Text(mainStat, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false))
@@ -1664,9 +1664,9 @@ private fun FinanceSectionHero(
 @Composable
 private fun FinanceIconTile(icon: ImageVector, tint: Color = mint) {
     val dark = LocalJessiDark.current
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(12.dp)
     Box(
-        Modifier.size(43.dp).clip(shape)
+        Modifier.size(38.dp).clip(shape)
             .background(Brush.linearGradient(listOf(
                 tint.copy(alpha = if (dark) .29f else .17f),
                 if (dark) Color(0xFF343057) else Color(0xFFF7FAFF)
@@ -1676,7 +1676,7 @@ private fun FinanceIconTile(icon: ImageVector, tint: Color = mint) {
                 else tint.copy(alpha = .29f), shape),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -1741,16 +1741,19 @@ private fun AccountsPage(accounts: List<Account>, txs: List<Transaction>, onEdit
                         color = financeAqua, fontSize = 11.sp)
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .27f))
-            Column(Modifier.fillMaxWidth().background(
-                Brush.horizontalGradient(listOf(financeAqua.copy(alpha = .15f),
-                    financeBlue.copy(alpha = .055f))),
-                RoundedCornerShape(13.dp)).padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+            Row(
+                Modifier.fillMaxWidth().background(
+                    Brush.horizontalGradient(listOf(financeAqua.copy(alpha = .12f),
+                        financeBlue.copy(alpha = .04f))),
+                    RoundedCornerShape(11.dp)
+                ).padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("موجودی فعلی", color = muted, fontSize = 11.sp)
-                Text(toman(amount), color = financeAqua, fontSize = 21.sp,
-                    fontWeight = FontWeight.ExtraBold)
+                Text("موجودی", color = muted, fontSize = 11.sp)
+                Text(toman(amount), color = financeAqua, fontSize = 17.sp,
+                    fontWeight = FontWeight.ExtraBold, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             }
             FinanceActionRow(
                 edit = { onEdit(acc) },
@@ -1839,7 +1842,7 @@ private fun TransactionTile(
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text("آزمایشی • در آمار و مانده حساب محاسبه شده",
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     color = financePurple, fontSize = 10.sp)
             }
         }
@@ -1884,12 +1887,12 @@ private fun DebtsPage(
                 Tag(if (mine) "بدهکارم" else "طلبکارم", !mine)
             }
             Row(Modifier.fillMaxWidth().background(
-                tone.copy(alpha = .085f), RoundedCornerShape(13.dp)).padding(11.dp),
+                tone.copy(alpha = .085f), RoundedCornerShape(11.dp)).padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text("مانده قابل تسویه", fontSize = 11.sp, color = muted)
                     Text(toman(remaining), color = if (mine) MaterialTheme.colorScheme.onSurface else mint,
-                        fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                        fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
                 }
                 if (remaining == 0L) Tag("تسویه شده", true)
             }
@@ -1898,7 +1901,7 @@ private fun DebtsPage(
             val progress = (row.paidToman.toFloat() /
                 row.totalToman.coerceAtLeast(1L)).coerceIn(0f, 1f)
             LinearProgressIndicator(
-                progress = { progress }, modifier = Modifier.fillMaxWidth().height(7.dp)
+                progress = { progress }, modifier = Modifier.fillMaxWidth().height(5.dp)
                     .clip(RoundedCornerShape(7.dp)),
                 color = tone, trackColor = tone.copy(alpha = .12f)
             )
@@ -1985,7 +1988,7 @@ private fun BudgetsPage(
                     shape = RoundedCornerShape(40.dp)
                 ) {
                     Text(digitsFa(percent.toString()) + "٪",
-                        Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                        Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         fontWeight = FontWeight.ExtraBold, color = usedColor, fontSize = 12.sp)
                 }
             }
@@ -2001,7 +2004,7 @@ private fun BudgetsPage(
                 }
             }
             LinearProgressIndicator(progress = { ratio.coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(8.dp)
+                modifier = Modifier.fillMaxWidth().height(5.dp)
                     .clip(RoundedCornerShape(7.dp)),
                 color = usedColor, trackColor = usedColor.copy(alpha = .12f))
             Text(
