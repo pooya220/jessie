@@ -17,6 +17,11 @@ import ir.jessi.finance.sms.SmsReviewNotifications
 import ir.jessi.finance.sms.SmsDiagnostics
 import ir.jessi.finance.sms.BankSmsParser
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.fragment.app.FragmentActivity
+import androidx.biometric.BiometricPrompt
+import androidx.biometric.BiometricManager
+import ir.jessi.finance.security.PinSecurity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -93,7 +98,39 @@ private val financeAmber: Color @Composable get() =
 
 
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+    private val appLocked = mutableStateOf(true)
+
+    override fun onStop() {
+        super.onStop()
+        if (PinSecurity(this).isEnabled()) appLocked.value = true
+    }
+
+    private fun promptBiometricUnlock(pinSecurity: PinSecurity, onSuccess: () -> Unit) {
+        val authenticator = BiometricManager.Authenticators.BIOMETRIC_WEAK
+        if (!pinSecurity.biometricsEnabled() ||
+            BiometricManager.from(this).canAuthenticate(authenticator) != BiometricManager.BIOMETRIC_SUCCESS
+        ) return
+        try {
+            val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        super.onAuthenticationSucceeded(result)
+                        pinSecurity.clearFailures()
+                        onSuccess()
+                    }
+                })
+            prompt.authenticate(BiometricPrompt.PromptInfo.Builder()
+                .setTitle("ورود امن به جسی")
+                .setSubtitle("با اثرانگشت وارد شو یا ورود با پین را انتخاب کن")
+                .setAllowedAuthenticators(authenticator)
+                .setNegativeButtonText("ورود با پین")
+                .build())
+        } catch (_: Exception) {
+            // App PIN stays available if biometric is unavailable.
+        }
+    }
+
     private val notificationReviewId = mutableLongStateOf(-1L)
     private val nowEpoch = mutableLongStateOf(System.currentTimeMillis())
 
@@ -102,7 +139,14 @@ class MainActivity : ComponentActivity() {
         notificationReviewId.longValue = intent.getLongExtra(SmsReviewNotifications.EXTRA_REVIEW_ID, -1L)
         setContent {
             val themePrefs = remember { getSharedPreferences("jessi_ui_theme", MODE_PRIVATE) }
+            val pinSecurity = remember { PinSecurity(this@MainActivity) }
+            var securityEnabled by remember { mutableStateOf(pinSecurity.isEnabled()) }
             var darkMode by rememberSaveable { mutableStateOf(themePrefs.getBoolean("is_dark", true)) }
+            LaunchedEffect(securityEnabled, appLocked.value) {
+                if (securityEnabled && appLocked.value) {
+                    promptBiometricUnlock(pinSecurity) { appLocked.value = false }
+                }
+            }
             SideEffect {
                 window.statusBarColor = if (darkMode) android.graphics.Color.rgb(8, 15, 38)
                     else android.graphics.Color.rgb(246, 250, 251)
@@ -118,8 +162,24 @@ class MainActivity : ComponentActivity() {
                 LocalJessiDark provides darkMode
             ) {
                 MaterialTheme(colorScheme = if (darkMode) darkColors else lightColors) {
-                    JessiHome(
+                    if (securityEnabled && appLocked.value) {
+                        JessiLockScreen(
+                            security = pinSecurity,
+                            onUnlocked = { appLocked.value = false },
+                            biometricAvailable = BiometricManager.from(this@MainActivity)
+                                .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
+                                BiometricManager.BIOMETRIC_SUCCESS,
+                            onTryBiometrics = {
+                                promptBiometricUnlock(pinSecurity) { appLocked.value = false }
+                            }
+                        )
+                    } else JessiHome(
                         openReviewId = notificationReviewId.longValue,
+                        pinSecurity = pinSecurity,
+                        onSecurityChanged = {
+                            securityEnabled = pinSecurity.isEnabled()
+                            appLocked.value = false
+                        },
                         nowEpoch = nowEpoch.longValue,
                         darkMode = darkMode,
                         onToggleTheme = {
@@ -163,7 +223,11 @@ private sealed interface Editor {
 }
 
 @Composable
-private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onToggleTheme: () -> Unit, onReviewOpened: () -> Unit, vm: FinanceViewModel = viewModel()) {
+private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
+    onToggleTheme: () -> Unit, onReviewOpened: () -> Unit,
+    pinSecurity: PinSecurity, onSecurityChanged: () -> Unit,
+    vm: FinanceViewModel = viewModel()
+) {
     val accounts by vm.accounts.collectAsState()
     val txs by vm.transactions.collectAsState()
     val debts by vm.debts.collectAsState()
@@ -173,6 +237,27 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
     val goalMovements by vm.goalMovements.collectAsState()
     val context = LocalContext.current
     val settings = remember(context) { context.getSharedPreferences("jessi_finance_settings", android.content.Context.MODE_PRIVATE) }
+    var backdropStyle by remember { mutableStateOf(settings.getString("backdrop_style", "aurora") ?: "aurora") }
+    var backdropUri by remember { mutableStateOf(settings.getString("backdrop_photo_uri", "") ?: "") }
+    var backdropDim by remember {
+        mutableFloatStateOf(settings.getFloat("backdrop_dim", if (darkMode) .18f else .12f))
+    }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                backdropUri = uri.toString()
+                backdropStyle = "photo"
+                settings.edit().putString("backdrop_photo_uri", backdropUri)
+                    .putString("backdrop_style", backdropStyle).apply()
+            } catch (_: Exception) {
+                Toast.makeText(context, "دسترسی به تصویر پس‌زمینه ممکن نبود",
+                    Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     var periodMode by remember { mutableStateOf(settings.getString("period_mode", FinancePeriodEngine.MONTHLY) ?: FinancePeriodEngine.MONTHLY) }
     var periodOffset by rememberSaveable { mutableIntStateOf(0) }
     var balanceVisible by remember {
@@ -289,8 +374,12 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
         }
     }
 
+    CompositionLocalProvider(LocalJessiBackdrop provides backdropStyle) {
+    Box(Modifier.fillMaxSize()) {
+        JessiBackdrop(backdropStyle, backdropUri, backdropDim, darkMode,
+            modifier = Modifier.fillMaxSize())
     Scaffold(
-        containerColor = background,
+        containerColor = Color.Transparent,
         topBar = {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
@@ -494,7 +583,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
             listOf(Color(0xFFF7FBFA), Color(0xFFF7FAFF), Color(0xFFFCFAFF))
         )
         Column(
-            Modifier.fillMaxSize().padding(padding).background(pageWash)
+            Modifier.fillMaxSize().padding(padding)
                 .verticalScroll(rememberScrollState()).padding(horizontal = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -596,6 +685,32 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
                         )
                     },
                     backupBusy = backupBusy,
+                    backgroundStyle = backdropStyle,
+                    backgroundPhotoUri = backdropUri,
+                    backgroundDim = backdropDim,
+                    onBackgroundStyle = { value ->
+                        backdropStyle = value
+                        settings.edit().putString("backdrop_style", value).apply()
+                    },
+                    onPickBackground = { photoPicker.launch(arrayOf("image/*")) },
+                    onClearBackground = {
+                        val previous = backdropUri
+                        if (previous.isNotBlank()) runCatching {
+                            context.contentResolver.releasePersistableUriPermission(
+                                Uri.parse(previous), Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            )
+                        }
+                        backdropUri = ""
+                        backdropStyle = "aurora"
+                        settings.edit().remove("backdrop_photo_uri")
+                            .putString("backdrop_style", "aurora").apply()
+                    },
+                    onBackgroundDim = { value ->
+                        backdropDim = value
+                        settings.edit().putFloat("backdrop_dim", value).apply()
+                    },
+                    pinSecurity = pinSecurity,
+                    onSecurityChanged = onSecurityChanged,
                     versionName = remember(context, installedVersion) {
                         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "نامشخص"
                     }
@@ -701,6 +816,8 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean, onT
             }
             Spacer(Modifier.height(86.dp))
         }
+    }
+    }
     }
 
     if (restorePreview != null) {
@@ -830,6 +947,10 @@ private fun SettingsPage(
     onRefreshDiagnostics: () -> Unit,
     onSimulateSms: (String, String) -> Unit,
     onExportBackup: () -> Unit, onImportBackup: () -> Unit, backupBusy: Boolean,
+    backgroundStyle: String, backgroundPhotoUri: String, backgroundDim: Float,
+    onBackgroundStyle: (String) -> Unit, onPickBackground: () -> Unit,
+    onClearBackground: () -> Unit, onBackgroundDim: (Float) -> Unit,
+    pinSecurity: PinSecurity, onSecurityChanged: () -> Unit,
     versionName: String
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
