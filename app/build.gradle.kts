@@ -16,10 +16,24 @@ android {
         versionName = "0.11.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    signingConfigs {
+        create("stable") {
+            // Restore the owner's private signing key only on the CI runner.
+            // Never commit the keystore or passwords to this public repository.
+            val stableKeystore = System.getenv("JESSI_SIGNING_STORE_FILE")
+            if (!stableKeystore.isNullOrBlank()) {
+                storeFile = file(stableKeystore)
+                storePassword = System.getenv("JESSI_SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("JESSI_SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("JESSI_SIGNING_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
-        // Preview installs next to the stable signed app; it never overwrites financial data.
-        debug { applicationIdSuffix = ".preview" }
-        release { isMinifyEnabled = false }
+        getByName("release") {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("stable")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

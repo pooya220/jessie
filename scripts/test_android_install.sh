@@ -12,9 +12,9 @@ test -s "$OLD_APK"
 adb install -r "$OLD_APK"
 adb shell am start -n ir.jessi.finance/.MainActivity
 sleep 3
-echo "=== Updating without uninstalling to Jessie v0.10.0 ==="
+echo "=== Updating without uninstalling to Jessie v0.11.0 ==="
 adb install -r "$APK"
-adb shell dumpsys package ir.jessi.finance | grep 'versionCode=16' | head -1
+adb shell dumpsys package ir.jessi.finance | grep 'versionCode=17' | head -1
 echo "=== Verifying installed package ==="
 adb shell pm path ir.jessi.finance | grep -F 'package:'
 echo "=== Granting SMS and notification permissions for deterministic emulator startup ==="

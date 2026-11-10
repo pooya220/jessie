@@ -1,4 +1,4 @@
-name: Jessie verified installable APK
+name: Jessie official signed APK
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: jessi-verified
+  group: jessi-official
   cancel-in-progress: true
 
 jobs:
@@ -33,44 +33,78 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Compile APK
-        run: gradle --no-daemon :app:assembleDebug
-      - name: Run unit tests
-        run: gradle --no-daemon :app:testDebugUnitTest
+      - name: Compile official app and run tests
+        run: |
+          gradle --no-daemon :app:assembleDebug :app:testDebugUnitTest
 
-      - name: Upload intermediary APK for offline signing ONLY
-        uses: actions/upload-artifact@v4
-        with:
-          name: Jessi-Preview-v0.11.0-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 5
-
-      - name: Locate stable signature
-        id: signed
+      - name: Choose a verified official signing method
+        id: signing
         shell: bash
+        env:
+          SIGNING_BUNDLE: ${{ secrets.JESSI_SIGNING_BUNDLE }}
         run: |
           set -euo pipefail
           VERSION=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)
           test -n "$VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if [[ -f "signing/v$VERSION.sigblock.b64" ]]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
+          if [[ -f "signing/v${VERSION}.sigblock.b64" ]]; then
+            echo "method=offline-block" >> "$GITHUB_OUTPUT"
+            echo "Offline signature block found for v${VERSION}." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ -n "$SIGNING_BUNDLE" ]]; then
+            echo "method=private-key" >> "$GITHUB_OUTPUT"
+            echo "The owner's private signing bundle is available to CI." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "No permanent signature for version $VERSION; APK publication blocked." >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Official v${VERSION} signing is not configured. Supply JESSI_SIGNING_BUNDLE as a GitHub Actions secret or signing/v${VERSION}.sigblock.b64 generated offline with the original permanent key."
+            echo "Official release blocked so that existing Jessie financial data cannot be put at risk." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
 
-      - name: Apply the permanent signing block
-        if: steps.signed.outputs.ready == 'true'
+      - name: Apply the precomputed permanent signature
+        if: steps.signing.outputs.method == 'offline-block'
         run: |
           python3 scripts/apply_signature_block.py \
             app/build/outputs/apk/debug/app-debug.apk \
-            signing/v${{ steps.signed.outputs.version }}.sigblock.b64 \
+            signing/v${{ steps.signing.outputs.version }}.sigblock.b64 \
             app/build/outputs/apk/signed/Jessi.apk
 
-      - name: Verify APK signature and original app identity
-        if: steps.signed.outputs.ready == 'true'
+      - name: Restore permanent signing key privately on runner
+        if: steps.signing.outputs.method == 'private-key'
+        env:
+          SIGNING_BUNDLE: ${{ secrets.JESSI_SIGNING_BUNDLE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, json, base64
+          bundle = json.loads(os.environ["SIGNING_BUNDLE"])
+          raw = base64.b64decode(bundle["keystore_b64"], validate=True)
+          if len(raw) < 1024 or len(raw) > 64000:
+              raise ValueError("Invalid signing keystore size")
+          path = os.path.join(os.environ["RUNNER_TEMP"], "jessi-release-signing.p12")
+          with open(path, "wb") as f:
+              f.write(raw)
+          os.chmod(path, 0o600)
+          values = {
+              "JESSI_SIGNING_STORE_FILE": path,
+              "JESSI_SIGNING_STORE_PASSWORD": bundle["store_password"],
+              "JESSI_SIGNING_KEY_ALIAS": bundle["key_alias"],
+              "JESSI_SIGNING_KEY_PASSWORD": bundle["key_password"],
+          }
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+              for key, value in values.items():
+                  if "\n" in value or "\r" in value:
+                      raise ValueError("Invalid signing value")
+                  env.write(f"{key}={value}\n")
+          PY
+
+      - name: Build with the owner's permanent private signer
+        if: steps.signing.outputs.method == 'private-key'
+        run: |
+          gradle --no-daemon :app:assembleRelease
+          mkdir -p app/build/outputs/apk/signed
+          cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/signed/Jessi.apk
+
+      - name: Verify signature matches previous official releases
         shell: bash
         run: |
           set -euo pipefail
@@ -79,9 +113,9 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --min-sdk-version 26 "$APK"
           CERT_SHA=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/.*Signer #1 certificate SHA-256 digest: //p' | head -1 | tr '[:upper:]' '[:lower:]')
           EXPECTED=0c8b4868394b2b1a5e8e3c29c95b9e4556bfbcfa4a1966f4260a880cb8fdb6d5
-          [[ "$CERT_SHA" == "$EXPECTED" ]] || { echo "::error::Wrong APK signing certificate"; exit 1; }
+          [[ "$CERT_SHA" == "$EXPECTED" ]] || { echo "::error::Signing certificate differs from v0.10.0"; exit 1; }
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep "^package: name='ir.jessi.finance' "
-          echo "Stable signature and identity verified." >> "$GITHUB_STEP_SUMMARY"
+          echo "Same app ID and permanent signing certificate verified." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Enable KVM for emulator
         run: |
@@ -89,8 +123,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Verify actual Android 13 installation and app launch
-        if: steps.signed.outputs.ready == 'true'
+      - name: Test install over previous official v0.10.0 and launch
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
@@ -100,52 +133,22 @@ jobs:
           disable-animations: true
           script: bash scripts/test_android_install.sh
 
-      - name: Verify preview install and app startup on Android 13
-        if: steps.signed.outputs.ready != 'true'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 33
-          target: google_apis
-          arch: x86_64
-          profile: pixel_5
-          disable-animations: true
-          script: bash scripts/test_android_preview.sh
-
-      - name: Publish safe side-by-side preview APK
-        if: steps.signed.outputs.ready != 'true'
+      - name: Release only the official verified APK
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
         run: |
           set -euo pipefail
-          VERSION="${{ steps.signed.outputs.version }}"
-          TAG="v${VERSION}-preview"
-          FILE="Jessi-v${VERSION}-preview.apk"
+          VERSION="${{ steps.signing.outputs.version }}"
+          TAG="v${VERSION}"
+          FILE="Jessi-v${VERSION}.apk"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Preview release already exists; do not overwrite."
-            exit 0
-          fi
-          cp app/build/outputs/apk/debug/app-debug.apk "$FILE"
-          gh release create "$TAG" "$FILE" --target "$GITHUB_SHA" --prerelease \
-            --title "جسی ${VERSION} — نسخه آزمایشی" \
-            --notes "نسخه آزمایشی با شناسه ir.jessi.finance.preview؛ کنار برنامه اصلی نصب می‌شود و داده‌های نسخه اصلی را تغییر نمی‌دهد. برای انتقال آزمایشی اطلاعات، ابتدا از نسخه اصلی فایل پشتیبان بگیرید و در این نسخه از تنظیمات بازیابی کنید. این فایل جایگزین مستقیم نسخه امضاشده اصلی نیست."
-
-      - name: Release the verified APK only
-        if: steps.signed.outputs.ready == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION="${{ steps.signed.outputs.version }}"
-          TAG="v$VERSION"
-          FILE="Jessi-v$VERSION.apk"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Existing release unchanged; no silent overwrites."
+            echo "Official release already exists; refusing silent overwrite." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           cp app/build/outputs/apk/signed/Jessi.apk "$FILE"
           gh release create "$TAG" "$FILE" \
             --target "$GITHUB_SHA" \
-            --title "جسی $VERSION" \
-            --notes "APK با امضای ثابت جسی که apksigner آن را تأیید کرده و نصب و اجرا روی شبیه‌ساز Android 13 تست شده است. نسخه‌های Debug قدیمی ممکن است برای مهاجرت یک‌باره به نسخه امضاشده نیاز به پشتیبان‌گیری داشته باشند."
+            --title "جسی ${VERSION}" \
+            --notes "نسخه رسمی با شناسه ir.jessi.finance و گواهی امضای یکسان با v0.10.0. نصب و آپدیت درجا از نسخه قبلی روی Android 13 تست شده؛ قبل از هر آپدیت مهم، از اطلاعات مالی پشتیبان بگیرید."
+          echo "Published signed Jessie v${VERSION}." >> "$GITHUB_STEP_SUMMARY"
