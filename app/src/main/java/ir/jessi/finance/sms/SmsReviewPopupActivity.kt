@@ -4,19 +4,14 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.activity.compose.setContent
-import androidx.biometric.BiometricManager
-import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Fingerprint
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,8 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -36,7 +29,6 @@ import ir.jessi.finance.data.Account
 import ir.jessi.finance.data.FinanceDatabase
 import ir.jessi.finance.data.SmsReview
 import ir.jessi.finance.data.SmsReviewPolicy
-import ir.jessi.finance.security.PinSecurity
 import ir.jessi.finance.ui.categories
 import ir.jessi.finance.ui.incomeCategories
 import ir.jessi.finance.ui.toman
@@ -48,20 +40,15 @@ import java.text.NumberFormat
 import java.util.Locale
 
 /**
- * A small notification-only window. It doesn't create/open MainActivity or show
- * banking data until the existing Jessie lock has been satisfied.
+ * A lightweight notification-only window. No PIN/biometric authentication:
+ * the user has explicitly chosen quick categorization from a notification.
+ * The app's own lock screen remains unchanged.
  */
 class SmsReviewPopupActivity : FragmentActivity() {
-    private var authenticated by mutableStateOf(false)
-    private var biometricAttempted = false
-    private lateinit var security: PinSecurity
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val reviewId = intent.getLongExtra(SmsReviewNotifications.EXTRA_REVIEW_ID, -1L)
         if (reviewId <= 0L) { finish(); return }
-        security = PinSecurity(this)
-        authenticated = !security.isEnabled()
         val dark = getSharedPreferences("jessi_ui_theme", MODE_PRIVATE)
             .getBoolean("is_dark", true)
 
@@ -90,16 +77,7 @@ class SmsReviewPopupActivity : FragmentActivity() {
                                 MaterialTheme.colorScheme.primary.copy(alpha = .24f)),
                             shadowElevation = 14.dp
                         ) {
-                            if (!authenticated) {
-                                PopupUnlock(
-                                    security = security,
-                                    onUnlocked = { authenticated = true },
-                                    onBiometric = { requestBiometric() },
-                                    biometricAvailable = canUseBiometric()
-                                )
-                            } else {
-                                ReviewPopupContent(reviewId) { finish() }
-                            }
+                            ReviewPopupContent(reviewId) { finish() }
                         }
                     }
                 }
@@ -112,106 +90,6 @@ class SmsReviewPopupActivity : FragmentActivity() {
         window.setLayout(WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT)
         window.setGravity(Gravity.CENTER)
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (::security.isInitialized && !authenticated && !biometricAttempted) {
-            biometricAttempted = true
-            window.decorView.post { if (!isFinishing && !authenticated) requestBiometric() }
-        }
-    }
-
-    private fun canUseBiometric() = security.biometricsEnabled() &&
-        BiometricManager.from(this).canAuthenticate(
-            BiometricManager.Authenticators.BIOMETRIC_WEAK
-        ) == BiometricManager.BIOMETRIC_SUCCESS
-
-    private fun requestBiometric() {
-        if (!canUseBiometric()) return
-        try {
-            val prompt = BiometricPrompt(this,
-                androidx.core.content.ContextCompat.getMainExecutor(this),
-                object : BiometricPrompt.AuthenticationCallback() {
-                    override fun onAuthenticationSucceeded(
-                        result: BiometricPrompt.AuthenticationResult
-                    ) {
-                        super.onAuthenticationSucceeded(result)
-                        security.clearFailures()
-                        authenticated = true
-                    }
-                })
-            prompt.authenticate(BiometricPrompt.PromptInfo.Builder()
-                .setTitle("تأیید ورود به جسی")
-                .setSubtitle("بررسی پیامک بانکی")
-                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
-                .setNegativeButtonText("ورود با پین")
-                .build())
-        } catch (_: Exception) {
-            // The same PIN verification remains available in the popup.
-        }
-    }
-}
-
-@Composable
-private fun PopupUnlock(
-    security: PinSecurity,
-    onUnlocked: () -> Unit,
-    onBiometric: () -> Unit,
-    biometricAvailable: Boolean
-) {
-    var pin by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
-    Column(
-        Modifier.padding(18.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Icon(Icons.Outlined.Lock, contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(30.dp))
-        Text("جسی • ورود امن", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        OutlinedTextField(
-            value = pin,
-            onValueChange = { value ->
-                pin = value.filter { it in '0'..'9' }.take(6)
-                error = null
-            },
-            placeholder = { Text("پین ورود") },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-        if (error != null) Text(error!!, color = MaterialTheme.colorScheme.error,
-            fontSize = 11.sp)
-        Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            Button(
-                modifier = Modifier.weight(1f),
-                enabled = pin.length in 4..6,
-                onClick = {
-                    val problem = security.verify(pin)
-                    if (problem == null) {
-                        pin = ""
-                        onUnlocked()
-                    } else {
-                        error = problem
-                        pin = ""
-                    }
-                }
-            ) {
-                Icon(Icons.Outlined.CheckCircle, contentDescription = null,
-                    modifier = Modifier.size(17.dp))
-                Spacer(Modifier.width(5.dp))
-                Text("ورود")
-            }
-            if (biometricAvailable) {
-                OutlinedIconButton(onClick = onBiometric) {
-                    Icon(Icons.Outlined.Fingerprint, contentDescription = "اثر انگشت")
-                }
-            }
-        }
     }
 }
 
