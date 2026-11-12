@@ -131,6 +131,13 @@ fun JessiLockScreen(
                 }
             }
         }
+        Text(
+            text = "Powered by PM",
+            fontSize = 10.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .72f),
+            letterSpacing = 1.sp,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 22.dp)
+        )
     }
 }
 
