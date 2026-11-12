@@ -28,15 +28,13 @@ jobs:
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -path "*/bin/sdkmanager" -type f | head -1)
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
-      - name: Check whether official signing credentials are configured
-        shell: bash
-        env:
-          SIGNING_BUNDLE: ${{ secrets.JESSI_SIGNING_BUNDLE }}
-        run: |
-          if [[ -n "$SIGNING_BUNDLE" ]]; then
-            echo "Official signing bundle is configured."
-          else
-            echo "Official signing bundle is not configured; a new signed update cannot be released."
-          fi
       - name: Compile Jessie and run unit tests
         run: gradle --no-daemon :app:assembleDebug :app:testDebugUnitTest
+
+      - name: Upload APK for separate verified offline signing
+        uses: actions/upload-artifact@v4
+        with:
+          name: jessi-unsigned-review-${{ github.sha }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 2
