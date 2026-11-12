@@ -246,7 +246,6 @@ private fun PopupChoice(
 @Composable
 private fun ReviewPopupContent(reviewId: Long, dismiss: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
     var loading by remember(reviewId) { mutableStateOf(true) }
     var loadError by remember(reviewId) { mutableStateOf(false) }
     var row by remember(reviewId) { mutableStateOf<SmsReview?>(null) }
@@ -369,8 +368,8 @@ private fun PopupReviewForm(
             accounts.map {
                 it.id.toString() to
                     listOf(it.title, it.bank,
-                        it.last4.takeIf(String::isNotBlank)?.let { last -> "•••• $last" } ?: "")
-                        .filter(String::isNotBlank).joinToString(" • ")
+                        it.last4.takeIf { last -> last.isNotBlank() }?.let { last -> "•••• $last" } ?: "")
+                        .filter { part -> part.isNotBlank() }.joinToString(" • ")
             },
             onSelected = { accountId = it.toLongOrNull() }
         )
