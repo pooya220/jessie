@@ -1932,50 +1932,81 @@ private fun FinanceActionRow(
 }
 
 @Composable
-private fun AccountsPage(accounts: List<Account>, txs: List<Transaction>, onEdit: (Account) -> Unit, onDelete: (Account) -> Unit) {
-    val balance = accounts.sumOf { accountBalance(it.id, it.openingToman, txs) }
-    FinanceSectionHero(
-        "حساب‌های من", "نمای یکجا از حساب‌ها و موجودی ثبت‌شده",
-        Icons.Filled.AccountBalanceWallet,
-        toman(balance), digitsFa(accounts.size.toString()) + " حساب", accent = financeAqua
-    )
-    if (accounts.isEmpty()) EmptyNote("حسابی ثبت نشده. برای شروع روی + بزن و موجودی اولیه را وارد کن.")
+private fun AccountsPage(
+    accounts: List<Account>, txs: List<Transaction>,
+    onEdit: (Account) -> Unit, onDelete: (Account) -> Unit
+) {
+    val total = accounts.sumOf { accountBalance(it.id, it.openingToman, txs) }
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("حساب‌های من", fontSize = 16.sp, fontWeight = FontWeight.Bold,
+            color = jessiReadableText(MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.weight(1f))
+        Text(toman(total), fontSize = 13.sp, fontWeight = FontWeight.Bold,
+            color = jessiReadableText(financeAqua), maxLines = 1,
+            overflow = TextOverflow.Ellipsis)
+    }
+    if (accounts.isEmpty()) EmptyNote("حسابی ثبت نشده. برای شروع روی + بزن.")
     accounts.forEach { acc ->
         val amount = accountBalance(acc.id, acc.openingToman, txs)
         val canDelete = txs.none { it.accountId == acc.id }
-        Tile(Modifier.fillMaxWidth(), accent = financeAqua) {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FinanceIconTile(Icons.Filled.AccountBalanceWallet, financeAqua)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(acc.title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                    Text(listOf(acc.bank, if (acc.last4.isNotBlank())
-                        "•••• " + digitsFa(acc.last4) else "").filter { it.isNotBlank() }
-                        .joinToString(" • "), color = jessiReadableText(muted), fontSize = 11.sp)
-                }
-                Surface(color = financeAqua.copy(alpha = .12f), shape = RoundedCornerShape(30.dp)) {
-                    Text("حساب", Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
-                        color = jessiReadableText(financeAqua), fontSize = 11.sp)
-                }
-            }
+        val details = listOf(
+            acc.bank, acc.last4.takeIf { it.isNotBlank() }?.let { "•••• " + digitsFa(it) }.orEmpty()
+        ).filter { it.isNotBlank() }.joinToString(" • ")
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(15.dp),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = .87f),
+            border = BorderStroke(1.dp, financeAqua.copy(alpha = .18f))
+        ) {
             Row(
-                Modifier.fillMaxWidth().background(
-                    Brush.horizontalGradient(listOf(financeAqua.copy(alpha = .12f),
-                        financeBlue.copy(alpha = .04f))),
-                    RoundedCornerShape(11.dp)
-                ).padding(horizontal = 10.dp, vertical = 8.dp),
+                Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("موجودی", color = jessiReadableText(muted), fontSize = 11.sp)
-                Text(toman(amount), color = jessiReadableText(financeAqua), fontSize = 17.sp,
-                    fontWeight = FontWeight.ExtraBold, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Surface(
+                    color = financeAqua.copy(alpha = .12f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null,
+                        tint = financeAqua, modifier = Modifier.padding(8.dp).size(18.dp))
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(acc.title, modifier = Modifier.weight(1f), maxLines = 1,
+                            overflow = TextOverflow.Ellipsis, fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+                        Spacer(Modifier.width(6.dp))
+                        Text(toman(amount), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                            color = jessiReadableText(financeAqua))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(details, modifier = Modifier.weight(1f), maxLines = 1,
+                            overflow = TextOverflow.Ellipsis, fontSize = 10.sp,
+                            color = jessiReadableText(muted))
+                        IconButton(
+                            onClick = { onEdit(acc) }, modifier = Modifier.size(27.dp)
+                        ) {
+                            Icon(Icons.Outlined.Edit, contentDescription = "ویرایش " + acc.title,
+                                modifier = Modifier.size(16.dp))
+                        }
+                        if (canDelete) {
+                            IconButton(
+                                onClick = { onDelete(acc) }, modifier = Modifier.size(27.dp)
+                            ) {
+                                Icon(Icons.Outlined.DeleteOutline,
+                                    contentDescription = "حذف " + acc.title,
+                                    tint = danger, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
             }
-            FinanceActionRow(
-                edit = { onEdit(acc) },
-                delete = if (canDelete) ({ onDelete(acc) }) else null
-            )
         }
     }
 }
