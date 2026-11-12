@@ -170,16 +170,32 @@ class MainActivity : FragmentActivity() {
                             (if (darkMode) Color.White else MaterialTheme.colorScheme.onSurface)
                     ) {
                     if (securityEnabled && appLocked.value) {
-                        JessiLockScreen(
-                            security = pinSecurity,
-                            onUnlocked = { appLocked.value = false },
-                            biometricAvailable = BiometricManager.from(this@MainActivity)
-                                .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
-                                BiometricManager.BIOMETRIC_SUCCESS,
-                            onTryBiometrics = {
-                                promptBiometricUnlock(pinSecurity) { appLocked.value = false }
-                            }
+                        // The lock screen uses exactly the same saved backdrop as Home.
+                        val backdropPrefs = getSharedPreferences(
+                            "jessi_finance_settings", MODE_PRIVATE
                         )
+                        val loginStyle = backdropPrefs.getString("backdrop_style", "aurora") ?: "aurora"
+                        val loginPhoto = backdropPrefs.getString("backdrop_photo_uri", "") ?: ""
+                        val loginDim = backdropPrefs.getFloat(
+                            "backdrop_dim", if (darkMode) .18f else .12f
+                        )
+                        Box(Modifier.fillMaxSize()) {
+                            JessiBackdrop(
+                                style = loginStyle, photoUri = loginPhoto,
+                                dim = loginDim, dark = darkMode,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            JessiLockScreen(
+                                security = pinSecurity,
+                                onUnlocked = { appLocked.value = false },
+                                biometricAvailable = BiometricManager.from(this@MainActivity)
+                                    .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
+                                    BiometricManager.BIOMETRIC_SUCCESS,
+                                onTryBiometrics = {
+                                    promptBiometricUnlock(pinSecurity) { appLocked.value = false }
+                                }
+                            )
+                        }
                     } else JessiHome(
                         openReviewId = notificationReviewId.longValue,
                         pinSecurity = pinSecurity,
@@ -1835,7 +1851,7 @@ private fun FinanceSectionHero(
 ) {
     val dark = LocalJessiDark.current
     val highlight = if (accent == Color.Unspecified) mint else accent
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(15.dp)
     val gradient = if (dark) Brush.linearGradient(
         listOf(
             highlight.copy(alpha = .30f), Color(0xD2302057),
@@ -1851,29 +1867,29 @@ private fun FinanceSectionHero(
             .background(if (dark) Color(0xB711172E) else Color(0xCFF9FBFF))
             .background(gradient)
             .border(1.dp, highlight.copy(alpha = if (dark) .49f else .24f), shape)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Surface(
                 color = highlight.copy(alpha = if (dark) .21f else .12f),
-                shape = RoundedCornerShape(13.dp)
+                shape = RoundedCornerShape(11.dp)
             ) {
                 Icon(icon, contentDescription = null, tint = highlight,
-                    modifier = Modifier.padding(8.dp).size(21.dp))
+                    modifier = Modifier.padding(6.dp).size(18.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                Text(description, color = jessiReadableText(muted), fontSize = 11.sp, lineHeight = 16.sp)
+                Text(title, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
+                Text(description, color = jessiReadableText(muted), fontSize = 10.sp, lineHeight = 14.sp)
             }
         }
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(mainStat, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp,
+            Text(mainStat, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp,
                 color = jessiReadableText(MaterialTheme.colorScheme.onSurface),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false))
-            Text(statLabel, fontSize = 11.sp, color = jessiReadableText(muted), modifier = Modifier.padding(bottom = 3.dp))
+            Text(statLabel, fontSize = 10.sp, color = jessiReadableText(muted), modifier = Modifier.padding(bottom = 2.dp))
         }
     }
 }
@@ -2012,7 +2028,10 @@ private fun AccountsPage(
 }
 
 @Composable
-private fun TransactionsPage(txs: List<Transaction>, accounts: List<Account>, onEdit: (Transaction) -> Unit, onDelete: (Transaction) -> Unit) {
+private fun TransactionsPage(
+    txs: List<Transaction>, accounts: List<Account>,
+    onEdit: (Transaction) -> Unit, onDelete: (Transaction) -> Unit
+) {
     val visible = txs.filter { it.kind != "TRANSFER_IN" }
     val income = txs.filter { it.kind == "IN" }.sumOf { it.amountToman }
     val expense = txs.filter { it.kind == "OUT" }.sumOf { it.amountToman }
@@ -2021,7 +2040,7 @@ private fun TransactionsPage(txs: List<Transaction>, accounts: List<Account>, on
         Icons.Filled.ReceiptLong,
         digitsFa(visible.size.toString()), "تراکنش", accent = financeBlue
     )
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
         FinanceSummaryChip("درآمد", income, income = true, Modifier.weight(1f))
         FinanceSummaryChip("هزینه", expense, income = false, Modifier.weight(1f))
     }
@@ -2042,15 +2061,18 @@ private fun TransactionTile(
     edit: (() -> Unit)?, delete: (() -> Unit)?
 ) {
     val credit = row.kind in listOf("IN", "DEBT_IN", "GOAL_IN")
-    val transfer = row.kind == "TRANSFER_OUT" || row.kind == "GOAL_OUT" || row.kind == "GOAL_IN"
+    val transfer = row.kind == "TRANSFER_OUT" || row.kind == "GOAL_OUT" ||
+        row.kind == "GOAL_IN"
     val transferTarget = if (transfer) txs.firstOrNull {
         it.groupId == row.groupId && it.kind == "TRANSFER_IN"
     }?.accountId else null
-    val description = if (transferTarget != null)
-        "انتقال به " + (accounts.firstOrNull { it.id == transferTarget }?.title ?: "حساب دیگر")
-    else if (row.kind == "GOAL_OUT") "کنارگذاشتن برای هدف"
-    else if (row.kind == "GOAL_IN") "بازگشت پول از هدف"
-    else row.category
+    val description = when {
+        transferTarget != null -> "انتقال به " +
+            (accounts.firstOrNull { it.id == transferTarget }?.title ?: "حساب دیگر")
+        row.kind == "GOAL_OUT" -> "کنارگذاشتن برای هدف"
+        row.kind == "GOAL_IN" -> "بازگشت پول از هدف"
+        else -> row.category
+    }
     val tone = when {
         row.kind in listOf("GOAL_OUT", "GOAL_IN") -> financePurple
         transfer -> financeBlue
@@ -2063,44 +2085,52 @@ private fun TransactionTile(
         credit -> Icons.Outlined.SouthWest
         else -> Icons.Outlined.NorthEast
     }
-    Tile(Modifier.fillMaxWidth(), accent = tone) {
-        Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FinanceIconTile(icon, tone)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(description, fontWeight = FontWeight.Bold, fontSize = 13.sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                Text((accounts.firstOrNull { it.id == row.accountId }?.title ?: "حساب نامشخص")
-                    + " • " + Jalali.of(row.createdAt),
-                    color = jessiReadableText(muted), fontSize = 11.sp)
-            }
-            Column(horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    val type = if (row.kind in listOf("GOAL_OUT", "GOAL_IN")) "بانک اهداف"
+        else if (transfer) "انتقال" else if (credit) "ورودی" else "خروجی"
+    Surface(
+        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = .86f),
+        border = BorderStroke(1.dp, tone.copy(alpha = .20f))
+    ) {
+        Column(Modifier.padding(horizontal = 9.dp, vertical = 7.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Surface(color = tone.copy(alpha = .14f),
+                    shape = RoundedCornerShape(9.dp)) {
+                    Icon(icon, contentDescription = null, tint = tone,
+                        modifier = Modifier.padding(7.dp).size(17.dp))
+                }
+                Text(description, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f), fontSize = 12.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
                 Text((if (credit) "+" else "−") + toman(row.amountToman),
-                    color = jessiReadableText(tone), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1)
-                Text(if (row.kind in listOf("GOAL_OUT", "GOAL_IN")) "بانک اهداف"
-                    else if (transfer) "انتقال" else if (credit) "ورودی" else "خروجی",
-                    color = jessiReadableText(muted), fontSize = 10.sp)
+                    color = jessiReadableText(tone), fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold, maxLines = 1)
             }
-        }
-        if (row.source == SmsReviewPolicy.TEST_SOURCE) {
-            Surface(
-                color = financePurple.copy(alpha = .13f),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text("آزمایشی • در آمار و مانده حساب محاسبه شده",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    color = jessiReadableText(financePurple), fontSize = 10.sp)
+            Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text((accounts.firstOrNull { it.id == row.accountId }?.title ?: "حساب نامشخص") +
+                    " • " + Jalali.of(row.createdAt) + " • " + type,
+                    color = jessiReadableText(muted), fontSize = 10.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f))
+                if (edit != null) IconButton(onClick = edit, modifier = Modifier.size(27.dp)) {
+                    Icon(Icons.Outlined.Edit, contentDescription = "ویرایش تراکنش",
+                        modifier = Modifier.size(16.dp))
+                }
+                if (delete != null) IconButton(onClick = delete, modifier = Modifier.size(27.dp)) {
+                    Icon(Icons.Outlined.DeleteOutline, contentDescription = "حذف تراکنش",
+                        tint = danger, modifier = Modifier.size(16.dp))
+                }
             }
-        }
-        if (row.note.isNotBlank()) {
-            Text(row.note, color = jessiReadableText(muted), fontSize = 11.sp,
+            if (row.note.isNotBlank()) Text(row.note,
+                color = jessiReadableText(muted), fontSize = 10.sp,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-        if (edit != null || delete != null) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .27f))
-            FinanceActionRow(edit, delete)
+            if (row.source == SmsReviewPolicy.TEST_SOURCE) Text(
+                "آزمایشی • در آمار و مانده حساب محاسبه شده",
+                color = jessiReadableText(financePurple), fontSize = 10.sp)
         }
     }
 }
@@ -2114,106 +2144,137 @@ private fun DebtsPage(
         .sumOf { (it.totalToman - it.paidToman).coerceAtLeast(0) }
     FinanceSectionHero(
         "بدهی و اقساط", "پیگیری سررسیدها و پرداخت‌های باقی‌مانده",
-        Icons.Filled.EventNote, toman(totalOwed), "بدهی باقی‌مانده", accent = financePurple
+        Icons.Filled.EventNote, toman(totalOwed), "بدهی باقی‌مانده",
+        accent = financePurple
     )
     if (debts.isEmpty()) EmptyNote("فعلاً بدهی یا طلبی ثبت نشده.")
     debts.forEach { row ->
         val remaining = (row.totalToman - row.paidToman).coerceAtLeast(0)
         val mine = row.direction == "I_OWE"
         val tone = if (mine) financePurple else financeAqua
-        Tile(Modifier.fillMaxWidth(), accent = tone) {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FinanceIconTile(if (row.installmentMonths > 0) Icons.Filled.CalendarMonth
-                    else Icons.Filled.Handshake, tone)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(row.person, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                    Text(if (row.installmentMonths > 0) "بازپرداخت اقساطی" else "تسویه عادی",
-                        color = jessiReadableText(muted), fontSize = 11.sp)
-                }
-                Tag(if (mine) "بدهکارم" else "طلبکارم", !mine)
-            }
-            Row(Modifier.fillMaxWidth().background(
-                tone.copy(alpha = .085f), RoundedCornerShape(11.dp)).padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("مانده قابل تسویه", fontSize = 11.sp, color = jessiReadableText(muted))
-                    Text(toman(remaining), color = jessiReadableText(if (mine) MaterialTheme.colorScheme.onSurface else mint),
-                        fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
-                }
-                if (remaining == 0L) Tag("تسویه شده", true)
-            }
-            Text("کل: " + toman(row.totalToman) + " • پرداخت‌شده: " +
-                toman(row.paidToman), color = jessiReadableText(muted), fontSize = 11.sp)
-            val progress = (row.paidToman.toFloat() /
-                row.totalToman.coerceAtLeast(1L)).coerceIn(0f, 1f)
-            LinearProgressIndicator(
-                progress = { progress }, modifier = Modifier.fillMaxWidth().height(5.dp)
-                    .clip(RoundedCornerShape(7.dp)),
-                color = tone, trackColor = tone.copy(alpha = .12f)
-            )
-            if (row.installmentMonths > 0) {
-                val done = Installments.countPaid(row)
-                val left = Installments.remainingCount(row)
-                val next = Installments.nextDate(row)
-                Row(horizontalArrangement = Arrangement.spacedBy(9.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Text(digitsFa(done.toString()) + " پرداخت‌شده", fontSize = 11.sp, color = jessiReadableText(mint))
-                    Text("•", color = jessiReadableText(muted))
-                    Text(digitsFa(left.toString()) + " باقی‌مانده", fontSize = 11.sp, color = jessiReadableText(muted))
-                }
-                if (next != null) {
-                    val dueEpoch = JalaliDates.toEpoch(next)
-                    val monthsAway = JalaliDates.monthDistance(Jalali.of(nowEpoch), next)
-                    val overdue = dueEpoch != null && dueEpoch < nowEpoch
-                    val status = when {
-                        overdue -> "سررسید گذشته"
-                        monthsAway > 0 -> "تا " + digitsFa(monthsAway.toString()) + " ماه دیگر"
-                        else -> "همین ماه"
+        val progress = (row.paidToman.toFloat() /
+            row.totalToman.coerceAtLeast(1L)).coerceIn(0f, 1f)
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = .87f),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, tone.copy(alpha = .20f))
+        ) {
+            Column(
+                Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Surface(color = tone.copy(alpha = .13f),
+                        shape = RoundedCornerShape(9.dp)) {
+                        Icon(if (row.installmentMonths > 0) Icons.Filled.CalendarMonth
+                            else Icons.Filled.Handshake, contentDescription = null,
+                            tint = tone, modifier = Modifier.padding(7.dp).size(17.dp))
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(Icons.Outlined.Event, contentDescription = null,
-                            tint = if (overdue) danger else tone, modifier = Modifier.size(17.dp))
-                        Text("قسط بعد: " + JalaliDates.format(next) + " • " + status,
-                            color = jessiReadableText(if (overdue) danger else muted), fontSize = 11.sp)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(row.person, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+                        Text((if (row.installmentMonths > 0) "اقساطی" else "تسویه عادی") +
+                            " • " + (if (mine) "بدهکارم" else "طلبکارم") +
+                            (if (remaining == 0L) " • تسویه شده" else ""),
+                            fontSize = 10.sp, color = jessiReadableText(muted))
                     }
-                    Text("مبلغ قسط بعدی: " + toman(Installments.nextAmount(row)),
-                        fontSize = 12.sp, fontWeight = FontWeight.Medium, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
+                    Text(toman(remaining), fontSize = 13.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = jessiReadableText(tone),
+                        maxLines = 1)
                 }
-                val dueHere = Installments.dueInPeriod(row, period.start, period.endExclusive)
-                if (dueHere > 0L) Tag("سررسید این دوره • " + toman(dueHere))
-            } else if (row.dueDateJalali.isNotBlank()) {
+                // Keep both the original amount and the paid amount visible.
+                Text("کل: " + toman(row.totalToman) + "  •  پرداخت‌شده: " +
+                    toman(row.paidToman), fontSize = 10.sp,
+                    color = jessiReadableText(muted), maxLines = 2)
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().height(4.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    color = tone, trackColor = tone.copy(alpha = .12f)
+                )
+                if (row.installmentMonths > 0) {
+                    val done = Installments.countPaid(row)
+                    val left = Installments.remainingCount(row)
+                    val next = Installments.nextDate(row)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text(digitsFa(done.toString()) + " پرداخت‌شده",
+                            fontSize = 10.sp, color = jessiReadableText(tone))
+                        Text(digitsFa(left.toString()) + " باقی‌مانده",
+                            fontSize = 10.sp, color = jessiReadableText(muted))
+                    }
+                    if (next != null) {
+                        val dueEpoch = JalaliDates.toEpoch(next)
+                        val monthsAway = JalaliDates.monthDistance(Jalali.of(nowEpoch), next)
+                        val overdue = dueEpoch != null && dueEpoch < nowEpoch
+                        val status = when {
+                            overdue -> "سررسید گذشته"
+                            monthsAway > 0 -> "تا " + digitsFa(monthsAway.toString()) + " ماه"
+                            else -> "همین ماه"
+                        }
+                        Text("قسط بعد: " + JalaliDates.format(next) + " • " + status +
+                            " • " + toman(Installments.nextAmount(row)),
+                            color = jessiReadableText(if (overdue) danger else muted),
+                            fontSize = 10.sp, maxLines = 2)
+                    }
+                    val dueHere = Installments.dueInPeriod(
+                        row, period.start, period.endExclusive)
+                    if (dueHere > 0L) Text("سررسید این دوره: " + toman(dueHere),
+                        color = jessiReadableText(tone), fontSize = 10.sp)
+                } else if (row.dueDateJalali.isNotBlank()) {
+                    Text("سررسید: " + row.dueDateJalali, fontSize = 10.sp,
+                        color = jessiReadableText(muted))
+                }
+                if (row.note.isNotBlank()) Text(row.note, fontSize = 10.sp,
+                    color = jessiReadableText(muted), maxLines = 2,
+                    overflow = TextOverflow.Ellipsis)
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Icon(Icons.Outlined.Event, contentDescription = null,
-                        tint = tone, modifier = Modifier.size(16.dp))
-                    Text("سررسید: " + row.dueDateJalali, fontSize = 11.sp, color = jessiReadableText(muted))
+                    if (remaining > 0L) {
+                        FilledTonalButton(
+                            onClick = { onPay(row) },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 1.dp),
+                            modifier = Modifier.height(32.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = tone.copy(alpha = .14f))
+                        ) {
+                            Icon(Icons.Outlined.CheckCircle, contentDescription = null,
+                                modifier = Modifier.size(15.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(if (mine) "ثبت پرداخت" else "ثبت وصول",
+                                fontSize = 11.sp)
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = { onEdit(row) }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Outlined.Edit, contentDescription = "ویرایش بدهی",
+                            modifier = Modifier.size(17.dp))
+                    }
+                    IconButton(onClick = { onDelete(row) }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Outlined.DeleteOutline,
+                            contentDescription = "حذف بدهی", tint = danger,
+                            modifier = Modifier.size(17.dp))
+                    }
                 }
             }
-            if (row.note.isNotBlank()) Text(row.note, fontSize = 11.sp, color = jessiReadableText(muted))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .27f))
-            FinanceActionRow(
-                edit = { onEdit(row) },
-                delete = { onDelete(row) },
-                primary = if (remaining > 0L) ({ onPay(row) }) else null,
-                primaryLabel = if (mine) "ثبت پرداخت" else "ثبت وصول"
-            )
         }
     }
 }
 
 @Composable
 private fun BudgetsPage(
-    budgets: List<Budget>, txs: List<Transaction>, onEdit: (Budget) -> Unit,
-    onDelete: (Budget) -> Unit
+    budgets: List<Budget>, txs: List<Transaction>,
+    onEdit: (Budget) -> Unit, onDelete: (Budget) -> Unit
 ) {
     val totalLimit = budgets.sumOf { it.monthlyLimitToman }
     FinanceSectionHero(
         "بودجه‌بندی", "کنترل هزینه‌ها در دوره مالی انتخاب‌شده",
-        Icons.Filled.PieChart, 
-        toman(totalLimit), "سقف کل بودجه‌ها", accent = financeAmber
+        Icons.Filled.PieChart, toman(totalLimit), "سقف کل بودجه‌ها",
+        accent = financeAmber
     )
     if (budgets.isEmpty()) EmptyNote("برای تعریف سقف هزینه ماهانه روی + بزن.")
     budgets.forEach { b ->
@@ -2221,47 +2282,65 @@ private fun BudgetsPage(
             .sumOf { it.amountToman }
         val ratio = spent.toFloat() / b.monthlyLimitToman.coerceAtLeast(1L)
         val percent = (ratio * 100f).toInt()
-        val usedColor = if (percent >= 100) danger
-            else if (percent >= 80) financeAmber else financeAqua
-        Tile(Modifier.fillMaxWidth(), accent = usedColor) {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FinanceIconTile(Icons.Filled.DonutLarge, usedColor)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(b.category, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                    Text("سقف هزینه این دوره", color = jessiReadableText(muted), fontSize = 11.sp)
+        val tone = when {
+            percent >= 100 -> danger
+            percent >= 80 -> financeAmber
+            else -> financeAqua
+        }
+        val status = when {
+            percent >= 100 -> "سقف هزینه رد شده"
+            percent >= 80 -> "نزدیک سقف هزینه"
+            else -> "در محدوده بودجه"
+        }
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = .87f),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, tone.copy(alpha = .20f))
+        ) {
+            Column(
+                Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Surface(color = tone.copy(alpha = .13f),
+                        shape = RoundedCornerShape(9.dp)) {
+                        Icon(Icons.Filled.DonutLarge, contentDescription = null,
+                            tint = tone, modifier = Modifier.padding(7.dp).size(17.dp))
+                    }
+                    Text(b.category, modifier = Modifier.weight(1f),
+                        fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                        color = jessiReadableText(MaterialTheme.colorScheme.onSurface),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(digitsFa(percent.toString()) + "٪", fontSize = 12.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = jessiReadableText(tone))
                 }
-                Surface(
-                    color = usedColor.copy(alpha = .13f),
-                    shape = RoundedCornerShape(40.dp)
-                ) {
-                    Text(digitsFa(percent.toString()) + "٪",
-                        Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        fontWeight = FontWeight.ExtraBold, color = jessiReadableText(usedColor), fontSize = 12.sp)
+                Text("مصرف‌شده: " + toman(spent) + "  •  سقف: " +
+                    toman(b.monthlyLimitToman), fontSize = 10.sp,
+                    color = jessiReadableText(MaterialTheme.colorScheme.onSurface),
+                    maxLines = 2)
+                LinearProgressIndicator(
+                    progress = { ratio.coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().height(4.dp)
+                        .clip(RoundedCornerShape(7.dp)),
+                    color = tone, trackColor = tone.copy(alpha = .12f)
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(status, fontSize = 10.sp, modifier = Modifier.weight(1f),
+                        color = jessiReadableText(if (percent >= 80) tone else muted))
+                    IconButton(onClick = { onEdit(b) }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Outlined.Edit, contentDescription = "ویرایش بودجه",
+                            modifier = Modifier.size(17.dp))
+                    }
+                    IconButton(onClick = { onDelete(b) }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Outlined.DeleteOutline,
+                            contentDescription = "حذف بودجه", tint = danger,
+                            modifier = Modifier.size(17.dp))
+                    }
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text("مصرف‌شده", color = jessiReadableText(muted), fontSize = 11.sp)
-                    Text(toman(spent), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                }
-                Column(horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text("سقف تعیین‌شده", color = jessiReadableText(muted), fontSize = 11.sp)
-                    Text(toman(b.monthlyLimitToman), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                }
-            }
-            LinearProgressIndicator(progress = { ratio.coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(5.dp)
-                    .clip(RoundedCornerShape(7.dp)),
-                color = usedColor, trackColor = usedColor.copy(alpha = .12f))
-            Text(
-                if (percent >= 100) "سقف هزینه این دسته رد شده"
-                else if (percent >= 80) "نزدیک سقف هزینه هستی"
-                else "در محدوده بودجه",
-                fontSize = 11.sp, color = jessiReadableText(if (percent >= 80) usedColor else muted))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .27f))
-            FinanceActionRow(edit = { onEdit(b) }, delete = { onDelete(b) })
         }
     }
 }

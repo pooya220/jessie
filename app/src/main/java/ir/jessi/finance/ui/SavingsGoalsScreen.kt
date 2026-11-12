@@ -87,7 +87,7 @@ fun SavingsGoalsScreen(
     val textMuted = MaterialTheme.colorScheme.onSurfaceVariant
     var showArchived by rememberSaveable { mutableStateOf(false) }
 
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(16.dp)
     val heroGradient = if (dark) Brush.linearGradient(
         listOf(Color(0xE630245C), Color(0xDE16334F), Color(0xDE19413D))
     ) else Brush.linearGradient(
@@ -96,25 +96,45 @@ fun SavingsGoalsScreen(
     Column(
         Modifier.fillMaxWidth().clip(shape).background(heroGradient)
             .border(1.dp, purple.copy(alpha = if (dark) .50f else .18f), shape)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(9.dp)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            Surface(color = purple.copy(alpha = .16f), shape = RoundedCornerShape(13.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Surface(color = purple.copy(alpha = .16f), shape = RoundedCornerShape(11.dp)) {
                 Icon(Icons.Filled.Savings, contentDescription = null, tint = purple,
-                    modifier = Modifier.padding(8.dp).size(21.dp))
+                    modifier = Modifier.padding(7.dp).size(18.dp))
             }
-            Column(Modifier.weight(1f)) {
-                Text("بانک اهداف", fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                Text("پس‌انداز برای دانشگاه، خرید و هر چیزی که برات مهمه",
-                    fontSize = 11.sp, color = jessiReadableText(textMuted))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text("بانک اهداف", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp,
+                    color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+                Text("پس‌انداز برای دانشگاه، خرید و هدف‌ها",
+                    fontSize = 10.sp, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = jessiReadableText(textMuted))
+            }
+            OutlinedButton(
+                onClick = onAdd, modifier = Modifier.height(32.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp),
+                border = BorderStroke(1.dp, purple.copy(alpha = .45f))
+            ) {
+                Icon(Icons.Outlined.Add, contentDescription = null,
+                    modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(3.dp))
+                Text("هدف جدید", fontSize = 11.sp)
             }
         }
-        Text(toman(totalSaved), fontWeight = FontWeight.ExtraBold, fontSize = 22.sp,
-            maxLines = 1, overflow = TextOverflow.Ellipsis, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-        Text("جمع پول کنارگذاشته‌شده • جدا از موجودی حساب‌ها",
-            color = jessiReadableText(textMuted), fontSize = 11.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text("جمع پول کنارگذاشته‌شده • جدا از موجودی حساب‌ها",
+                modifier = Modifier.weight(1f), fontSize = 10.sp,
+                color = jessiReadableText(textMuted),
+                maxLines = 2)
+            Text(toman(totalSaved), fontWeight = FontWeight.ExtraBold,
+                fontSize = 17.sp, maxLines = 1,
+                color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             GoalMetricTile(
                 label = "برنامه ماهانه", value = toman(monthlyTotal),
                 icon = Icons.Outlined.CalendarMonth, tone = purple,
@@ -125,12 +145,6 @@ fun SavingsGoalsScreen(
                 icon = Icons.Outlined.TrendingUp, tone = aqua,
                 modifier = Modifier.weight(1f)
             )
-        }
-        Button(onClick = onAdd, modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = purple)) {
-            Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(7.dp))
-            Text("ساخت هدف جدید", fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
         }
     }
 
@@ -168,128 +182,149 @@ fun SavingsGoalsScreen(
         var expandedHistory by rememberSaveable(goal.id) { mutableStateOf(false) }
         GoalSurface(tone, dark) {
             Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Surface(color = tone.copy(alpha = if (dark) .24f else .11f),
-                    shape = RoundedCornerShape(14.dp)) {
-                    Icon(goalIcon(goal.category), contentDescription = null, tint = tone,
-                        modifier = Modifier.padding(8.dp).size(20.dp))
+                    shape = RoundedCornerShape(10.dp)) {
+                    Icon(goalIcon(goal.category), contentDescription = null,
+                        tint = tone, modifier = Modifier.padding(7.dp).size(18.dp))
                 }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(goal.title, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                    Text(goalCategoryText(goal.category),
-                        fontSize = 11.sp, color = jessiReadableText(textMuted))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text(goal.title, fontSize = 13.sp,
+                        fontWeight = FontWeight.ExtraBold, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+                    Text(goalCategoryText(goal.category) + " • " +
+                        (if (goal.archived) "آرشیو" else if (hasTarget &&
+                            saved >= goal.targetToman) "تکمیل!" else
+                            digitsFa((progress * 100).toInt().toString()) + "٪"),
+                        fontSize = 10.sp, maxLines = 1,
+                        color = jessiReadableText(textMuted))
                 }
-                if (goal.archived) {
-                    Text("آرشیو", color = jessiReadableText(tone), fontSize = 11.sp)
-                } else if (hasTarget && saved >= goal.targetToman) {
-                    Text("تکمیل!", color = jessiReadableText(tone), fontSize = 12.sp,
-                        fontWeight = FontWeight.ExtraBold)
-                } else {
-                    Text(digitsFa((progress * 100).toInt().toString()) + "٪",
-                        color = jessiReadableText(tone), fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+                Column(horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text(toman(saved), fontWeight = FontWeight.ExtraBold,
+                        fontSize = 13.sp, maxLines = 1,
+                        color = jessiReadableText(tone))
+                    Text("پس‌انداز فعلی", fontSize = 9.sp,
+                        color = jessiReadableText(textMuted))
                 }
             }
-            Row(verticalAlignment = Alignment.Bottom) {
-                Column(Modifier.weight(1f)) {
-                    Text("پس‌انداز فعلی", color = jessiReadableText(textMuted), fontSize = 11.sp)
-                    Text(toman(saved), fontWeight = FontWeight.ExtraBold,
-                        fontSize = 18.sp, color = jessiReadableText(tone),
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                if (hasTarget) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("هدف نهایی", color = jessiReadableText(textMuted), fontSize = 11.sp)
-                        Text(toman(goal.targetToman), fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                    }
-                }
+            if (hasTarget) {
+                Text("هدف نهایی: " + toman(goal.targetToman), fontSize = 10.sp,
+                    color = jessiReadableText(textMuted))
             }
             LinearProgressIndicator(
                 progress = { progress },
-                modifier = Modifier.fillMaxWidth().height(6.dp)
-                    .clip(RoundedCornerShape(10.dp)),
+                modifier = Modifier.fillMaxWidth().height(4.dp)
+                    .clip(RoundedCornerShape(9.dp)),
                 color = tone, trackColor = tone.copy(alpha = if (dark) .18f else .12f)
             )
             if (planned > 0L) {
-                val progressColor = if (monthSaved >= planned) aqua else tone
-                Row(Modifier.fillMaxWidth()
-                    .background(progressColor.copy(alpha = .09f), RoundedCornerShape(12.dp))
-                    .padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("این ماه: " + toman(monthSaved), fontSize = 11.sp,
-                        color = jessiReadableText(progressColor), fontWeight = FontWeight.Medium)
-                    Text("برنامه: " + toman(planned), fontSize = 11.sp,
-                        color = jessiReadableText(textMuted))
-                }
+                Text("این ماه: " + toman(monthSaved) + "  •  برنامه: " + toman(planned),
+                    fontSize = 10.sp, maxLines = 2,
+                    color = jessiReadableText(if (monthSaved >= planned) aqua else textMuted))
             }
             val forecast = SavingsGoalMath.monthsToGoal(saved, goal.targetToman, planned)
             if (forecast != null && forecast > 0L) {
-                Text("با همین برنامه: حدود " + digitsFa(forecast.toString()) + " ماه تا هدف",
-                    color = jessiReadableText(textMuted), fontSize = 11.sp)
+                Text("با همین برنامه: حدود " + digitsFa(forecast.toString()) +
+                    " ماه تا هدف", fontSize = 10.sp, color = jessiReadableText(textMuted))
             }
             if (goal.deadlineJalali.isNotBlank()) {
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Icon(Icons.Outlined.Event, contentDescription = null, tint = tone,
-                        modifier = Modifier.size(16.dp))
-                    Text("تاریخ هدف: " + goal.deadlineJalali, fontSize = 11.sp,
-                        color = jessiReadableText(textMuted))
-                }
+                Text("تاریخ هدف: " + goal.deadlineJalali,
+                    fontSize = 10.sp, color = jessiReadableText(textMuted))
             }
-            if (goal.note.isNotBlank()) Text(goal.note, fontSize = 11.sp, color = jessiReadableText(textMuted))
-            if (!goal.archived) {
-                Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Button(onClick = { onDeposit(goal) }, modifier = Modifier.weight(1f),
+            if (goal.note.isNotBlank()) {
+                Text(goal.note, fontSize = 10.sp, maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = jessiReadableText(textMuted))
+            }
+            Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                if (!goal.archived) {
+                    Button(
+                        onClick = { onDeposit(goal) },
                         enabled = accounts.isNotEmpty(),
-                        colors = ButtonDefaults.buttonColors(containerColor = tone)) {
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 9.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = tone)
+                    ) {
                         Icon(Icons.Outlined.Add, contentDescription = null,
-                            modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("واریز", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
+                            modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(2.dp))
+                        Text("واریز", fontSize = 11.sp)
                     }
-                    OutlinedButton(onClick = { onWithdraw(goal) },
+                    OutlinedButton(
+                        onClick = { onWithdraw(goal) },
                         enabled = saved > 0L && accounts.isNotEmpty(),
-                        modifier = Modifier.weight(1f)) { Text("برداشت", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp)
+                    ) {
+                        Text("برداشت", fontSize = 11.sp)
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = { onEdit(goal) }, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Outlined.Edit, contentDescription = "ویرایش هدف",
+                        modifier = Modifier.size(17.dp))
+                }
+                if (goal.archived || (saved == 0L && goalEntries.isNotEmpty())) {
+                    IconButton(onClick = { onArchive(goal) }, modifier = Modifier.size(28.dp)) {
+                        Icon(if (goal.archived) Icons.Outlined.Unarchive
+                            else Icons.Outlined.Archive,
+                            contentDescription = if (goal.archived)
+                                "بازگردانی از آرشیو" else "بایگانی هدف",
+                            tint = tone, modifier = Modifier.size(17.dp))
+                    }
+                }
+                if (goalEntries.isEmpty()) {
+                    IconButton(onClick = { onDelete(goal) }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Outlined.DeleteOutline, contentDescription = "حذف هدف",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(17.dp))
+                    }
                 }
             }
             if (goalEntries.isNotEmpty()) {
-                HorizontalDivider(color = tone.copy(alpha = .22f))
-                TextButton(onClick = { expandedHistory = !expandedHistory }) {
+                TextButton(
+                    onClick = { expandedHistory = !expandedHistory },
+                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
                     Icon(Icons.Outlined.ReceiptLong, contentDescription = null,
-                        modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(if (expandedHistory) "بستن ریز واریزها" else
-                        "تاریخچه " + digitsFa(goalEntries.size.toString()) + " جابه‌جایی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
+                        modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (expandedHistory) "بستن تاریخچه" else
+                        "تاریخچه " + digitsFa(goalEntries.size.toString()) + " جابه‌جایی",
+                        fontSize = 10.sp,
+                        color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
                 }
                 if (expandedHistory) {
                     goalEntries.sortedWith(compareByDescending<GoalMovement> { it.createdAt }
                         .thenByDescending { it.id }).take(20).forEach { movement ->
                         val deposit = movement.operation == "DEPOSIT"
                         Row(
-                            Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                            Modifier.fillMaxWidth().padding(vertical = 3.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(7.dp)
                         ) {
                             Icon(
                                 if (deposit) Icons.Outlined.ArrowDownward
                                 else Icons.Outlined.ArrowUpward,
                                 contentDescription = null,
                                 tint = if (deposit) aqua else tone,
-                                modifier = Modifier.size(17.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                             Column(Modifier.weight(1f)) {
                                 Text(if (deposit) "واریز به هدف" else "برداشت از هدف",
-                                    fontSize = 11.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                                Text(
-                                    (accounts.firstOrNull { it.id == movement.accountId }?.title
-                                        ?: "حساب") + " • " + Jalali.of(movement.createdAt),
-                                    color = jessiReadableText(textMuted), fontSize = 10.sp
-                                )
+                                    fontSize = 10.sp,
+                                    color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+                                Text((accounts.firstOrNull { it.id == movement.accountId }?.title
+                                    ?: "حساب") + " • " + Jalali.of(movement.createdAt),
+                                    color = jessiReadableText(textMuted), fontSize = 9.sp)
                             }
                             Text((if (deposit) "+" else "−") + toman(movement.amountToman),
                                 color = jessiReadableText(if (deposit) aqua else tone),
-                                fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                fontWeight = FontWeight.Bold, fontSize = 10.sp)
                         }
                     }
                     if (goalEntries.size > 20) {
@@ -298,28 +333,9 @@ fun SavingsGoalsScreen(
                     }
                 }
             }
-            HorizontalDivider(color = tone.copy(alpha = .18f))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { onEdit(goal) }) {
-                    Icon(Icons.Outlined.Edit, contentDescription = null,
-                        modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp)); Text("ویرایش", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                }
-                Spacer(Modifier.weight(1f))
-                if (goal.archived) {
-                    TextButton(onClick = { onArchive(goal) }) { Text("بازگردانی از آرشیو", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
-                } else if (saved == 0L && goalEntries.isNotEmpty()) {
-                    TextButton(onClick = { onArchive(goal) }) { Text("بایگانی", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
-                }
-                if (goalEntries.isEmpty()) {
-                    TextButton(onClick = { onDelete(goal) }) {
-                        Text("حذف", color = jessiReadableText(MaterialTheme.colorScheme.error))
-                    }
-                }
-            }
         }
     }
+
     if (active.isNotEmpty()) {
         Text(
             "پول هدف از موجودی حساب انتخابی کم یا به آن بازگردانده می‌شود، " +
@@ -345,10 +361,10 @@ private fun GoalMetricTile(
             Modifier.background(Brush.linearGradient(listOf(
                 tone.copy(alpha = if (dark) .25f else .09f),
                 Color.Transparent
-            ))).padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            ))).padding(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(icon, contentDescription = null, tint = tone, modifier = Modifier.size(17.dp))
+                Icon(icon, contentDescription = null, tint = tone, modifier = Modifier.size(15.dp))
                 Text(label, fontSize = 10.sp, color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
             }
             Text(value, fontWeight = FontWeight.ExtraBold, color = jessiReadableText(tone),
@@ -361,7 +377,7 @@ private fun GoalMetricTile(
 private fun GoalSurface(
     tone: Color, dark: Boolean, content: @Composable ColumnScope.() -> Unit
 ) {
-    val shape = RoundedCornerShape(17.dp)
+    val shape = RoundedCornerShape(14.dp)
     val base = if (dark) Color(0xAE12182F) else Color(0xC8F8FBFF)
     val gradient = if (dark) Brush.linearGradient(listOf(
         tone.copy(alpha = .28f),

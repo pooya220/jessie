@@ -33,9 +33,9 @@ fun FinancialTrendChart(periods: List<FinancePeriod>, selectedIndex: Int, transa
     val shown = periods.drop(selectedIndex).take(6).reversed()
     val incomes = shown.map { p -> transactions.filter { p.contains(it.createdAt) && it.kind == "IN" }.sumOf { it.amountToman } }
     val expenses = shown.map { p -> transactions.filter { p.contains(it.createdAt) && it.kind == "OUT" }.sumOf { it.amountToman } }
-    Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("روند درآمد و هزینه", fontSize = 15.sp, fontWeight = FontWeight.Bold,
+            Text("روند درآمد و هزینه", fontSize = 13.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f), color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
             Text("۶ دوره اخیر", fontSize = 10.sp, color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
         }
@@ -44,7 +44,7 @@ fun FinancialTrendChart(periods: List<FinancePeriod>, selectedIndex: Int, transa
                 color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
         } else {
             val maximum = (incomes + expenses).maxOrNull()?.coerceAtLeast(1L) ?: 1L
-            Canvas(Modifier.fillMaxWidth().height(96.dp)) {
+            Canvas(Modifier.fillMaxWidth().height(78.dp)) {
                 val column = size.width / shown.size
                 val plotHeight = size.height - 4.dp.toPx()
                 for (i in shown.indices) {
@@ -92,7 +92,7 @@ fun SpendingCategoryChart(transactions: List<Transaction>) {
     else listOf(Color(0xFF08AB67), Color(0xFF27A9F1), Color(0xFFFFBE4A),
         Color(0xFFF16FC3), Color(0xFFB478FD))
     val track = MaterialTheme.colorScheme.outline.copy(alpha = .3f)
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("تفکیک هزینه‌ها", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
         Row(
             Modifier.fillMaxWidth(),
@@ -120,9 +120,9 @@ fun SpendingCategoryChart(transactions: List<Transaction>) {
                     }
                 }
             }
-            Box(Modifier.size(120.dp), contentAlignment = Alignment.Center) {
-                Canvas(Modifier.fillMaxSize().padding(9.dp)) {
-                    val ring = Stroke(width = 22.dp.toPx(), cap = StrokeCap.Butt)
+            Box(Modifier.size(104.dp), contentAlignment = Alignment.Center) {
+                Canvas(Modifier.fillMaxSize().padding(8.dp)) {
+                    val ring = Stroke(width = 19.dp.toPx(), cap = StrokeCap.Butt)
                     drawArc(track, -90f, 360f, false, style = ring)
                     if (total > 0L) {
                         var angle = -90f
@@ -162,7 +162,7 @@ fun InstallmentForecastChart(debts: List<Debt>, now: Long) {
         }
     }
     val upcoming = periods.map { p -> debts.sumOf { Installments.dueInPeriod(it, p.start, p.endExclusive) } }
-    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("برنامه اقساط ۶ ماه آینده", color = jessiReadableText(MaterialTheme.colorScheme.onSurface),
             fontSize = 15.sp, fontWeight = FontWeight.Bold)
         if (upcoming.all { it == 0L }) {
@@ -170,7 +170,7 @@ fun InstallmentForecastChart(debts: List<Debt>, now: Long) {
                 color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
         } else {
             val max = upcoming.maxOrNull()?.coerceAtLeast(1L) ?: 1L
-            Canvas(Modifier.fillMaxWidth().height(70.dp)) {
+            Canvas(Modifier.fillMaxWidth().height(58.dp)) {
                 val col = size.width / 6
                 upcoming.forEachIndexed { i, amount ->
                     val height = size.height * (amount.toFloat() / max)

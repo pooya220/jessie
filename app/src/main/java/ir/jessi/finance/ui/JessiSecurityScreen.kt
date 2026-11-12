@@ -57,7 +57,7 @@ fun JessiLockScreen(
         Surface(
             modifier = Modifier.fillMaxWidth().widthIn(max = 370.dp),
             shape = RoundedCornerShape(22.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = .94f),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = .76f),
             border = androidx.compose.foundation.BorderStroke(
                 1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .25f)
             )
