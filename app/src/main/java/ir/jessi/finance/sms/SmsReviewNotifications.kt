@@ -53,11 +53,11 @@ object SmsReviewNotifications {
         if (blockedReason(context) != null) return false
 
         val manager = context.getSystemService(NotificationManager::class.java)
-        val openIntent = Intent(context, MainActivity::class.java).apply {
+        val openIntent = Intent(context, SmsReviewPopupActivity::class.java).apply {
             action = Intent.ACTION_VIEW
             data = Uri.parse("jessi://sms-review/$reviewId")
             putExtra(EXTRA_REVIEW_ID, reviewId)
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
         }
         val ignoreIntent = Intent(context, SmsReviewActionReceiver::class.java).apply {
             action = ACTION_IGNORE

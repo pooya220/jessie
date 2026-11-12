@@ -18,6 +18,11 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <activity
+            android:name=".sms.SmsReviewPopupActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Jessi.SmsPopup" />
         <receiver android:name=".sms.SmsReviewActionReceiver" android:exported="false" />
         <receiver android:name=".sms.BankSmsReceiver" android:exported="true" android:permission="android.permission.BROADCAST_SMS">
             <intent-filter>

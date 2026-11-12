@@ -51,52 +51,84 @@ fun JessiLockScreen(
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     Box(
-        Modifier.fillMaxSize().padding(horizontal = 24.dp),
+        Modifier.fillMaxSize().padding(horizontal = 22.dp),
         contentAlignment = Alignment.Center
     ) {
         Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = .90f),
+            modifier = Modifier.fillMaxWidth().widthIn(max = 370.dp),
+            shape = RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = .94f),
             border = androidx.compose.foundation.BorderStroke(
-                1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .30f)
-            ),
-            modifier = Modifier.fillMaxWidth()
+                1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .25f)
+            )
         ) {
             Column(
-                Modifier.padding(22.dp),
+                Modifier.padding(horizontal = 17.dp, vertical = 18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(11.dp)
             ) {
-                Icon(Icons.Outlined.Lock, contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(38.dp))
-                Text("ورود امن به جسی", fontWeight = FontWeight.ExtraBold, fontSize = 21.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                Text("ابتدا اثرانگشت را تأیید کن، یا با پین وارد شو",
-                    color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant),
-                    fontSize = 12.sp)
-                PinInput("پین ورود (۴ تا ۶ رقم)", pin, { pin = it; error = null })
-                if (error != null) Text(error!!, color = jessiReadableText(MaterialTheme.colorScheme.error), fontSize = 12.sp)
-                Button(
-                    onClick = {
-                        val result = security.verify(pin)
-                        if (result == null) { pin = ""; onUnlocked() }
-                        else { error = result; pin = "" }
+                Surface(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = .12f),
+                    shape = RoundedCornerShape(17.dp)
+                ) {
+                    Icon(
+                        Icons.Outlined.Lock, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(11.dp).size(27.dp)
+                    )
+                }
+                Text("جسی", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp,
+                    color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = { value ->
+                        pin = value.filter { it in '0'..'9' }.take(6)
+                        error = null
                     },
-                    enabled = pin.length in 4..6,
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("ورود با پین", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) }
-                if (biometricAvailable && security.biometricsEnabled()) {
-                    OutlinedButton(
-                        onClick = onTryBiometrics, modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Outlined.Fingerprint, contentDescription = null,
+                    singleLine = true,
+                    placeholder = { Text("پین ورود", fontSize = 13.sp) },
+                    leadingIcon = {
+                        Icon(Icons.Outlined.Security, contentDescription = null,
                             modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("تلاش دوباره با اثرانگشت", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    visualTransformation = PasswordVisualTransformation(),
+                    shape = RoundedCornerShape(13.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (error != null) {
+                    Text(error!!, color = MaterialTheme.colorScheme.error,
+                        fontSize = 11.sp)
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val result = security.verify(pin)
+                            if (result == null) { pin = ""; onUnlocked() }
+                            else { error = result; pin = "" }
+                        },
+                        enabled = pin.length in 4..6,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Outlined.Lock, contentDescription = null,
+                            modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text("ورود")
+                    }
+                    if (biometricAvailable && security.biometricsEnabled()) {
+                        OutlinedIconButton(
+                            onClick = onTryBiometrics,
+                            modifier = Modifier.size(43.dp)
+                        ) {
+                            Icon(Icons.Outlined.Fingerprint,
+                                contentDescription = "ورود با اثرانگشت",
+                                modifier = Modifier.size(23.dp))
+                        }
                     }
                 }
-                Text("برای امنیت اطلاعات مالی، بعد از خروج از برنامه دوباره قفل فعال می‌شود.",
-                    color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant),
-                    fontSize = 10.sp)
             }
         }
     }
