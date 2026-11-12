@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Floating window: taps on a transaction notification do not open the app's main screen. -->
+    <style name="Theme.Jessi.SmsPopup" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:windowDimAmount">0.5</item>
+        <item name="android:windowSoftInputMode">adjustResize</item>
+    </style>
+</resources>
