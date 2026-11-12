@@ -1192,6 +1192,14 @@ private fun SettingsPage(
                 JessiSecuritySettings(pinSecurity, onSecurityChanged)
             }
         }
+        Text(
+            text = "Powered by PM",
+            fontSize = 10.sp,
+            letterSpacing = 1.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .72f),
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 14.dp),
+            textAlign = TextAlign.Center
+        )
     }
 }
 
