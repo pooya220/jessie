@@ -27,6 +27,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.animation.core.*
+import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -426,7 +429,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                 Spacer(Modifier.width(9.dp))
                 Column(Modifier.weight(1f)) {
                     Text("جسی", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                    Text("مدیریت مالی شخصی", color = jessiReadableText(muted), fontSize = 10.sp)
+                    Text("Powerd by PR", color = jessiReadableText(muted), fontSize = 9.sp, letterSpacing = .7.sp)
                 }
                 IconButton(
                     onClick = { showSettings = !showSettings },
@@ -472,37 +475,55 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
             }
         },
         bottomBar = {
-            // N2: floating liquid-glass dock. The selected destination has a
-            // soft inner highlight, frosted tint and a distinct active marker.
+            // Pop Out Heart: keep the existing five destinations while lifting
+            // the active icon above a floating liquid-glass dock.
             val glassShape = RoundedCornerShape(27.dp)
-            val dockGlass = if (darkMode) {
-                Brush.linearGradient(listOf(
-                    Color(0xE62F365E), Color(0xE11C2342), Color(0xEA24365B)
-                ))
-            } else {
-                Brush.linearGradient(listOf(
-                    Color(0xF7FFFFFF), Color(0xE9E9F4FF), Color(0xF5FFFFFF)
-                ))
+            val heartShape = GenericShape { size, _ ->
+                val w = size.width
+                val h = size.height
+                moveTo(w * .5f, h * .23f)
+                cubicTo(w * .76f, -h * .08f, w * 1.12f, h * .29f, w * .88f, h * .62f)
+                cubicTo(w * .72f, h * .84f, w * .55f, h * .96f, w * .5f, h)
+                cubicTo(w * .45f, h * .96f, w * .28f, h * .84f, w * .12f, h * .62f)
+                cubicTo(-w * .12f, h * .29f, w * .24f, -h * .08f, w * .5f, h * .23f)
+                close()
             }
+            val dockGlass = Brush.linearGradient(
+                if (darkMode) listOf(
+                    Color(0xE62F365E), Color(0xE11C2342), Color(0xEA24365B)
+                ) else listOf(
+                    Color(0xF7FFFFFF), Color(0xE9E9F4FF), Color(0xF5FFFFFF)
+                )
+            )
             Box(
-                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp)
-                    .height(81.dp).shadow(13.dp, glassShape)
-                    .clip(glassShape).background(dockGlass)
-                    .border(1.dp, if (darkMode) Color(0x7AFFFFFF)
-                        else Color.White, glassShape)
+                Modifier.fillMaxWidth().height(111.dp)
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
             ) {
-                // A subtle reflected top edge evokes liquid glass without
-                // blurring the icons or reducing touch accessibility.
-                Box(Modifier.fillMaxWidth().height(2.dp)
-                    .background(Brush.horizontalGradient(listOf(
-                        Color.Transparent,
-                        Color.White.copy(alpha = if (darkMode) .45f else .95f),
-                        Color.Transparent
-                    ))))
-                NavigationBar(
-                    containerColor = Color.Transparent,
-                    tonalElevation = 0.dp,
-                    modifier = Modifier.fillMaxSize()
+                Box(
+                    Modifier.align(Alignment.BottomCenter)
+                        .fillMaxWidth().height(74.dp)
+                        .shadow(13.dp, glassShape)
+                        .clip(glassShape).background(dockGlass)
+                        .border(
+                            1.dp,
+                            if (darkMode) Color(0x7AFFFFFF) else Color.White,
+                            glassShape
+                        )
+                ) {
+                    Box(
+                        Modifier.fillMaxWidth().height(2.dp)
+                            .background(Brush.horizontalGradient(listOf(
+                                Color.Transparent,
+                                Color.White.copy(alpha = if (darkMode) .45f else .95f),
+                                Color.Transparent
+                            )))
+                    )
+                }
+                Row(
+                    Modifier.align(Alignment.BottomCenter)
+                        .fillMaxWidth().height(90.dp)
+                        .padding(horizontal = 3.dp),
+                    verticalAlignment = Alignment.Bottom
                 ) {
                     Tab.entries.forEach { item ->
                         val selected = tab == item && !showSettings
@@ -523,57 +544,83 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                         val accent = when (item) {
                             Tab.ACCOUNTS -> financeAqua
                             Tab.TXS -> financeBlue
-                            Tab.HOME -> financeAqua
+                            Tab.HOME -> financePurple
                             Tab.DEBTS -> financePurple
                             Tab.GOALS -> financeAmber
                         }
-                        val iconShape = RoundedCornerShape(if (item == Tab.HOME) 16.dp else 14.dp)
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = { tabName = item.name; showSettings = false },
-                            icon = {
-                                Box(
-                                    Modifier.size(if (item == Tab.HOME) 42.dp else 38.dp)
-                                        .clip(iconShape)
-                                        .background(if (selected) {
-                                            Brush.linearGradient(listOf(
-                                                accent.copy(alpha = if (darkMode) .33f else .19f),
-                                                Color.White.copy(alpha = if (darkMode) .17f else .84f)
-                                            ))
-                                        } else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)))
-                                        .border(1.dp, if (selected) {
-                                            if (darkMode) Color.White.copy(alpha = .38f)
-                                            else accent.copy(alpha = .33f)
-                                        } else Color.Transparent, iconShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        if (selected) filledIcon else outlineIcon,
-                                        contentDescription = item.label,
-                                        modifier = Modifier.size(if (item == Tab.HOME) 26.dp else 23.dp)
-                                    )
-                                }
-                            },
-                            label = {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    Text(item.label, fontSize = 10.sp,
-                                        fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
-                                        maxLines = 1, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                                    if (selected) {
-                                        Box(Modifier.width(14.dp).height(3.dp)
-                                            .background(accent, RoundedCornerShape(2.dp)))
-                                    }
-                                }
-                            },
-                            alwaysShowLabel = true,
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = accent, selectedTextColor = accent,
-                                indicatorColor = Color.Transparent,
-                                unselectedIconColor = if (darkMode) Color(0xFFB7C0D9) else Color(0xFF61758A),
-                                unselectedTextColor = if (darkMode) Color(0xFFB7C0D9) else Color(0xFF61758A)
-                            )
+                        val popOffset by animateDpAsState(
+                            targetValue = if (selected) (-27).dp else 0.dp,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            ),
+                            label = "heartPop_${item.name}"
                         )
+                        val popScale by animateFloatAsState(
+                            targetValue = if (selected) 1.1f else 1f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            ),
+                            label = "heartScale_${item.name}"
+                        )
+                        val iconShape = if (selected) heartShape else RoundedCornerShape(16.dp)
+                        Column(
+                            Modifier.weight(1f).fillMaxHeight()
+                                .clickable { tabName = item.name; showSettings = false }
+                                .padding(top = 1.dp, bottom = 10.dp),
+                            verticalArrangement = Arrangement.Bottom,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(
+                                Modifier.size(49.dp)
+                                    .offset(y = popOffset)
+                                    .scale(popScale)
+                                    .clip(iconShape)
+                                    .background(
+                                        if (selected) Brush.linearGradient(listOf(
+                                            accent.copy(alpha = .95f),
+                                            if (darkMode) financeBlue.copy(alpha = .92f)
+                                            else accent.copy(alpha = .79f)
+                                        ))
+                                        else Brush.linearGradient(listOf(
+                                            Color.Transparent, Color.Transparent
+                                        ))
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (selected) Color.White.copy(alpha = if (darkMode) .65f else .85f)
+                                        else Color.Transparent,
+                                        iconShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    if (selected) filledIcon else outlineIcon,
+                                    contentDescription = item.label,
+                                    tint = if (selected) Color.White
+                                        else if (darkMode) Color(0xFFD0D8EC)
+                                        else Color(0xFF60758A),
+                                    modifier = Modifier
+                                        .offset(y = if (selected) (-3).dp else 0.dp)
+                                        .size(if (selected) 24.dp else 23.dp)
+                                )
+                            }
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                item.label, maxLines = 1, fontSize = 10.sp,
+                                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
+                                color = if (selected) accent else jessiReadableText(muted)
+                            )
+                            Spacer(Modifier.height(3.dp))
+                            Box(
+                                Modifier.width(15.dp).height(3.dp)
+                                    .background(
+                                        if (selected) accent else Color.Transparent,
+                                        RoundedCornerShape(2.dp)
+                                    )
+                            )
+                        }
                     }
                 }
             }
@@ -1193,7 +1240,7 @@ private fun SettingsPage(
             }
         }
         Text(
-            text = "Powered by PM",
+            text = "Powerd by PR",
             fontSize = 10.sp,
             letterSpacing = 1.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .72f),
