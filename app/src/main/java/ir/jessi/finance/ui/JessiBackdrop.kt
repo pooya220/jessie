@@ -37,7 +37,7 @@ private fun palette(style: String, dark: Boolean): List<Color> = when(style) {
         else listOf(Color(0xFFF8EBF6), Color(0xFFFBE5D7), Color(0xFFF7F3F3))
     "minimal" -> if (dark) listOf(Color(0xFF11152A), Color(0xFF171C32))
         else listOf(Color(0xFFF7F9FB), Color(0xFFEAF3F5))
-    else -> if (dark) listOf(Color(0xFF07091D), Color(0xFF101135), Color(0xFF080C27))
+    else -> if (dark) listOf(Color(0xFF090E2B), Color(0xFF1C153B), Color(0xFF0A2435))
         else listOf(Color(0xFFF0ECFD), Color(0xFFE5F7F8), Color(0xFFF1F6FD))
 }
 
@@ -79,23 +79,23 @@ fun JessiBackdrop(
         } else if (style != "minimal") {
             Canvas(Modifier.fillMaxSize()) {
                 val span = maxOf(size.width, size.height)
-                val a = Offset(size.width * .12f, size.height * .18f)
-                val b = Offset(size.width * .90f, size.height * .83f)
+                val a = Offset(size.width * .12f, size.height * .22f)
+                val b = Offset(size.width * .88f, size.height * .75f)
                 drawCircle(
                     brush = Brush.radialGradient(
                         listOf(
-                            if (dark) Color(0x472C62FB) else Color(0x554EA4F0),
+                            if (dark) Color(0x6636D7FF) else Color(0x554EA4F0),
                             Color.Transparent
-                        ), center = a, radius = span * .58f
-                    ), radius = span * .58f, center = a
+                        ), center = a, radius = span * .72f
+                    ), radius = span * .72f, center = a
                 )
                 drawCircle(
                     brush = Brush.radialGradient(
                         listOf(
-                            if (dark) Color(0x66A044FF) else Color(0x44CB8BDD),
+                            if (dark) Color(0x66CE78FF) else Color(0x44CB8BDD),
                             Color.Transparent
-                        ), center = b, radius = span * .53f
-                    ), radius = span * .53f, center = b
+                        ), center = b, radius = span * .66f
+                    ), radius = span * .66f, center = b
                 )
             }
         }

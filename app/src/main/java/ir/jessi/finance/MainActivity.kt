@@ -80,24 +80,24 @@ private val lightColors = lightColorScheme(
     error = Color(0xFFD83D67), outline = Color(0xFFDCEBE8)
 )
 private val darkColors = darkColorScheme(
-    primary = Color(0xFFB38AFF), onPrimary = Color(0xFF0B0E23),
-    secondary = Color(0xFF65B9FF), onSecondary = Color(0xFF071022),
-    background = Color(0xFF080B20), onBackground = Color.White,
-    surface = Color(0xFF11162F), surfaceVariant = Color(0xFF1A2041),
-    onSurface = Color.White, onSurfaceVariant = Color(0xFFD0D3E8),
+    primary = Color(0xFFD062FF), onPrimary = Color.White,
+    secondary = Color(0xFF41DDFB), onSecondary = Color.White,
+    background = Color(0xFF070A21), onBackground = Color.White,
+    surface = Color(0xFF12152F), surfaceVariant = Color(0xFF1D2148),
+    onSurface = Color.White, onSurfaceVariant = Color.White,
     onPrimaryContainer = Color.White, onSecondaryContainer = Color.White,
     onTertiaryContainer = Color.White, onError = Color.White,
-    error = Color(0xFFFF6B98), outline = Color(0xFF404A78)
+    error = Color(0xFFFF699E), outline = Color(0xFF3B4078)
 )
 internal val LocalJessiDark = compositionLocalOf { true }
 
 // Consistent four-tone accents shared across every tab: jade, cyan, violet and amber.
 private val financeAqua: Color @Composable get() =
-    if (LocalJessiDark.current) Color(0xFF47E5C5) else Color(0xFF008F69)
+    if (LocalJessiDark.current) Color(0xFF36E8C4) else Color(0xFF008F69)
 private val financeBlue: Color @Composable get() =
-    if (LocalJessiDark.current) Color(0xFF63B5FF) else Color(0xFF2477C8)
+    if (LocalJessiDark.current) Color(0xFF43C8FF) else Color(0xFF2477C8)
 private val financePurple: Color @Composable get() =
-    if (LocalJessiDark.current) Color(0xFFBE8BFF) else Color(0xFF8450C8)
+    if (LocalJessiDark.current) Color(0xFFD062FF) else Color(0xFF8450C8)
 private val financeAmber: Color @Composable get() =
     if (LocalJessiDark.current) Color(0xFFFFC779) else Color(0xFFB47827)
 
@@ -153,9 +153,9 @@ class MainActivity : FragmentActivity() {
                 }
             }
             SideEffect {
-                window.statusBarColor = if (darkMode) android.graphics.Color.rgb(8, 11, 32)
+                window.statusBarColor = if (darkMode) android.graphics.Color.rgb(8, 15, 38)
                     else android.graphics.Color.rgb(246, 250, 251)
-                window.navigationBarColor = if (darkMode) android.graphics.Color.rgb(8, 11, 32)
+                window.navigationBarColor = if (darkMode) android.graphics.Color.rgb(8, 15, 38)
                     else android.graphics.Color.rgb(246, 250, 251)
                 WindowCompat.getInsetsController(window, window.decorView).apply {
                     isAppearanceLightStatusBars = !darkMode
@@ -409,134 +409,119 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
         contentColor = if (darkMode) Color.White else MaterialTheme.colorScheme.onSurface,
         topBar = {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    Modifier.size(44.dp).clip(RoundedCornerShape(15.dp))
-                        .background(Brush.linearGradient(
-                            if (darkMode) listOf(Color(0xFF392360), Color(0xFF173B6B))
-                            else listOf(Color(0xFFE7DFFF), Color(0xFFDAF0FF))
-                        ))
-                        .border(
-                            .9.dp,
-                            if (darkMode) Color(0xFF9E88F4).copy(alpha = .46f)
-                            else Color(0xFFD8C8F2),
-                            RoundedCornerShape(15.dp)
-                        ),
+                    Modifier.size(42.dp).clip(RoundedCornerShape(14.dp))
+                        .background(Brush.linearGradient(if (darkMode)
+                            listOf(Color(0xFF5A378F), Color(0xFF164A69))
+                            else listOf(Color(0xFFDCF4FC), Color(0xFFE9E3FF))))
+                        .border(1.dp, if (darkMode) Color.White.copy(alpha = .23f)
+                            else Color(0xFFCEDCF2), RoundedCornerShape(14.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        Modifier.size(width = 16.dp, height = 25.dp)
-                            .offset(x = (-6).dp, y = 1.dp)
-                            .clip(RoundedCornerShape(
-                                topStart = 12.dp, topEnd = 4.dp,
-                                bottomEnd = 12.dp, bottomStart = 4.dp
-                            ))
-                            .background(Brush.verticalGradient(listOf(
-                                Color(0xFFC389FF), Color(0xFF7A4FDF)
-                            )))
-                    )
-                    Box(
-                        Modifier.size(width = 16.dp, height = 28.dp)
-                            .offset(x = 6.dp, y = (-1).dp)
-                            .clip(RoundedCornerShape(
-                                topStart = 4.dp, topEnd = 12.dp,
-                                bottomEnd = 4.dp, bottomStart = 12.dp
-                            ))
-                            .background(Brush.verticalGradient(listOf(
-                                Color(0xFF6DD4FF), Color(0xFF6554E9)
-                            )))
-                    )
+                    Icon(Icons.Filled.AutoAwesome, contentDescription = "نشان جسی",
+                        tint = if (darkMode) Color(0xFFBFE7FF) else Color(0xFF008F69),
+                        modifier = Modifier.size(25.dp))
                 }
                 Spacer(Modifier.width(9.dp))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    Text("جسی", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold,
-                        color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
-                    Text("Powerd by PR", fontSize = 9.sp, letterSpacing = .7.sp,
-                        color = jessiReadableText(muted))
+                Column(Modifier.weight(1f)) {
+                    Text("جسی", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
+                    Text("Powerd by PR", color = jessiReadableText(muted), fontSize = 9.sp, letterSpacing = .7.sp)
                 }
                 IconButton(
                     onClick = { showSettings = !showSettings },
-                    modifier = Modifier.size(43.dp).clip(RoundedCornerShape(15.dp))
-                        .background(if (darkMode) Color(0xB61B2245) else secondary)
+                    modifier = Modifier.size(43.dp)
                 ) {
                     Icon(
                         if (showSettings) Icons.Outlined.ArrowBack else Icons.Outlined.Settings,
                         contentDescription = if (showSettings) "بازگشت به برنامه" else "تنظیمات جسی",
-                        tint = if (darkMode) Color(0xFFE8E6FF) else muted,
-                        modifier = Modifier.size(22.dp)
+                        tint = muted, modifier = Modifier.size(23.dp)
                     )
                 }
-                Spacer(Modifier.width(7.dp))
-                IconButton(
+                // One accessible toggle: tap anywhere to flip between light and dark.
+                Surface(
                     onClick = onToggleTheme,
-                    modifier = Modifier.size(43.dp).clip(RoundedCornerShape(15.dp))
-                        .background(if (darkMode) Color(0xB61B2245) else secondary)
+                    modifier = Modifier.width(80.dp).height(40.dp),
+                    color = secondary,
+                    shape = RoundedCornerShape(50.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .55f))
                 ) {
-                    Icon(
-                        if (darkMode) Icons.Outlined.DarkMode else Icons.Outlined.LightMode,
-                        contentDescription = if (darkMode) "تغییر به حالت روشن" else "تغییر به حالت تیره",
-                        tint = if (darkMode) Color(0xFFB7A0FF) else muted,
-                        modifier = Modifier.size(21.dp)
-                    )
+                    Box(Modifier.fillMaxSize().padding(3.dp)) {
+                        Icon(Icons.Outlined.LightMode, contentDescription = null,
+                            tint = muted, modifier = Modifier.align(Alignment.CenterStart)
+                                .padding(start = 8.dp).size(18.dp))
+                        Icon(Icons.Outlined.DarkMode, contentDescription = null,
+                            tint = muted, modifier = Modifier.align(Alignment.CenterEnd)
+                                .padding(end = 8.dp).size(18.dp))
+                        Box(
+                            Modifier.align(if (darkMode) Alignment.CenterEnd else Alignment.CenterStart)
+                                .size(34.dp).background(
+                                    if (darkMode) Color(0xFF8143E5) else Color(0xFF00A960),
+                                    CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                if (darkMode) Icons.Outlined.DarkMode else Icons.Outlined.LightMode,
+                                contentDescription = if (darkMode) "دارک مود؛ تغییر به لایت" else "لایت مود؛ تغییر به دارک",
+                                tint = Color.White, modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
             }
         },
         bottomBar = {
-            // Soft pop-out dock: a calm glass capsule and a gently lifted
-            // round active icon. No pointed heart silhouette or hard edges.
-            val dockShape = RoundedCornerShape(33.dp)
+            // Only the five-tab dock appearance changes. Every existing destination,
+            // tab state and action remains exactly as before.
+            val dockShape = RoundedCornerShape(36.dp)
             val dockGlass = Brush.linearGradient(
                 if (darkMode) listOf(
-                    Color(0xF21A2040), Color(0xF0131A34), Color(0xF2221847)
+                    Color(0xE52A355F), Color(0xEE1C2041), Color(0xE526224A)
                 ) else listOf(
-                    Color(0xF8FFFFFF), Color(0xF3F0F3FF), Color(0xF7FFFFFF)
+                    Color(0xF8FFFFFF), Color(0xEDF0F3FF), Color(0xF7FFFFFF)
                 )
             )
-            val dockEdge = Brush.horizontalGradient(
-                listOf(
-                    if (darkMode) Color(0xFF7F6EE7) else Color(0xFFA9A2E6),
-                    if (darkMode) Color(0xFFA761F0) else Color(0xFFAF8AE7),
-                    if (darkMode) Color(0xFF579CE7) else Color(0xFF7FADDF)
+            val dockStroke = Brush.horizontalGradient(
+                if (darkMode) listOf(
+                    Color(0xFF99B7F0).copy(alpha = .65f),
+                    Color(0xFFB98DF1).copy(alpha = .75f),
+                    Color(0xFF87A8E3).copy(alpha = .7f)
+                ) else listOf(
+                    Color.White, Color(0xFFCBBEF4), Color.White
                 )
             )
             Box(
-                Modifier.fillMaxWidth().height(94.dp)
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                Modifier.fillMaxWidth().height(100.dp)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Box(
                     Modifier.align(Alignment.BottomCenter)
-                        .fillMaxWidth().height(71.dp)
-                        .shadow(15.dp, dockShape)
-                        .clip(dockShape)
-                        .background(dockGlass)
-                        .border(
-                            1.dp,
-                            if (darkMode) dockEdge else Brush.linearGradient(
-                                listOf(Color.White, Color(0xFFD8CEFA), Color.White)
-                            ),
-                            dockShape
-                        )
+                        .fillMaxWidth().height(75.dp)
+                        .shadow(12.dp, dockShape)
+                        .clip(dockShape).background(dockGlass)
+                        .border(1.dp, dockStroke, dockShape)
                 ) {
                     Box(
                         Modifier.fillMaxWidth().height(1.dp)
                             .background(Brush.horizontalGradient(listOf(
                                 Color.Transparent,
-                                Color.White.copy(alpha = if (darkMode) .20f else .80f),
+                                Color.White.copy(alpha = if (darkMode) .40f else .85f),
                                 Color.Transparent
                             )))
                     )
                 }
                 Row(
                     Modifier.align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .height(82.dp)
-                        .padding(horizontal = 5.dp),
+                        .fillMaxWidth().height(88.dp)
+                        .padding(horizontal = 6.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
                     Tab.entries.forEach { item ->
                         val selected = tab == item && !showSettings
+                        val isCenterHome = item == Tab.HOME
                         val outlineIcon: ImageVector = when (item) {
                             Tab.ACCOUNTS -> Icons.Outlined.AccountBalanceWallet
                             Tab.TXS -> Icons.Outlined.ReceiptLong
@@ -551,96 +536,100 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                             Tab.DEBTS -> Icons.Filled.EventNote
                             Tab.GOALS -> Icons.Filled.Savings
                         }
-                        val animSpec = spring<Float>(
-                            dampingRatio = .92f,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
                         val progress by animateFloatAsState(
                             targetValue = if (selected) 1f else 0f,
-                            animationSpec = animSpec,
-                            label = "softDockProgress_${item.name}"
-                        )
-                        val lift by animateDpAsState(
-                            targetValue = if (selected) 11.dp else 0.dp,
                             animationSpec = spring(
-                                dampingRatio = .92f,
+                                dampingRatio = .88f,
                                 stiffness = Spring.StiffnessMediumLow
                             ),
-                            label = "softDockLift_${item.name}"
+                            label = "jessiDock_${item.name}"
                         )
-                        val iconScale by animateFloatAsState(
-                            targetValue = if (selected) 1.04f else 1f,
-                            animationSpec = animSpec,
-                            label = "softDockScale_${item.name}"
+                        val lift by animateDpAsState(
+                            targetValue = when {
+                                isCenterHome -> 16.dp
+                                selected -> 3.dp
+                                else -> 0.dp
+                            },
+                            animationSpec = spring(
+                                dampingRatio = .88f,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            label = "jessiDockLift_${item.name}"
                         )
-                        val restingColor = if (darkMode) Color(0xFFC4CEE4)
-                            else Color(0xFF66778B)
-                        val activeLabel = if (darkMode) Color(0xFFF1EBFF)
-                            else Color(0xFF6853A7)
-
+                        val normalTint = if (darkMode) Color(0xFFD1D5EC)
+                            else Color(0xFF63748C)
+                        val activeTint = if (darkMode) Color(0xFFD8BBFF)
+                            else Color(0xFF7556BE)
                         Column(
                             Modifier.weight(1f).fillMaxHeight()
-                                .clip(RoundedCornerShape(22.dp))
+                                .clip(RoundedCornerShape(20.dp))
                                 .clickable {
                                     tabName = item.name
                                     showSettings = false
                                 }
-                                .padding(bottom = 8.dp),
-                            verticalArrangement = Arrangement.Bottom,
-                            horizontalAlignment = Alignment.CenterHorizontally
+                                .padding(bottom = 7.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Bottom
                         ) {
                             Box(
-                                modifier = Modifier.size(47.dp),
+                                Modifier.height(53.dp).fillMaxWidth(),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Box(
-                                    Modifier.size(46.dp)
+                                    Modifier
+                                        .size(if (isCenterHome) 53.dp else 43.dp)
                                         .offset(y = -lift)
-                                        .scale(iconScale)
+                                        .scale(if (selected && isCenterHome) 1.04f else 1f)
                                         .shadow(
-                                            6.dp * progress,
-                                            CircleShape,
-                                            clip = false
+                                            if (isCenterHome) 9.dp else 0.dp,
+                                            CircleShape, clip = false
                                         )
                                         .clip(CircleShape)
-                                        .background(
-                                            Brush.linearGradient(
-                                                if (darkMode) listOf(
-                                                    Color(0xFFC18BFF).copy(alpha = progress),
-                                                    Color(0xFF6F50E8).copy(alpha = progress),
-                                                    Color(0xFF489BFF).copy(alpha = progress)
-                                                ) else listOf(
-                                                    Color(0xFF8B84D3).copy(alpha = progress),
-                                                    Color(0xFF6297C2).copy(alpha = progress)
+                                        .background(Brush.linearGradient(
+                                            when {
+                                                isCenterHome -> listOf(
+                                                    Color(0xFFBD8AFF), Color(0xFF834CEA),
+                                                    Color(0xFF4A9AF5)
                                                 )
-                                            )
-                                        )
+                                                darkMode -> listOf(
+                                                    Color(0x003A4266),
+                                                    Color(0x705D4A95).copy(alpha = progress * .4f)
+                                                )
+                                                else -> listOf(
+                                                    Color.Transparent,
+                                                    Color(0xFF9B81D6).copy(alpha = progress * .15f)
+                                                )
+                                            }
+                                        ))
                                         .border(
-                                            1.dp,
-                                            Color.White.copy(alpha = .32f * progress),
+                                            if (isCenterHome) 1.dp else 0.dp,
+                                            if (isCenterHome) Color.White.copy(alpha = .49f)
+                                            else Color.Transparent,
                                             CircleShape
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        if (selected) filledIcon else outlineIcon,
+                                        if (selected || isCenterHome) filledIcon else outlineIcon,
                                         contentDescription = item.label,
-                                        tint = androidx.compose.ui.graphics.lerp(
-                                            restingColor, Color.White, progress
-                                        ),
-                                        modifier = Modifier.size(23.dp)
+                                        tint = if (isCenterHome) Color.White
+                                            else androidx.compose.ui.graphics.lerp(
+                                                normalTint, activeTint, progress
+                                            ),
+                                        modifier = Modifier.size(
+                                            if (isCenterHome) 25.dp else 23.dp
+                                        )
                                     )
                                 }
                             }
-                            Spacer(Modifier.height(1.dp))
                             Text(
-                                item.label,
-                                maxLines = 1,
-                                fontSize = 10.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold
+                                item.label, fontSize = 10.sp, maxLines = 1,
+                                fontWeight = if (selected) FontWeight.Bold
                                     else FontWeight.Medium,
-                                color = androidx.compose.ui.graphics.lerp(
-                                    restingColor, activeLabel, progress
+                                color = if (isCenterHome) {
+                                    if (darkMode) Color(0xFFF4EDFF) else activeTint
+                                } else androidx.compose.ui.graphics.lerp(
+                                    normalTint, activeTint, progress
                                 )
                             )
                         }
@@ -1519,24 +1508,23 @@ private fun Tile(
     val tint = if (accent == Color.Unspecified) {
         if (dark) financePurple else financeAqua
     } else accent
-    val shape = RoundedCornerShape(20.dp)
-    val base = if (dark) Color(0xE7121730) else Color(0xCEF7FBFF)
+    val shape = RoundedCornerShape(18.dp)
+    val base = if (dark) Color(0xAC12182F) else Color(0xCEF7FBFF)
     val aurora = if (dark) Brush.linearGradient(listOf(
-        Color(0xE7231C47), Color(0xE2162347),
-        Color(0xE3141B36), Color(0xF0101631)
+        Color(0xC230255A), Color(0xC0142B47), Color(0xBD173244), Color(0xBC151930)
     )) else Brush.linearGradient(listOf(
         Color(0xCFF1EAFB), Color(0xD5F1FAFF), Color(0xCDECF9F6), Color(0xCFFDFBFF)
     ))
     val glow = Brush.radialGradient(listOf(
-        tint.copy(alpha = if (dark) .20f else .095f),
+        tint.copy(alpha = if (dark) .23f else .095f),
         Color.Transparent
-    ), radius = 590f)
+    ), radius = 540f)
     Surface(
         modifier = modifier, color = base, shape = shape,
         contentColor = if (dark) Color.White else MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp,
-            if (dark) tint.copy(alpha = .25f) else tint.copy(alpha = .19f)),
-        shadowElevation = if (dark) 6.dp else 2.dp
+            if (dark) tint.copy(alpha = .35f) else tint.copy(alpha = .19f)),
+        shadowElevation = if (dark) 4.dp else 2.dp
     ) {
         Column(
             Modifier.background(aurora).background(glow)
@@ -1574,12 +1562,12 @@ private fun DashboardCompactMetric(
     modifier: Modifier = Modifier
 ) {
     val dark = LocalJessiDark.current
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(13.dp)
     Column(
         modifier.clip(shape).background(Brush.linearGradient(
-            listOf(tone.copy(alpha = if (dark) .18f else .13f),
-                if (dark) Color(0xFF141B3A) else Color.White.copy(alpha = .75f))
-        )).border(1.dp, tone.copy(alpha = if (dark) .28f else .20f), shape)
+            listOf(tone.copy(alpha = if (dark) .23f else .13f),
+                if (dark) Color(0xFF18243A) else Color.White.copy(alpha = .75f))
+        )).border(1.dp, tone.copy(alpha = if (dark) .34f else .20f), shape)
             .padding(9.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
@@ -1593,41 +1581,6 @@ private fun DashboardCompactMetric(
         Text(value, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
             color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
-    }
-}
-
-@Composable
-private fun DashboardQuickLink(
-    label: String, detail: String, icon: ImageVector,
-    accent: Color, modifier: Modifier = Modifier, onClick: () -> Unit
-) {
-    val dark = LocalJessiDark.current
-    val shape = RoundedCornerShape(22.dp)
-    Column(
-        modifier.clip(shape)
-            .background(Brush.verticalGradient(
-                if (dark) listOf(
-                    accent.copy(alpha = .22f), Color(0xF0192044), Color(0xF0101733)
-                ) else listOf(
-                    accent.copy(alpha = .12f), Color.White.copy(alpha = .90f)
-                )
-            ))
-            .border(1.dp, accent.copy(alpha = if (dark) .40f else .22f), shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 5.dp, vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(5.dp)
-    ) {
-        Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(25.dp))
-        Text(
-            label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-            color = jessiReadableText(MaterialTheme.colorScheme.onSurface),
-            maxLines = 1
-        )
-        Text(
-            detail, fontSize = 10.sp, maxLines = 1,
-            color = jessiReadableText(muted), overflow = TextOverflow.Ellipsis
-        )
     }
 }
 
@@ -1653,34 +1606,29 @@ private fun Dashboard(
     // undated or fully-settled records. Do not include the total lifetime balance.
     val nextMonthDue = UpcomingDebtPlanner.nextMonth(debts, nowEpoch)
     val heroGradient = if (dark)
-        Brush.linearGradient(listOf(Color(0xF22B2065), Color(0xEF161B42), Color(0xED102D53)))
+        Brush.linearGradient(listOf(Color(0xE630235C), Color(0xDD172B4D), Color(0xDD17443F)))
     else Brush.linearGradient(listOf(Color(0xE9F3ECFB), Color(0xE6EBF7FF), Color(0xE6E8F8F2)))
-    val heroShape = RoundedCornerShape(27.dp)
-    val heroGlow = Brush.radialGradient(
-        listOf(if (dark) Color(0x884B5BFF) else Color(0x227C72F8), Color.Transparent),
-        radius = 690f
-    )
+    val heroShape = RoundedCornerShape(19.dp)
 
     // Dashboard follows the reference top-to-bottom, using real account and period data.
     Column(
-        Modifier.fillMaxWidth().clip(heroShape)
-            .background(heroGradient).background(heroGlow)
+        Modifier.fillMaxWidth().clip(heroShape).background(heroGradient)
             .border(BorderStroke(1.dp,
-                if (dark) Color(0xFF9987EC).copy(alpha = .65f)
+                if (dark) Color(0xFFB483F7).copy(alpha = .56f)
                 else Color(0xFFC7DCEC)), heroShape)
-            .padding(horizontal = 17.dp, vertical = 16.dp),
+            .padding(11.dp),
         verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(
-                color = if (dark) Color(0x662C315D) else Color(0xFFD9F5E5),
+                color = if (dark) Color(0xFF59318C) else Color(0xFFD9F5E5),
                 shape = RoundedCornerShape(13.dp)
             ) {
                 Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null,
                     modifier = Modifier.padding(8.dp).size(20.dp), tint = financeAqua)
             }
             Spacer(Modifier.width(9.dp))
-            Text("موجودی کل", modifier = Modifier.weight(1f),
+            Text("موجودی کل حساب‌ها", modifier = Modifier.weight(1f),
                 fontSize = 13.sp, fontWeight = FontWeight.Bold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
             IconButton(onClick = { onBalanceVisibilityChange(!balanceVisible) }, modifier = Modifier.size(36.dp)) {
                 Icon(if (balanceVisible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
@@ -1709,33 +1657,6 @@ private fun Dashboard(
         }
     }
 
-    // Dynamic shortcuts: no static demo financial data.
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        DashboardQuickLink(
-            label = "اهداف",
-            detail = digitsFa(goals.count { !it.archived }.toString()) + " هدف فعال",
-            icon = Icons.Outlined.TrackChanges, accent = financePurple,
-            modifier = Modifier.weight(1f),
-            onClick = { onSelectTab(Tab.GOALS) }
-        )
-        DashboardQuickLink(
-            label = "اقساط",
-            detail = digitsFa(nextMonthDue.payments.count { it.isInstallment }.toString()) + " قسط",
-            icon = Icons.Outlined.CalendarMonth, accent = financeBlue,
-            modifier = Modifier.weight(1f),
-            onClick = { onSelectTab(Tab.DEBTS) }
-        )
-        DashboardQuickLink(
-            label = "حساب‌ها",
-            detail = digitsFa(accounts.size.toString()) + " حساب",
-            icon = Icons.Outlined.AccountBalanceWallet, accent = financeAqua,
-            modifier = Modifier.weight(1f),
-            onClick = { onSelectTab(Tab.ACCOUNTS) }
-        )
-    }
     Tile(Modifier.fillMaxWidth()) {
         SpendingCategoryChart(current)
     }
@@ -2000,8 +1921,8 @@ private fun FinanceSectionHero(
     val shape = RoundedCornerShape(15.dp)
     val gradient = if (dark) Brush.linearGradient(
         listOf(
-            highlight.copy(alpha = .22f), Color(0xED201D49),
-            Color(0xEC152142), Color(0xE9111730)
+            highlight.copy(alpha = .30f), Color(0xD2302057),
+            Color(0xCF14364B), Color(0xD5111A34)
         )
     ) else Brush.linearGradient(
         listOf(
