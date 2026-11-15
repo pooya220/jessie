@@ -27,7 +27,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.animation.core.*
 import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.layout.*
@@ -475,54 +474,51 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
             }
         },
         bottomBar = {
-            // Pop Out Heart: keep the existing five destinations while lifting
-            // the active icon above a floating liquid-glass dock.
-            val glassShape = RoundedCornerShape(27.dp)
-            val heartShape = GenericShape { size, _ ->
-                val w = size.width
-                val h = size.height
-                moveTo(w * .5f, h * .23f)
-                cubicTo(w * .76f, -h * .08f, w * 1.12f, h * .29f, w * .88f, h * .62f)
-                cubicTo(w * .72f, h * .84f, w * .55f, h * .96f, w * .5f, h)
-                cubicTo(w * .45f, h * .96f, w * .28f, h * .84f, w * .12f, h * .62f)
-                cubicTo(-w * .12f, h * .29f, w * .24f, -h * .08f, w * .5f, h * .23f)
-                close()
-            }
+            // Soft pop-out dock: a calm glass capsule and a gently lifted
+            // round active icon. No pointed heart silhouette or hard edges.
+            val dockShape = RoundedCornerShape(33.dp)
             val dockGlass = Brush.linearGradient(
                 if (darkMode) listOf(
-                    Color(0xE62F365E), Color(0xE11C2342), Color(0xEA24365B)
+                    Color(0xF021294D), Color(0xEB252B4D), Color(0xF0213457)
                 ) else listOf(
-                    Color(0xF7FFFFFF), Color(0xE9E9F4FF), Color(0xF5FFFFFF)
+                    Color(0xF8FFFFFF), Color(0xF3F0F3FF), Color(0xF7FFFFFF)
                 )
             )
+            val activeGradient = Brush.linearGradient(
+                if (darkMode) listOf(Color(0xFF8460CD), Color(0xFF4E80B8))
+                else listOf(Color(0xFF8B84D3), Color(0xFF6297C2))
+            )
             Box(
-                Modifier.fillMaxWidth().height(111.dp)
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                Modifier.fillMaxWidth().height(94.dp)
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Box(
                     Modifier.align(Alignment.BottomCenter)
-                        .fillMaxWidth().height(74.dp)
-                        .shadow(13.dp, glassShape)
-                        .clip(glassShape).background(dockGlass)
+                        .fillMaxWidth().height(71.dp)
+                        .shadow(10.dp, dockShape)
+                        .clip(dockShape)
+                        .background(dockGlass)
                         .border(
-                            1.dp,
-                            if (darkMode) Color(0x7AFFFFFF) else Color.White,
-                            glassShape
+                            .8.dp,
+                            if (darkMode) Color.White.copy(alpha = .19f)
+                            else Color.White.copy(alpha = .88f),
+                            dockShape
                         )
                 ) {
                     Box(
-                        Modifier.fillMaxWidth().height(2.dp)
+                        Modifier.fillMaxWidth().height(1.dp)
                             .background(Brush.horizontalGradient(listOf(
                                 Color.Transparent,
-                                Color.White.copy(alpha = if (darkMode) .45f else .95f),
+                                Color.White.copy(alpha = if (darkMode) .20f else .80f),
                                 Color.Transparent
                             )))
                     )
                 }
                 Row(
                     Modifier.align(Alignment.BottomCenter)
-                        .fillMaxWidth().height(90.dp)
-                        .padding(horizontal = 3.dp),
+                        .fillMaxWidth()
+                        .height(82.dp)
+                        .padding(horizontal = 5.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
                     Tab.entries.forEach { item ->
@@ -541,84 +537,96 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                             Tab.DEBTS -> Icons.Filled.EventNote
                             Tab.GOALS -> Icons.Filled.Savings
                         }
-                        val accent = when (item) {
-                            Tab.ACCOUNTS -> financeAqua
-                            Tab.TXS -> financeBlue
-                            Tab.HOME -> financePurple
-                            Tab.DEBTS -> financePurple
-                            Tab.GOALS -> financeAmber
-                        }
-                        val popOffset by animateDpAsState(
-                            targetValue = if (selected) (-27).dp else 0.dp,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            ),
-                            label = "heartPop_${item.name}"
+                        val animSpec = spring<Float>(
+                            dampingRatio = .92f,
+                            stiffness = Spring.StiffnessMediumLow
                         )
-                        val popScale by animateFloatAsState(
-                            targetValue = if (selected) 1.1f else 1f,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            ),
-                            label = "heartScale_${item.name}"
+                        val progress by animateFloatAsState(
+                            targetValue = if (selected) 1f else 0f,
+                            animationSpec = animSpec,
+                            label = "softDockProgress_${item.name}"
                         )
-                        val iconShape = if (selected) heartShape else RoundedCornerShape(16.dp)
+                        val lift by animateDpAsState(
+                            targetValue = if (selected) 11.dp else 0.dp,
+                            animationSpec = spring(
+                                dampingRatio = .92f,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            label = "softDockLift_${item.name}"
+                        )
+                        val iconScale by animateFloatAsState(
+                            targetValue = if (selected) 1.04f else 1f,
+                            animationSpec = animSpec,
+                            label = "softDockScale_${item.name}"
+                        )
+                        val restingColor = if (darkMode) Color(0xFFC4CEE4)
+                            else Color(0xFF66778B)
+                        val activeLabel = if (darkMode) Color(0xFFF1EBFF)
+                            else Color(0xFF6853A7)
+
                         Column(
                             Modifier.weight(1f).fillMaxHeight()
-                                .clickable { tabName = item.name; showSettings = false }
-                                .padding(top = 1.dp, bottom = 10.dp),
+                                .clip(RoundedCornerShape(22.dp))
+                                .clickable {
+                                    tabName = item.name
+                                    showSettings = false
+                                }
+                                .padding(bottom = 8.dp),
                             verticalArrangement = Arrangement.Bottom,
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Box(
-                                Modifier.size(49.dp)
-                                    .offset(y = popOffset)
-                                    .scale(popScale)
-                                    .clip(iconShape)
-                                    .background(
-                                        if (selected) Brush.linearGradient(listOf(
-                                            accent.copy(alpha = .95f),
-                                            if (darkMode) financeBlue.copy(alpha = .92f)
-                                            else accent.copy(alpha = .79f)
-                                        ))
-                                        else Brush.linearGradient(listOf(
-                                            Color.Transparent, Color.Transparent
-                                        ))
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (selected) Color.White.copy(alpha = if (darkMode) .65f else .85f)
-                                        else Color.Transparent,
-                                        iconShape
-                                    ),
+                                modifier = Modifier.size(47.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    if (selected) filledIcon else outlineIcon,
-                                    contentDescription = item.label,
-                                    tint = if (selected) Color.White
-                                        else if (darkMode) Color(0xFFD0D8EC)
-                                        else Color(0xFF60758A),
-                                    modifier = Modifier
-                                        .offset(y = if (selected) (-3).dp else 0.dp)
-                                        .size(if (selected) 24.dp else 23.dp)
-                                )
-                            }
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                item.label, maxLines = 1, fontSize = 10.sp,
-                                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
-                                color = if (selected) accent else jessiReadableText(muted)
-                            )
-                            Spacer(Modifier.height(3.dp))
-                            Box(
-                                Modifier.width(15.dp).height(3.dp)
-                                    .background(
-                                        if (selected) accent else Color.Transparent,
-                                        RoundedCornerShape(2.dp)
+                                Box(
+                                    Modifier.size(46.dp)
+                                        .offset(y = -lift)
+                                        .scale(iconScale)
+                                        .shadow(
+                                            6.dp * progress,
+                                            CircleShape,
+                                            clip = false
+                                        )
+                                        .clip(CircleShape)
+                                        .background(
+                                            Brush.linearGradient(
+                                                if (darkMode) listOf(
+                                                    Color(0xFF8460CD).copy(alpha = progress),
+                                                    Color(0xFF4E80B8).copy(alpha = progress)
+                                                ) else listOf(
+                                                    Color(0xFF8B84D3).copy(alpha = progress),
+                                                    Color(0xFF6297C2).copy(alpha = progress)
+                                                )
+                                            )
+                                        )
+                                        .border(
+                                            1.dp,
+                                            Color.White.copy(alpha = .32f * progress),
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        if (selected) filledIcon else outlineIcon,
+                                        contentDescription = item.label,
+                                        tint = androidx.compose.ui.graphics.lerp(
+                                            restingColor, Color.White, progress
+                                        ),
+                                        modifier = Modifier.size(23.dp)
                                     )
+                                }
+                            }
+                            Spacer(Modifier.height(1.dp))
+                            Text(
+                                item.label,
+                                maxLines = 1,
+                                fontSize = 10.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold
+                                    else FontWeight.Medium,
+                                color = androidx.compose.ui.graphics.lerp(
+                                    restingColor, activeLabel, progress
+                                )
                             )
                         }
                     }
