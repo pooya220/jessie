@@ -12,8 +12,8 @@ android {
         applicationId = "ir.jessi.finance"
         minSdk = 26
         targetSdk = 35
-        versionCode = 29
-        versionName = "0.11.12"
+        versionCode = 30
+        versionName = "0.11.13"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
