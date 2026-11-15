@@ -82,8 +82,8 @@ private val lightColors = lightColorScheme(
 private val darkColors = darkColorScheme(
     primary = Color(0xFFD062FF), onPrimary = Color.White,
     secondary = Color(0xFF41DDFB), onSecondary = Color.White,
-    background = Color(0xFF070A21), onBackground = Color.White,
-    surface = Color(0xFF12152F), surfaceVariant = Color(0xFF1D2148),
+    background = Color(0xFF000000), onBackground = Color.White,
+    surface = Color(0xFF151027), surfaceVariant = Color(0xFF241935),
     onSurface = Color.White, onSurfaceVariant = Color.White,
     onPrimaryContainer = Color.White, onSecondaryContainer = Color.White,
     onTertiaryContainer = Color.White, onError = Color.White,
@@ -153,9 +153,9 @@ class MainActivity : FragmentActivity() {
                 }
             }
             SideEffect {
-                window.statusBarColor = if (darkMode) android.graphics.Color.rgb(8, 15, 38)
+                window.statusBarColor = if (darkMode) android.graphics.Color.BLACK
                     else android.graphics.Color.rgb(246, 250, 251)
-                window.navigationBarColor = if (darkMode) android.graphics.Color.rgb(8, 15, 38)
+                window.navigationBarColor = if (darkMode) android.graphics.Color.BLACK
                     else android.graphics.Color.rgb(246, 250, 251)
                 WindowCompat.getInsetsController(window, window.decorView).apply {
                     isAppearanceLightStatusBars = !darkMode
@@ -408,68 +408,78 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
         containerColor = Color.Transparent,
         contentColor = if (darkMode) Color.White else MaterialTheme.colorScheme.onSurface,
         topBar = {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // RTL: settings on the visual right, light/dark on the visual left.
+            // Title is anchored to the true center, independent of action widths.
+            Box(
+                Modifier.fillMaxWidth().height(74.dp)
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    Modifier.size(42.dp).clip(RoundedCornerShape(14.dp))
-                        .background(Brush.linearGradient(if (darkMode)
-                            listOf(Color(0xFF5A378F), Color(0xFF164A69))
-                            else listOf(Color(0xFFDCF4FC), Color(0xFFE9E3FF))))
-                        .border(1.dp, if (darkMode) Color.White.copy(alpha = .23f)
-                            else Color(0xFFCEDCF2), RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center
+                Column(
+                    Modifier.align(Alignment.Center),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(Icons.Filled.AutoAwesome, contentDescription = "نشان جسی",
-                        tint = if (darkMode) Color(0xFFBFE7FF) else Color(0xFF008F69),
-                        modifier = Modifier.size(25.dp))
-                }
-                Spacer(Modifier.width(9.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("جسی", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
-                    Text("Powerd by PR", color = jessiReadableText(muted), fontSize = 9.sp, letterSpacing = .7.sp)
-                }
-                IconButton(
-                    onClick = { showSettings = !showSettings },
-                    modifier = Modifier.size(43.dp)
-                ) {
-                    Icon(
-                        if (showSettings) Icons.Outlined.ArrowBack else Icons.Outlined.Settings,
-                        contentDescription = if (showSettings) "بازگشت به برنامه" else "تنظیمات جسی",
-                        tint = muted, modifier = Modifier.size(23.dp)
+                    Text(
+                        "جسی", fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = jessiReadableText(MaterialTheme.colorScheme.onSurface)
+                    )
+                    Text(
+                        "Powerd by PR",
+                        color = jessiReadableText(muted),
+                        fontSize = 9.sp, letterSpacing = .7.sp
                     )
                 }
-                // One accessible toggle: tap anywhere to flip between light and dark.
-                Surface(
-                    onClick = onToggleTheme,
-                    modifier = Modifier.width(80.dp).height(40.dp),
-                    color = secondary,
-                    shape = RoundedCornerShape(50.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .55f))
+                val headerButtonShape = RoundedCornerShape(16.dp)
+                val headerGlass = Brush.linearGradient(
+                    if (darkMode) listOf(
+                        Color(0xFF321A46), Color(0xFF142647), Color(0xFF3A1B42)
+                    ) else listOf(
+                        Color(0xFFF7EBFF), Color(0xFFEBF3FF), Color(0xFFFFF0F9)
+                    )
+                )
+                IconButton(
+                    onClick = { showSettings = !showSettings },
+                    modifier = Modifier.align(Alignment.CenterStart)
+                        .size(45.dp).clip(headerButtonShape)
+                        .background(headerGlass)
+                        .border(
+                            1.dp,
+                            if (darkMode) Color(0xFF9B7BCC).copy(alpha = .60f)
+                            else Color(0xFFD7BFE9),
+                            headerButtonShape
+                        )
                 ) {
-                    Box(Modifier.fillMaxSize().padding(3.dp)) {
-                        Icon(Icons.Outlined.LightMode, contentDescription = null,
-                            tint = muted, modifier = Modifier.align(Alignment.CenterStart)
-                                .padding(start = 8.dp).size(18.dp))
-                        Icon(Icons.Outlined.DarkMode, contentDescription = null,
-                            tint = muted, modifier = Modifier.align(Alignment.CenterEnd)
-                                .padding(end = 8.dp).size(18.dp))
-                        Box(
-                            Modifier.align(if (darkMode) Alignment.CenterEnd else Alignment.CenterStart)
-                                .size(34.dp).background(
-                                    if (darkMode) Color(0xFF8143E5) else Color(0xFF00A960),
-                                    CircleShape
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                if (darkMode) Icons.Outlined.DarkMode else Icons.Outlined.LightMode,
-                                contentDescription = if (darkMode) "دارک مود؛ تغییر به لایت" else "لایت مود؛ تغییر به دارک",
-                                tint = Color.White, modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
+                    Icon(
+                        if (showSettings) Icons.Outlined.ArrowBack
+                        else Icons.Outlined.Settings,
+                        contentDescription = if (showSettings)
+                            "بازگشت به برنامه" else "تنظیمات جسی",
+                        tint = if (darkMode) Color(0xFFF2E6FF) else muted,
+                        modifier = Modifier.size(23.dp)
+                    )
+                }
+                IconButton(
+                    onClick = onToggleTheme,
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                        .size(45.dp).clip(headerButtonShape)
+                        .background(headerGlass)
+                        .border(
+                            1.dp,
+                            if (darkMode) Color(0xFF8D96E8).copy(alpha = .55f)
+                            else Color(0xFFC4D4F5),
+                            headerButtonShape
+                        )
+                ) {
+                    Icon(
+                        if (darkMode) Icons.Outlined.DarkMode
+                        else Icons.Outlined.LightMode,
+                        contentDescription = if (darkMode)
+                            "تغییر به حالت روشن" else "تغییر به حالت تیره",
+                        tint = if (darkMode) Color(0xFFD1BCFF) else muted,
+                        modifier = Modifier.size(22.dp)
+                    )
                 }
             }
         },
@@ -479,16 +489,16 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
             val dockShape = RoundedCornerShape(36.dp)
             val dockGlass = Brush.linearGradient(
                 if (darkMode) listOf(
-                    Color(0xE52A355F), Color(0xEE1C2041), Color(0xE526224A)
+                    Color(0xF218203E), Color(0xF0211634), Color(0xF31C142F)
                 ) else listOf(
                     Color(0xF8FFFFFF), Color(0xEDF0F3FF), Color(0xF7FFFFFF)
                 )
             )
             val dockStroke = Brush.horizontalGradient(
                 if (darkMode) listOf(
-                    Color(0xFF99B7F0).copy(alpha = .65f),
-                    Color(0xFFB98DF1).copy(alpha = .75f),
-                    Color(0xFF87A8E3).copy(alpha = .7f)
+                    Color(0xFF669DF6).copy(alpha = .7f),
+                    Color(0xFFC782ED).copy(alpha = .8f),
+                    Color(0xFFF17FC2).copy(alpha = .75f)
                 ) else listOf(
                     Color.White, Color(0xFFCBBEF4), Color.White
                 )
@@ -521,7 +531,6 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                 ) {
                     Tab.entries.forEach { item ->
                         val selected = tab == item && !showSettings
-                        val isCenterHome = item == Tab.HOME
                         val outlineIcon: ImageVector = when (item) {
                             Tab.ACCOUNTS -> Icons.Outlined.AccountBalanceWallet
                             Tab.TXS -> Icons.Outlined.ReceiptLong
@@ -545,16 +554,20 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                             label = "jessiDock_${item.name}"
                         )
                         val lift by animateDpAsState(
-                            targetValue = when {
-                                isCenterHome -> 16.dp
-                                selected -> 3.dp
-                                else -> 0.dp
-                            },
+                            targetValue = if (selected) 16.dp else 0.dp,
                             animationSpec = spring(
                                 dampingRatio = .88f,
                                 stiffness = Spring.StiffnessMediumLow
                             ),
                             label = "jessiDockLift_${item.name}"
+                        )
+                        val bubbleSize by animateDpAsState(
+                            targetValue = if (selected) 53.dp else 43.dp,
+                            animationSpec = spring(
+                                dampingRatio = .88f,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            label = "jessiDockBubble_${item.name}"
                         )
                         val normalTint = if (darkMode) Color(0xFFD1D5EC)
                             else Color(0xFF63748C)
@@ -577,47 +590,35 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                             ) {
                                 Box(
                                     Modifier
-                                        .size(if (isCenterHome) 53.dp else 43.dp)
+                                        .size(bubbleSize)
                                         .offset(y = -lift)
-                                        .scale(if (selected && isCenterHome) 1.04f else 1f)
+                                        .scale(1f + progress * .04f)
                                         .shadow(
-                                            if (isCenterHome) 9.dp else 0.dp,
+                                            9.dp * progress,
                                             CircleShape, clip = false
                                         )
                                         .clip(CircleShape)
-                                        .background(Brush.linearGradient(
-                                            when {
-                                                isCenterHome -> listOf(
-                                                    Color(0xFFBD8AFF), Color(0xFF834CEA),
-                                                    Color(0xFF4A9AF5)
-                                                )
-                                                darkMode -> listOf(
-                                                    Color(0x003A4266),
-                                                    Color(0x705D4A95).copy(alpha = progress * .4f)
-                                                )
-                                                else -> listOf(
-                                                    Color.Transparent,
-                                                    Color(0xFF9B81D6).copy(alpha = progress * .15f)
-                                                )
-                                            }
-                                        ))
+                                        .background(Brush.linearGradient(listOf(
+                                            Color(0xFFB66CFF).copy(alpha = progress),
+                                            Color(0xFF7361EE).copy(alpha = progress),
+                                            Color(0xFF429CFD).copy(alpha = progress),
+                                            Color(0xFFF083D0).copy(alpha = progress)
+                                        )))
                                         .border(
-                                            if (isCenterHome) 1.dp else 0.dp,
-                                            if (isCenterHome) Color.White.copy(alpha = .49f)
-                                            else Color.Transparent,
+                                            1.dp * progress,
+                                            Color.White.copy(alpha = .55f * progress),
                                             CircleShape
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        if (selected || isCenterHome) filledIcon else outlineIcon,
+                                        if (selected) filledIcon else outlineIcon,
                                         contentDescription = item.label,
-                                        tint = if (isCenterHome) Color.White
-                                            else androidx.compose.ui.graphics.lerp(
-                                                normalTint, activeTint, progress
-                                            ),
+                                        tint = androidx.compose.ui.graphics.lerp(
+                                            normalTint, Color.White, progress
+                                        ),
                                         modifier = Modifier.size(
-                                            if (isCenterHome) 25.dp else 23.dp
+                                            if (selected) 25.dp else 23.dp
                                         )
                                     )
                                 }
@@ -626,9 +627,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                                 item.label, fontSize = 10.sp, maxLines = 1,
                                 fontWeight = if (selected) FontWeight.Bold
                                     else FontWeight.Medium,
-                                color = if (isCenterHome) {
-                                    if (darkMode) Color(0xFFF4EDFF) else activeTint
-                                } else androidx.compose.ui.graphics.lerp(
+                                color = androidx.compose.ui.graphics.lerp(
                                     normalTint, activeTint, progress
                                 )
                             )
@@ -1509,16 +1508,18 @@ private fun Tile(
         if (dark) financePurple else financeAqua
     } else accent
     val shape = RoundedCornerShape(18.dp)
-    val base = if (dark) Color(0xAC12182F) else Color(0xCEF7FBFF)
+    val base = if (dark) Color(0xE5110F20) else Color(0xCEF7FBFF)
     val aurora = if (dark) Brush.linearGradient(listOf(
-        Color(0xC230255A), Color(0xC0142B47), Color(0xBD173244), Color(0xBC151930)
+        Color(0xEF2A1747), Color(0xEA132B4C),
+        Color(0xEB3A1744), Color(0xF1131027)
     )) else Brush.linearGradient(listOf(
         Color(0xCFF1EAFB), Color(0xD5F1FAFF), Color(0xCDECF9F6), Color(0xCFFDFBFF)
     ))
     val glow = Brush.radialGradient(listOf(
-        tint.copy(alpha = if (dark) .23f else .095f),
+        if (dark) Color(0x543E62F4) else tint.copy(alpha = .095f),
+        if (dark) Color(0x23FF6FCA) else Color.Transparent,
         Color.Transparent
-    ), radius = 540f)
+    ), radius = 560f)
     Surface(
         modifier = modifier, color = base, shape = shape,
         contentColor = if (dark) Color.White else MaterialTheme.colorScheme.onSurface,
@@ -1565,8 +1566,8 @@ private fun DashboardCompactMetric(
     val shape = RoundedCornerShape(13.dp)
     Column(
         modifier.clip(shape).background(Brush.linearGradient(
-            listOf(tone.copy(alpha = if (dark) .23f else .13f),
-                if (dark) Color(0xFF18243A) else Color.White.copy(alpha = .75f))
+            listOf(tone.copy(alpha = if (dark) .25f else .13f),
+                if (dark) Color(0xFF201539) else Color.White.copy(alpha = .75f))
         )).border(1.dp, tone.copy(alpha = if (dark) .34f else .20f), shape)
             .padding(9.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp)
@@ -1606,7 +1607,7 @@ private fun Dashboard(
     // undated or fully-settled records. Do not include the total lifetime balance.
     val nextMonthDue = UpcomingDebtPlanner.nextMonth(debts, nowEpoch)
     val heroGradient = if (dark)
-        Brush.linearGradient(listOf(Color(0xE630235C), Color(0xDD172B4D), Color(0xDD17443F)))
+        Brush.linearGradient(listOf(Color(0xF42B174A), Color(0xEE142B53), Color(0xED461A46)))
     else Brush.linearGradient(listOf(Color(0xE9F3ECFB), Color(0xE6EBF7FF), Color(0xE6E8F8F2)))
     val heroShape = RoundedCornerShape(19.dp)
 
@@ -1921,8 +1922,8 @@ private fun FinanceSectionHero(
     val shape = RoundedCornerShape(15.dp)
     val gradient = if (dark) Brush.linearGradient(
         listOf(
-            highlight.copy(alpha = .30f), Color(0xD2302057),
-            Color(0xCF14364B), Color(0xD5111A34)
+            highlight.copy(alpha = .25f), Color(0xE32D184B),
+            Color(0xDC173356), Color(0xE536173C)
         )
     ) else Brush.linearGradient(
         listOf(
@@ -1969,7 +1970,7 @@ private fun FinanceIconTile(icon: ImageVector, tint: Color = mint) {
         Modifier.size(38.dp).clip(shape)
             .background(Brush.linearGradient(listOf(
                 tint.copy(alpha = if (dark) .29f else .17f),
-                if (dark) Color(0xFF343057) else Color(0xFFF7FAFF)
+                if (dark) Color(0xFF27234A) else Color(0xFFF7FAFF)
             )))
             .border(1.dp,
                 if (dark) Color.White.copy(alpha = .20f)

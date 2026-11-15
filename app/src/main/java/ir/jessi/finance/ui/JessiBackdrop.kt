@@ -68,7 +68,9 @@ fun JessiBackdrop(
             }
         }.getOrNull()
     }
-    val colors = palette(style, dark)
+    // Dark mode canvas stays pure #000000. Saved photo backgrounds remain
+    // user-selectable; they are never deleted or overwritten by this theme.
+    val colors = if (dark) listOf(Color.Black, Color.Black) else palette(style, dark)
     Box(modifier.background(Brush.verticalGradient(colors))) {
         if (style == "photo" && image != null) {
             Image(
@@ -76,7 +78,7 @@ fun JessiBackdrop(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
-        } else if (style != "minimal") {
+        } else if (!dark && style != "minimal") {
             Canvas(Modifier.fillMaxSize()) {
                 val span = maxOf(size.width, size.height)
                 val a = Offset(size.width * .12f, size.height * .22f)

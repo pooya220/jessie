@@ -89,7 +89,7 @@ fun SavingsGoalsScreen(
 
     val shape = RoundedCornerShape(16.dp)
     val heroGradient = if (dark) Brush.linearGradient(
-        listOf(Color(0xE630245C), Color(0xDE16334F), Color(0xDE19413D))
+        listOf(Color(0xED36194D), Color(0xE9182C53), Color(0xF13B1A43))
     ) else Brush.linearGradient(
         listOf(Color(0xE8F1ECFC), Color(0xE8EDF8FF), Color(0xE8EAF8F2))
     )
@@ -378,10 +378,10 @@ private fun GoalSurface(
     tone: Color, dark: Boolean, content: @Composable ColumnScope.() -> Unit
 ) {
     val shape = RoundedCornerShape(14.dp)
-    val base = if (dark) Color(0xAE12182F) else Color(0xC8F8FBFF)
+    val base = if (dark) Color(0xE5121125) else Color(0xC8F8FBFF)
     val gradient = if (dark) Brush.linearGradient(listOf(
         tone.copy(alpha = .28f),
-        Color(0xBE1F254D), Color(0xBE143543), Color(0xC214192E)
+        Color(0xDD311B4B), Color(0xE0172E54), Color(0xE72B1642)
     )) else Brush.linearGradient(listOf(
         tone.copy(alpha = .12f),
         Color(0xD6F4F1FC), Color(0xD6EDF9FC), Color(0xD6FAFCFF)
