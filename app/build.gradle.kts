@@ -32,7 +32,12 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("stable")
+            // A replaceable CI-only debug certificate is used when the owner's
+            // permanent key is unavailable; the Release variant is always
+            // non-debuggable, and this intermediate APK is never published.
+            signingConfig = if (!System.getenv("JESSI_SIGNING_STORE_FILE").isNullOrBlank())
+                signingConfigs.getByName("stable")
+            else signingConfigs.getByName("debug")
         }
     }
     compileOptions {
