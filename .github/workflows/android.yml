@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: jessi-official
@@ -36,6 +37,31 @@ jobs:
       - name: Compile official app and run tests
         run: |
           gradle --no-daemon :app:assembleRelease :app:testDebugUnitTest
+
+      # v0.11.14 was signed against the archived, exact Release output.
+      # Verify the original SHA-256 before applying its public APK signature.
+      # This never handles private signing material and never relaxes signature checks.
+      - name: Restore checksum-locked original 0.11.14 Release input
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)
+          if [[ "$VERSION" == "0.11.14" ]]; then
+            mkdir -p "$RUNNER_TEMP/jessi-verified-input"
+            gh run download 43760821344 \
+              --repo "$GITHUB_REPOSITORY" \
+              --name jessi-signing-input-ed7ef3a89986442de10ab0712a79afde7eb9047c \
+              --dir "$RUNNER_TEMP/jessi-verified-input"
+            test -s "$RUNNER_TEMP/jessi-verified-input/app-release.apk"
+            printf '%s  %s\n' \
+              47f2a2c4afaf14d7d65654492e958db14b7df9449a31e683583d3b5cccc2eb45 \
+              "$RUNNER_TEMP/jessi-verified-input/app-release.apk" | sha256sum --check --status
+            cp "$RUNNER_TEMP/jessi-verified-input/app-release.apk" \
+              app/build/outputs/apk/release/app-release.apk
+            echo "Restored the exact, SHA-256 pinned release input for 0.11.14." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Save APK signing input for offline permanent signer
         uses: actions/upload-artifact@v4
