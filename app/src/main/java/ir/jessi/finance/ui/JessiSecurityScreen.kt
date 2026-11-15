@@ -54,8 +54,12 @@ fun JessiLockScreen(
         Modifier.fillMaxSize().padding(horizontal = 22.dp),
         contentAlignment = Alignment.Center
     ) {
-        Surface(
+        Column(
             modifier = Modifier.fillMaxWidth().widthIn(max = 370.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(22.dp),
             color = MaterialTheme.colorScheme.surface.copy(alpha = .76f),
             border = androidx.compose.foundation.BorderStroke(
@@ -132,12 +136,13 @@ fun JessiLockScreen(
             }
         }
         Text(
-            text = "Powered by PM",
-            fontSize = 10.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .72f),
+            text = "Powerd by PR",
+            fontSize = 9.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .78f),
             letterSpacing = 1.sp,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 22.dp)
+            modifier = Modifier.padding(top = 10.dp)
         )
+        }
     }
 }
 
