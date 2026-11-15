@@ -35,13 +35,13 @@ jobs:
 
       - name: Compile official app and run tests
         run: |
-          gradle --no-daemon :app:assembleDebug :app:testDebugUnitTest
+          gradle --no-daemon :app:assembleRelease :app:testDebugUnitTest
 
       - name: Save APK signing input for offline permanent signer
         uses: actions/upload-artifact@v4
         with:
           name: jessi-signing-input-${{ github.sha }}
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 2
 
@@ -70,7 +70,7 @@ jobs:
         if: steps.signing.outputs.method == 'offline-block'
         run: |
           python3 scripts/apply_signature_block.py \
-            app/build/outputs/apk/debug/app-debug.apk \
+            app/build/outputs/apk/release/app-release.apk \
             signing/v${{ steps.signing.outputs.version }}.sigblock.b64 \
             app/build/outputs/apk/signed/Jessi.apk
 
