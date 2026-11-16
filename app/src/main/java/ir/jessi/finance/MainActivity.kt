@@ -511,7 +511,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                 )
             )
             Box(
-                Modifier.fillMaxWidth().height(100.dp)
+                Modifier.fillMaxWidth().height(112.dp)
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Box(
@@ -532,7 +532,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                 }
                 Row(
                     Modifier.align(Alignment.BottomCenter)
-                        .fillMaxWidth().height(88.dp)
+                        .fillMaxWidth().height(94.dp)
                         .padding(horizontal = 6.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
@@ -581,8 +581,10 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                         val activeTint = if (darkMode) Color(0xFFD8BBFF)
                             else Color(0xFF7556BE)
                         Column(
+                            // Do not clip the tab column: the selected bubble
+                            // must be free to float above the glass panel without
+                            // its circular rim or soft shadow being cut off.
                             Modifier.weight(1f).fillMaxHeight()
-                                .clip(RoundedCornerShape(20.dp))
                                 .clickable {
                                     tabName = item.name
                                     showSettings = false
