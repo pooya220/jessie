@@ -47,6 +47,7 @@ fun JessiBackdrop(
     photoUri: String,
     dim: Float,
     dark: Boolean,
+    darkness: Float = 0f,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -68,9 +69,10 @@ fun JessiBackdrop(
             }
         }.getOrNull()
     }
-    // Dark mode canvas stays pure #000000. Saved photo backgrounds remain
-    // user-selectable; they are never deleted or overwritten by this theme.
-    val colors = if (dark) listOf(Color.Black, Color.Black) else palette(style, dark)
+    // Restore the original aurora/selected palette; the user can fade it
+    // toward pure black independently of glass strength, without losing
+    // the chosen background style or photo.
+    val colors = palette(style, dark)
     Box(modifier.background(Brush.verticalGradient(colors))) {
         if (style == "photo" && image != null) {
             Image(
@@ -78,7 +80,7 @@ fun JessiBackdrop(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
-        } else if (!dark && style != "minimal") {
+        } else if (style != "minimal") {
             Canvas(Modifier.fillMaxSize()) {
                 val span = maxOf(size.width, size.height)
                 val a = Offset(size.width * .12f, size.height * .22f)
@@ -101,11 +103,18 @@ fun JessiBackdrop(
                 )
             }
         }
-        // Adjustable scrim retains text contrast while letting the chosen backdrop shine through.
+        // This slider is the original glass/veil intensity.
         Box(Modifier.fillMaxSize().background(
             if (dark) Color.Black.copy(alpha = dim.coerceIn(0f, .78f))
             else Color.White.copy(alpha = dim.coerceIn(0f, .78f))
         ))
+        // Separate dark-mode slider: 0% shows the old aurora, 100%
+        // makes the canvas solid black. Works with photos and presets.
+        if (dark && darkness > 0f) {
+            Box(Modifier.fillMaxSize().background(
+                Color.Black.copy(alpha = darkness.coerceIn(0f, 1f))
+            ))
+        }
     }
 }
 
@@ -115,10 +124,12 @@ fun JessiBackgroundSettings(
     photoUri: String,
     dim: Float,
     dark: Boolean,
+    darkness: Float,
     onStyleChange: (String) -> Unit,
     onChooseImage: () -> Unit,
     onClearImage: () -> Unit,
-    onDimChange: (Float) -> Unit
+    onDimChange: (Float) -> Unit,
+    onDarknessChange: (Float) -> Unit
 ) {
     val options = listOf(
         Triple("aurora", "شفق بنفش", "هاله‌های بنفش و فیروزه‌ای"),
@@ -181,6 +192,28 @@ fun JessiBackgroundSettings(
         }
         Text("شدت پوشش شیشه‌ای پس‌زمینه", fontSize = 12.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
         Slider(value = dim, onValueChange = onDimChange, valueRange = 0f..0.78f)
+        Spacer(Modifier.height(2.dp))
+        Row(
+            Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("تیرگی پس‌زمینه", fontSize = 12.sp,
+                color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
+            Text("${(darkness * 100).toInt()}٪", fontSize = 11.sp,
+                color = jessiReadableText(MaterialTheme.colorScheme.primary))
+        }
+        Slider(
+            value = darkness.coerceIn(0f, 1f),
+            onValueChange = onDarknessChange,
+            valueRange = 0f..1f,
+            enabled = dark
+        )
+        Text(
+            if (dark) "از پس‌زمینه رنگی قبلی (۰٪) تا مشکی کامل (۱۰۰٪)"
+            else "برای تنظیم تیرگی، ابتدا حالت تاریک را فعال کن.",
+            fontSize = 10.sp,
+            color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant)
+        )
         Text("تصویر انتخابی فقط در همین گوشی استفاده می‌شود و به سرور ارسال نمی‌شود.",
             color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 10.sp)
     }
