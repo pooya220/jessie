@@ -181,10 +181,12 @@ class MainActivity : FragmentActivity() {
                         val loginDim = backdropPrefs.getFloat(
                             "backdrop_dim", if (darkMode) .18f else .12f
                         )
+                        val loginDarkness = backdropPrefs.getFloat("backdrop_darkness", 0f)
                         Box(Modifier.fillMaxSize()) {
                             JessiBackdrop(
                                 style = loginStyle, photoUri = loginPhoto,
                                 dim = loginDim, dark = darkMode,
+                                darkness = loginDarkness,
                                 modifier = Modifier.fillMaxSize()
                             )
                             JessiLockScreen(
@@ -267,6 +269,11 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
     var backdropUri by remember { mutableStateOf(settings.getString("backdrop_photo_uri", "") ?: "") }
     var backdropDim by remember {
         mutableFloatStateOf(settings.getFloat("backdrop_dim", if (darkMode) .18f else .12f))
+    }
+    // Independent, persistent dark-mode background black overlay (0..100%).
+    // Existing glass strength and saved background choice are not changed.
+    var backdropDarkness by remember {
+        mutableFloatStateOf(settings.getFloat("backdrop_darkness", 0f).coerceIn(0f, 1f))
     }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -403,7 +410,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
     CompositionLocalProvider(LocalJessiBackdrop provides backdropStyle) {
     Box(Modifier.fillMaxSize()) {
         JessiBackdrop(backdropStyle, backdropUri, backdropDim, darkMode,
-            modifier = Modifier.fillMaxSize())
+            darkness = backdropDarkness, modifier = Modifier.fillMaxSize())
     Scaffold(
         containerColor = Color.Transparent,
         contentColor = if (darkMode) Color.White else MaterialTheme.colorScheme.onSurface,
@@ -766,6 +773,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                     backgroundStyle = backdropStyle,
                     backgroundPhotoUri = backdropUri,
                     backgroundDim = backdropDim,
+                    backgroundDarkness = backdropDarkness,
                     onBackgroundStyle = { value ->
                         backdropStyle = value
                         settings.edit().putString("backdrop_style", value).apply()
@@ -786,6 +794,10 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                     onBackgroundDim = { value ->
                         backdropDim = value
                         settings.edit().putFloat("backdrop_dim", value).apply()
+                    },
+                    onBackgroundDarkness = { value ->
+                        backdropDarkness = value.coerceIn(0f, 1f)
+                        settings.edit().putFloat("backdrop_darkness", backdropDarkness).apply()
                     },
                     pinSecurity = pinSecurity,
                     onSecurityChanged = onSecurityChanged,
@@ -1026,8 +1038,10 @@ private fun SettingsPage(
     onSimulateSms: (String, String) -> Unit,
     onExportBackup: () -> Unit, onImportBackup: () -> Unit, backupBusy: Boolean,
     backgroundStyle: String, backgroundPhotoUri: String, backgroundDim: Float,
+    backgroundDarkness: Float,
     onBackgroundStyle: (String) -> Unit, onPickBackground: () -> Unit,
     onClearBackground: () -> Unit, onBackgroundDim: (Float) -> Unit,
+    onBackgroundDarkness: (Float) -> Unit,
     pinSecurity: PinSecurity, onSecurityChanged: () -> Unit,
     versionName: String
 ) {
@@ -1095,10 +1109,12 @@ private fun SettingsPage(
                 JessiBackgroundSettings(
                     style = backgroundStyle, photoUri = backgroundPhotoUri,
                     dim = backgroundDim, dark = darkMode,
+                    darkness = backgroundDarkness,
                     onStyleChange = onBackgroundStyle,
                     onChooseImage = onPickBackground,
                     onClearImage = onClearBackground,
-                    onDimChange = onBackgroundDim
+                    onDimChange = onBackgroundDim,
+                    onDarknessChange = onBackgroundDarkness
                 )
             }
         }
