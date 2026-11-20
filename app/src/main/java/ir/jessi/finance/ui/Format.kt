@@ -42,6 +42,8 @@ fun accountBalance(accountId: Long, initial: Long, transactions: List<Transactio
         balance + (if (tx.kind in setOf("IN", "TRANSFER_IN", "DEBT_IN", "GOAL_IN")) tx.amountToman else -tx.amountToman)
     }
 
-val incomeCategories = listOf("درآمد", "حقوق", "هدیه", "بازگشت وجه", "سایر")
+// Snapshot state is read by Compose directly. User changes immediately appear
+// in every transaction, SMS review and budget category chooser.
+val incomeCategories: List<String> get() = FinanceCategories.income
 
-val categories = listOf("خوراک", "سوخت", "خرید", "قبوض", "تفریح", "دانشگاه", "سلامت", "حمل‌ونقل", "حقوق", "سایر")
+val categories: List<String> get() = FinanceCategories.expense
