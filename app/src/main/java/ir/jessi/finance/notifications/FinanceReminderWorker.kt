@@ -120,7 +120,7 @@ object FinanceReminderScheduler {
             val period = FinancePeriodEngine.periods(transactions, periodMode, now).first()
             for (alert in FinanceReminderRules.budgetAlerts(budgets, transactions, period)) {
                 synchronized(lock) {
-                    if (sent.getBoolean(alert.key, false)) continue
+                    if (sent.getBoolean(alert.key, false)) return@synchronized
                     val shownPercent = alert.percent.coerceAtMost(999)
                     val number = NumberFormat.getIntegerInstance(Locale.US)
                         .format(alert.spentToman)
@@ -149,7 +149,7 @@ object FinanceReminderScheduler {
             val debts = dao.getDebts()
             for (due in FinanceReminderRules.installmentsDueToday(debts, today)) {
                 synchronized(lock) {
-                    if (sent.getBoolean(due.key, false)) continue
+                    if (sent.getBoolean(due.key, false)) return@synchronized
                     val amount = NumberFormat.getIntegerInstance(Locale.US)
                         .format(due.amountToman)
                     manager.notify("jessi_due_" + due.debtId, 8812,
