@@ -53,8 +53,12 @@ object FinanceCategories {
         val values = supplied.map { it.trim() }
             .filter { it.isNotBlank() && it.length <= MAX_LABEL_LENGTH }
             .distinct().take(MAX_CATEGORIES)
-        val required = defaults(kind).filter { isProtected(kind, it) }
-        return (required + values).distinct().take(MAX_CATEGORIES)
+        // Keep the user's original ordering (especially existing defaults).
+        // If a damaged/old preference omitted a required fallback, restore it
+        // without replacing another protected category.
+        val missingRequired = defaults(kind)
+            .filter { isProtected(kind, it) && it !in values }
+        return values.take(MAX_CATEGORIES - missingRequired.size) + missingRequired
     }
 
     fun initialize(appContext: Context) {
