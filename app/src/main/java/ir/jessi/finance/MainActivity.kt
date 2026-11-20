@@ -14,6 +14,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Build
 import ir.jessi.finance.sms.SmsReviewNotifications
+import ir.jessi.finance.notifications.FinanceReminderScheduler
 import ir.jessi.finance.sms.SmsDiagnostics
 import ir.jessi.finance.sms.BankSmsParser
 import androidx.activity.ComponentActivity
@@ -137,11 +138,14 @@ class MainActivity : FragmentActivity() {
     }
 
     private val notificationReviewId = mutableLongStateOf(-1L)
+    private val reminderDestination = mutableStateOf<String?>(null)
     private val nowEpoch = mutableLongStateOf(System.currentTimeMillis())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         notificationReviewId.longValue = intent.getLongExtra(SmsReviewNotifications.EXTRA_REVIEW_ID, -1L)
+        reminderDestination.value = intent.getStringExtra(FinanceReminderScheduler.EXTRA_OPEN_TAB)
+        FinanceReminderScheduler.start(this)
         setContent {
             val themePrefs = remember { getSharedPreferences("jessi_ui_theme", MODE_PRIVATE) }
             val pinSecurity = remember { PinSecurity(this@MainActivity) }
@@ -202,6 +206,8 @@ class MainActivity : FragmentActivity() {
                         }
                     } else JessiHome(
                         openReviewId = notificationReviewId.longValue,
+                        openReminderTab = reminderDestination.value,
+                        onReminderOpened = { reminderDestination.value = null },
                         pinSecurity = pinSecurity,
                         onSecurityChanged = {
                             securityEnabled = pinSecurity.isEnabled()
@@ -224,12 +230,14 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         nowEpoch.longValue = System.currentTimeMillis()
+        FinanceReminderScheduler.checkSoon(this)
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         notificationReviewId.longValue = intent.getLongExtra(SmsReviewNotifications.EXTRA_REVIEW_ID, -1L)
+        reminderDestination.value = intent.getStringExtra(FinanceReminderScheduler.EXTRA_OPEN_TAB)
     }
 }
 
@@ -251,7 +259,8 @@ private sealed interface Editor {
 }
 
 @Composable
-private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
+private fun JessiHome(openReviewId: Long, openReminderTab: String?,
+    onReminderOpened: () -> Unit, nowEpoch: Long, darkMode: Boolean,
     onToggleTheme: () -> Unit, onReviewOpened: () -> Unit,
     pinSecurity: PinSecurity, onSecurityChanged: () -> Unit,
     vm: FinanceViewModel = viewModel()
@@ -301,6 +310,12 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
     }
     var reviewNotificationsEnabled by remember {
         mutableStateOf(settings.getBoolean("sms_review_notifications_enabled", true))
+    }
+    var budgetRemindersEnabled by remember {
+        mutableStateOf(settings.getBoolean(FinanceReminderScheduler.PREF_BUDGET_ENABLED, true))
+    }
+    var installmentRemindersEnabled by remember {
+        mutableStateOf(settings.getBoolean(FinanceReminderScheduler.PREF_INSTALLMENT_ENABLED, true))
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var diagnosticRefresh by remember { mutableIntStateOf(0) }
@@ -357,6 +372,24 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
     var tabName by rememberSaveable { mutableStateOf(Tab.HOME.name) }
     // Budget management is retained within the Accounts destination.
     var accountsShowBudgets by rememberSaveable { mutableStateOf(false) }
+    // Opening a financial reminder takes the user to the relevant existing tab.
+    // The original app PIN/biometric gate remains in effect.
+    LaunchedEffect(openReminderTab) {
+        when (openReminderTab) {
+            "ACCOUNTS" -> {
+                tabName = Tab.ACCOUNTS.name
+                accountsShowBudgets = true
+                showSettings = false
+                periodOffset = 0
+            }
+            "DEBTS" -> {
+                tabName = Tab.DEBTS.name
+                showSettings = false
+                periodOffset = 0
+            }
+        }
+        if (openReminderTab != null) onReminderOpened()
+    }
     val tab = Tab.valueOf(tabName)
     var editor by remember { mutableStateOf<Editor?>(null) }
     val ioScope = rememberCoroutineScope()
@@ -692,6 +725,30 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                         }
                     },
                     reviewNotificationsEnabled = reviewNotificationsEnabled,
+                    budgetRemindersEnabled = budgetRemindersEnabled,
+                    installmentRemindersEnabled = installmentRemindersEnabled,
+                    onBudgetRemindersChange = { value ->
+                        budgetRemindersEnabled = value
+                        settings.edit().putBoolean(
+                            FinanceReminderScheduler.PREF_BUDGET_ENABLED, value
+                        ).apply()
+                        if (value) {
+                            FinanceReminderScheduler.checkSoon(context)
+                            if (!notificationsPermitted && Build.VERSION.SDK_INT >= 33)
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    },
+                    onInstallmentRemindersChange = { value ->
+                        installmentRemindersEnabled = value
+                        settings.edit().putBoolean(
+                            FinanceReminderScheduler.PREF_INSTALLMENT_ENABLED, value
+                        ).apply()
+                        if (value) {
+                            FinanceReminderScheduler.checkSoon(context)
+                            if (!notificationsPermitted && Build.VERSION.SDK_INT >= 33)
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    },
                     onReviewNotificationsChange = { value ->
                         reviewNotificationsEnabled = value
                         settings.edit().putBoolean("sms_review_notifications_enabled", value).apply()
@@ -704,6 +761,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                         periodMode = value
                         periodOffset = 0
                         settings.edit().putString("period_mode", value).apply()
+                        FinanceReminderScheduler.checkSoon(context)
                     },
                     smsPermitted = smsPermitted,
                     notificationsPermitted = notificationsPermitted,
@@ -817,6 +875,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                         periodMode = it
                         periodOffset = 0
                         settings.edit().putString("period_mode", it).apply()
+                        FinanceReminderScheduler.checkSoon(context)
                     },
                     onPrevious = { periodOffset = (selectedIndex + 1).coerceAtMost(periods.lastIndex) },
                     onNext = { periodOffset = (selectedIndex - 1).coerceAtLeast(0) }
@@ -939,6 +998,7 @@ private fun JessiHome(openReviewId: Long, nowEpoch: Long, darkMode: Boolean,
                                 }
                                 restorePreview = null
                                 periodOffset = 0
+                                FinanceReminderScheduler.checkSoon(context)
                                 Toast.makeText(context, "بازیابی اطلاعات موفق بود", Toast.LENGTH_LONG).show()
                             } catch (e: Exception) {
                                 Toast.makeText(context, "بازیابی انجام نشد؛ اطلاعات قبلی حفظ شدند: " +
@@ -1028,6 +1088,9 @@ private fun SettingsPage(
     balanceVisible: Boolean, onBalanceVisibilityChange: (Boolean) -> Unit,
     smsMonitoringEnabled: Boolean, onSmsMonitoringChange: (Boolean) -> Unit,
     reviewNotificationsEnabled: Boolean, onReviewNotificationsChange: (Boolean) -> Unit,
+    budgetRemindersEnabled: Boolean, installmentRemindersEnabled: Boolean,
+    onBudgetRemindersChange: (Boolean) -> Unit,
+    onInstallmentRemindersChange: (Boolean) -> Unit,
     periodMode: String, onPeriodChange: (String) -> Unit,
     smsPermitted: Boolean, notificationsPermitted: Boolean,
     onSmsPermission: () -> Unit, onNotificationPermission: () -> Unit,
@@ -1078,7 +1141,7 @@ private fun SettingsPage(
             SettingsNavRow(Icons.Outlined.Lock, "قفل ورود و امنیت",
                 "اثر انگشت و پین ورود", financePurple) { section = "security" }
             SettingsNavRow(Icons.Outlined.Sms, "پیامک و اعلان‌ها",
-                "مجوزها و تنظیمات بررسی پیامک", financeBlue) { section = "sms" }
+                "اعلان پیامک، هشدار بودجه و سررسید اقساط", financeBlue) { section = "sms" }
             SettingsNavRow(Icons.Outlined.BugReport, "آزمایش و عیب‌یابی",
                 "اعلان آزمایشی و تست متن پیامک", financePurple) { section = "diagnostics" }
             SettingsNavRow(Icons.Outlined.SaveAlt, "پشتیبان‌گیری",
@@ -1122,6 +1185,29 @@ private fun SettingsPage(
         }
 
         if (section == "sms") {
+        Tile(Modifier.fillMaxWidth(), accent = financePurple) {
+            SettingsGroupTitle(Icons.Outlined.NotificationsActive,
+                "هشدارهای مالی", accent = financePurple)
+            SettingsToggle(
+                icon = Icons.Outlined.Savings,
+                title = "هشدار ۹۰٪ بودجه",
+                description = "برای هر دسته‌بندی، یک‌بار در هر دوره مالی",
+                checked = budgetRemindersEnabled, onChange = onBudgetRemindersChange
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .35f))
+            SettingsToggle(
+                icon = Icons.Outlined.CalendarMonth,
+                title = "یادآوری سررسید اقساط",
+                description = "در روز سررسید هر قسط پرداخت‌نشده",
+                checked = installmentRemindersEnabled,
+                onChange = onInstallmentRemindersChange
+            )
+            Text(
+                "جسی در پس‌زمینه بررسی می‌کند؛ ممکن است به‌خاطر مدیریت باتری اندروید، " +
+                    "اعلان سررسید با کمی تأخیر برسد.",
+                fontSize = 10.sp, color = jessiReadableText(muted)
+            )
+        }
         Tile(Modifier.fillMaxWidth(), accent = financeBlue) {
             SettingsGroupTitle(Icons.Outlined.Sms, "پیامک بانکی و اعلان‌ها", accent = financeBlue)
             SettingsToggle(
