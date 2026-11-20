@@ -13,7 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.LockOutline
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -128,7 +128,7 @@ fun FinanceCategorySettings(
                 )
                 if (system) {
                     Icon(
-                        Icons.Outlined.LockOutline,
+                        Icons.Outlined.Lock,
                         contentDescription = "دسته سیستمی، برای حفظ محاسبات ثابت است",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(19.dp).padding(top = 2.dp)
