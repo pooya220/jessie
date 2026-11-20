@@ -12,8 +12,8 @@ android {
         applicationId = "ir.jessi.finance"
         minSdk = 26
         targetSdk = 35
-        versionCode = 33
-        versionName = "0.11.16"
+        versionCode = 34
+        versionName = "0.11.17"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -67,6 +67,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.room:room-runtime:2.7.2")
     implementation("androidx.room:room-ktx:2.7.2")
+    // Persistent local checks after app closes/reboots; no exact-alarm privilege.
+    implementation("androidx.work:work-runtime-ktx:2.10.2")
     kapt("androidx.room:room-compiler:2.7.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
