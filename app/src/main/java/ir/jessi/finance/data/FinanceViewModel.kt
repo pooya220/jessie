@@ -91,6 +91,10 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 if (kind == FinanceCategories.EXPENSE)
                     dao.renameBudgetCategory(old, new)
             }
+        }
+        // A background scheduler issue must never be mistaken for failure of
+        // the already-committed financial record rename.
+        if (outcome.isSuccess) runCatching {
             FinanceReminderScheduler.checkSoon(getApplication())
         }
         withContext(Dispatchers.Main) {
