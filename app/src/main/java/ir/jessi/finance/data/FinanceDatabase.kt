@@ -186,6 +186,10 @@ interface FinanceDao {
     @Query("DELETE FROM debts WHERE id=:id") suspend fun deleteDebt(id: Long)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertBudget(row: Budget): Long
     @Update suspend fun updateBudget(row: Budget)
+    @Query("UPDATE transactions SET category=:to WHERE category=:from AND kind=:kind")
+    suspend fun renameTransactionCategory(kind: String, from: String, to: String)
+    @Query("UPDATE budgets SET category=:to WHERE category=:from")
+    suspend fun renameBudgetCategory(from: String, to: String)
     @Query("DELETE FROM budgets WHERE id=:id") suspend fun deleteBudget(id: Long)
     @androidx.room.Transaction suspend fun applyDebtPayment(row: Debt, amount: Long, accountId: Long) {
         require(amount > 0 && amount <= row.totalToman - row.paidToman)

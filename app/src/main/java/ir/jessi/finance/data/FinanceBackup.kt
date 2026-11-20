@@ -3,6 +3,7 @@ package ir.jessi.finance.data
 import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
+import ir.jessi.finance.ui.FinanceCategories
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -13,7 +14,7 @@ import java.nio.charset.StandardCharsets
  */
 object FinanceBackup {
     private const val FORMAT = "jessi-finance-backup"
-    private const val SCHEMA = 2
+    private const val SCHEMA = 3
     private const val MAX_SIZE = 25 * 1024 * 1024
     private const val MAX_ROWS = 100_000
 
@@ -25,7 +26,9 @@ object FinanceBackup {
         val reviews: List<SmsReview>,
         val ignored: List<IgnoredSms>,
         val goals: List<SavingsGoal> = emptyList(),
-        val movements: List<GoalMovement> = emptyList()
+        val movements: List<GoalMovement> = emptyList(),
+        val expenseCategories: List<String>? = null,
+        val incomeCategories: List<String>? = null
     ) {
         fun summary(): String = "حساب‌ها: ${accounts.size} • تراکنش‌ها: ${transactions.size}" +
             "\nبدهی‌ها و اقساط: ${debts.size} • بودجه‌ها: ${budgets.size}" +
@@ -99,10 +102,19 @@ object FinanceBackup {
             put("smsIgnored", snapshot.ignored.jsonArray { it.json() })
             put("goals", snapshot.goals.jsonArray { it.json() })
             put("goalMovements", snapshot.movements.jsonArray { it.json() })
+            put("expenseCategories", JSONArray(snapshot.expenseCategories
+                ?: FinanceCategories.expenseDefaults))
+            put("incomeCategories", JSONArray(snapshot.incomeCategories
+                ?: FinanceCategories.incomeDefaults))
         }
         val bytes = root.toString(2).toByteArray(StandardCharsets.UTF_8)
         require(bytes.size <= MAX_SIZE) { "حجم فایل پشتیبان بیشتر از حد مجاز است" }
         return bytes
+    }
+
+    private fun JSONArray.labels(): List<String> {
+        require(length() <= 80) { "تعداد دسته‌بندی‌ها نامعتبر است" }
+        return List(length()) { index -> getString(index) }
     }
 
     private fun decode(input: ByteArray): Snapshot {
@@ -161,7 +173,11 @@ object FinanceBackup {
                         operation = it.getString("operation"),
                         createdAt = it.getLong("createdAt")
                     )
-                }
+                },
+            expenseCategories = if (schema < 3) null
+                else root.getJSONArray("expenseCategories").labels(),
+            incomeCategories = if (schema < 3) null
+                else root.getJSONArray("incomeCategories").labels()
         )
         validate(snapshot)
         return snapshot
@@ -169,6 +185,12 @@ object FinanceBackup {
 
     private fun validate(data: Snapshot) {
         fun <T> unique(values: List<T>) = values.size == values.toSet().size
+        for (labels in listOfNotNull(data.expenseCategories, data.incomeCategories)) {
+            require(labels.size in 1..80 &&
+                unique(labels) &&
+                labels.all { it.isNotBlank() && it.length <= 36 && it == it.trim() }
+            ) { "دسته‌بندی‌های پشتیبان معتبر نیستند" }
+        }
         val accountIds = data.accounts.map { it.id }
         require(unique(accountIds) && accountIds.all { it > 0L }) { "شناسه حساب‌های فایل نامعتبر است" }
         require(data.accounts.all { it.title.isNotBlank() && it.openingToman in 0..100_000_000_000_000L }) {
@@ -251,7 +273,9 @@ object FinanceBackup {
             Snapshot(
                 dao.getAccounts(), dao.getTransactions(), dao.getDebts(),
                 dao.getBudgets(), dao.getSmsReviews(), dao.getIgnoredSms(),
-                dao.getGoals(), dao.getGoalMovements()
+                dao.getGoals(), dao.getGoalMovements(),
+                expenseCategories = FinanceCategories.readSaved(context, FinanceCategories.EXPENSE),
+                incomeCategories = FinanceCategories.readSaved(context, FinanceCategories.INCOME)
             )
         }
     }
@@ -305,5 +329,11 @@ object FinanceBackup {
             dao.restoreGoals(snapshot.goals)
             dao.restoreGoalMovements(snapshot.movements)
         }
+        // Previous (v1/v2) backups have no catalog; keep the user's current
+        // choices when importing them. The financial database is already
+        // committed, so no financial data is lost if preferences differ.
+        FinanceCategories.restore(
+            context, snapshot.expenseCategories, snapshot.incomeCategories
+        )
     }
 }

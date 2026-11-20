@@ -143,6 +143,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Restore editable category choices before the first Compose frame.
+        FinanceCategories.initialize(this)
         notificationReviewId.longValue = intent.getLongExtra(SmsReviewNotifications.EXTRA_REVIEW_ID, -1L)
         reminderDestination.value = intent.getStringExtra(FinanceReminderScheduler.EXTRA_OPEN_TAB)
         FinanceReminderScheduler.start(this)
@@ -725,6 +727,14 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                         }
                     },
                     reviewNotificationsEnabled = reviewNotificationsEnabled,
+                    onRenameCategory = { kind, old, name, callback ->
+                        vm.renameCategory(kind, old, name) { ok, problem ->
+                            if (ok) {
+                                val saved = FinanceCategories.rename(kind, old, name)
+                                callback(saved == null, saved)
+                            } else callback(false, problem)
+                        }
+                    },
                     budgetRemindersEnabled = budgetRemindersEnabled,
                     installmentRemindersEnabled = installmentRemindersEnabled,
                     onBudgetRemindersChange = { value ->
@@ -1088,6 +1098,8 @@ private fun SettingsPage(
     balanceVisible: Boolean, onBalanceVisibilityChange: (Boolean) -> Unit,
     smsMonitoringEnabled: Boolean, onSmsMonitoringChange: (Boolean) -> Unit,
     reviewNotificationsEnabled: Boolean, onReviewNotificationsChange: (Boolean) -> Unit,
+    onRenameCategory: (kind: String, old: String, name: String,
+        callback: (Boolean, String?) -> Unit) -> Unit,
     budgetRemindersEnabled: Boolean, installmentRemindersEnabled: Boolean,
     onBudgetRemindersChange: (Boolean) -> Unit,
     onInstallmentRemindersChange: (Boolean) -> Unit,
@@ -1113,6 +1125,7 @@ private fun SettingsPage(
     var section by remember { mutableStateOf("home") }
     val titles = mapOf(
         "appearance" to "ظاهر و پس‌زمینه",
+        "categories" to "دسته‌بندی‌های درآمد و هزینه",
         "security" to "قفل ورود و امنیت",
         "sms" to "پیامک و اعلان‌ها",
         "diagnostics" to "آزمایش و عیب‌یابی",
@@ -1138,6 +1151,10 @@ private fun SettingsPage(
         if (section == "home") {
             SettingsNavRow(Icons.Outlined.Palette, "ظاهر و پس‌زمینه",
                 "تم، تصویر دلخواه، شدت هاله شیشه‌ای", financeAqua) { section = "appearance" }
+            SettingsNavRow(Icons.Outlined.Category, "دسته‌بندی‌های درآمد و هزینه",
+                "افزودن، تغییر نام یا حذف دسته‌ها", financePurple) {
+                section = "categories"
+            }
             SettingsNavRow(Icons.Outlined.Lock, "قفل ورود و امنیت",
                 "اثر انگشت و پین ورود", financePurple) { section = "security" }
             SettingsNavRow(Icons.Outlined.Sms, "پیامک و اعلان‌ها",
@@ -1151,6 +1168,12 @@ private fun SettingsPage(
             SettingsNavRow(Icons.Outlined.Info, "درباره جسی",
                 "نسخه و اطلاعات نگهداری داده", financeBlue) { section = "about" }
         }
+        if (section == "categories") {
+            Tile(Modifier.fillMaxWidth(), accent = financePurple) {
+                FinanceCategorySettings(onRename = onRenameCategory)
+            }
+        }
+
         if (section == "appearance") {
         Tile(Modifier.fillMaxWidth(), accent = financeAqua) {
             SettingsGroupTitle(Icons.Outlined.Palette, "ظاهر و حریم خصوصی", accent = financeAqua)
@@ -2611,7 +2634,10 @@ private fun TransactionDialog(
         if (transfer) onTransfer(accountId!!, targetAccountId!!, amount!!, note)
         else onSave(Transaction(
             id = initial?.id ?: 0, accountId = accountId!!, amountToman = amount!!,
-            kind = type, category = if (type == "IN" && category !in incomeCategories) "درآمد" else category,
+            kind = type, category = if (
+                type == "IN" && category !in incomeCategories &&
+                category != initial?.category
+            ) "درآمد" else category,
             note = note, createdAt = initial?.createdAt ?: System.currentTimeMillis(),
             source = initial?.source ?: "MANUAL", groupId = initial?.groupId,
             dedupKey = initial?.dedupKey
