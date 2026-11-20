@@ -2,6 +2,8 @@ package ir.jessi.finance.data
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.room.withTransaction
+import ir.jessi.finance.ui.FinanceCategories
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
@@ -14,7 +16,8 @@ import java.util.UUID
 import kotlinx.coroutines.withContext
 
 class FinanceViewModel(application: Application) : AndroidViewModel(application) {
-    private val dao = FinanceDatabase.get(application).dao()
+    private val database = FinanceDatabase.get(application)
+    private val dao = database.dao()
     val accounts = dao.watchAccounts().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val transactions = dao.watchTransactions().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val debts = dao.watchDebts().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -62,6 +65,37 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
     fun deleteBudget(id: Long) = viewModelScope.launch(Dispatchers.IO) {
         dao.deleteBudget(id)
+    }
+
+    /**
+     * Rename historical transactions and related budget labels in one
+     * transaction so charts, budget alerts and existing totals stay connected.
+     * No amounts or transaction dates are modified.
+     */
+    fun renameCategory(
+        kind: String, old: String, new: String,
+        onComplete: (Boolean, String?) -> Unit
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        val outcome = runCatching {
+            require(kind == FinanceCategories.INCOME || kind == FinanceCategories.EXPENSE)
+            require(old.isNotBlank() && new.isNotBlank() && old != new)
+            database.withTransaction {
+                if (kind == FinanceCategories.EXPENSE) {
+                    val budgets = dao.getBudgets()
+                    if (budgets.any { it.category == old } &&
+                        budgets.any { it.category == new }) {
+                        error("برای نام جدید از قبل سقف بودجه ثبت شده است؛ اول آن را ویرایش کن")
+                    }
+                }
+                dao.renameTransactionCategory(kind, old, new)
+                if (kind == FinanceCategories.EXPENSE)
+                    dao.renameBudgetCategory(old, new)
+            }
+            FinanceReminderScheduler.checkSoon(getApplication())
+        }
+        withContext(Dispatchers.Main) {
+            onComplete(outcome.isSuccess, outcome.exceptionOrNull()?.message)
+        }
     }
     fun saveGoal(row: SavingsGoal, onComplete: (Boolean) -> Unit) =
         viewModelScope.launch(Dispatchers.IO) {
