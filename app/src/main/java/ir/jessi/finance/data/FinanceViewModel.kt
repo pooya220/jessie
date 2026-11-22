@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ir.jessi.finance.sms.SmsReviewNotifications
 import ir.jessi.finance.notifications.FinanceReminderScheduler
+import ir.jessi.finance.widgets.JessiWidgetUpdater
 import ir.jessi.finance.sms.BankSmsParser
 import java.util.UUID
 import kotlinx.coroutines.withContext
@@ -30,41 +31,55 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     fun saveAccount(row: Account) = viewModelScope.launch(Dispatchers.IO) {
         if (row.id == 0L) dao.insertAccount(row) else dao.updateAccount(row)
+        JessiWidgetUpdater.request(getApplication())
     }
-    fun deleteAccount(id: Long) = viewModelScope.launch(Dispatchers.IO) { dao.deleteUnusedAccount(id) }
+    fun deleteAccount(id: Long) = viewModelScope.launch(Dispatchers.IO) {
+        dao.deleteUnusedAccount(id)
+        JessiWidgetUpdater.request(getApplication())
+    }
     fun saveTransaction(row: Transaction) = viewModelScope.launch(Dispatchers.IO) {
         if (row.id == 0L) dao.insertTransaction(row) else dao.updateTransaction(row)
         FinanceReminderScheduler.checkSoon(getApplication())
+        JessiWidgetUpdater.request(getApplication())
     }
     fun transfer(from: Long, to: Long, amount: Long, note: String) = viewModelScope.launch(Dispatchers.IO) {
-        if (from != to && amount > 0L) dao.transfer(from, to, amount, note)
+        if (from != to && amount > 0L) {
+            dao.transfer(from, to, amount, note)
+            JessiWidgetUpdater.request(getApplication())
+        }
     }
     fun deleteTransaction(row: Transaction) = viewModelScope.launch(Dispatchers.IO) {
         if (row.groupId != null) dao.deleteTransactionGroup(row.groupId)
         else dao.deleteTransaction(row.id)
         FinanceReminderScheduler.checkSoon(getApplication())
+        JessiWidgetUpdater.request(getApplication())
     }
     fun saveDebt(row: Debt) = viewModelScope.launch(Dispatchers.IO) {
         if (row.id == 0L) dao.insertDebt(row) else dao.updateDebt(row)
         FinanceReminderScheduler.checkSoon(getApplication())
+        JessiWidgetUpdater.request(getApplication())
     }
     fun deleteDebt(id: Long) = viewModelScope.launch(Dispatchers.IO) {
         dao.deleteDebt(id)
         FinanceReminderScheduler.cancelDebt(getApplication(), id)
         FinanceReminderScheduler.checkSoon(getApplication())
+        JessiWidgetUpdater.request(getApplication())
     }
     fun settleDebt(row: Debt, amount: Long, accountId: Long) = viewModelScope.launch(Dispatchers.IO) {
         if (amount <= 0 || amount > row.totalToman - row.paidToman) return@launch
         dao.applyDebtPayment(row, amount, accountId)
         FinanceReminderScheduler.cancelDebt(getApplication(), row.id)
         FinanceReminderScheduler.checkSoon(getApplication())
+        JessiWidgetUpdater.request(getApplication())
     }
     fun saveBudget(row: Budget) = viewModelScope.launch(Dispatchers.IO) {
         if (row.id == 0L) dao.insertBudget(row) else dao.updateBudget(row)
         FinanceReminderScheduler.checkSoon(getApplication())
+        JessiWidgetUpdater.request(getApplication())
     }
     fun deleteBudget(id: Long) = viewModelScope.launch(Dispatchers.IO) {
         dao.deleteBudget(id)
+        JessiWidgetUpdater.request(getApplication())
     }
 
     /**
@@ -96,6 +111,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         // the already-committed financial record rename.
         if (outcome.isSuccess) runCatching {
             FinanceReminderScheduler.checkSoon(getApplication())
+            JessiWidgetUpdater.request(getApplication())
         }
         withContext(Dispatchers.Main) {
             onComplete(outcome.isSuccess, outcome.exceptionOrNull()?.message)
@@ -120,6 +136,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     ) = viewModelScope.launch(Dispatchers.IO) {
         val ok = try { dao.moveGoalMoney(goalId, accountId, amountToman, operation) }
             catch (_: Exception) { false }
+        if (ok) JessiWidgetUpdater.request(getApplication())
         withContext(Dispatchers.Main) { onComplete(ok) }
     }
 
@@ -147,6 +164,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         if (saved) {
             SmsReviewNotifications.cancel(getApplication(), row.id)
             FinanceReminderScheduler.checkSoon(getApplication())
+            JessiWidgetUpdater.request(getApplication())
         }
         withContext(Dispatchers.Main) { onResult(saved) }
     }

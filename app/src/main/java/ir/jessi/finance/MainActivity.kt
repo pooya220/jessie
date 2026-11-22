@@ -15,6 +15,7 @@ import android.os.Bundle
 import android.os.Build
 import ir.jessi.finance.sms.SmsReviewNotifications
 import ir.jessi.finance.notifications.FinanceReminderScheduler
+import ir.jessi.finance.widgets.JessiWidgetUpdater
 import ir.jessi.finance.sms.SmsDiagnostics
 import ir.jessi.finance.sms.BankSmsParser
 import androidx.activity.ComponentActivity
@@ -148,6 +149,7 @@ class MainActivity : FragmentActivity() {
         notificationReviewId.longValue = intent.getLongExtra(SmsReviewNotifications.EXTRA_REVIEW_ID, -1L)
         reminderDestination.value = intent.getStringExtra(FinanceReminderScheduler.EXTRA_OPEN_TAB)
         FinanceReminderScheduler.start(this)
+        JessiWidgetUpdater.request(this)
         setContent {
             val themePrefs = remember { getSharedPreferences("jessi_ui_theme", MODE_PRIVATE) }
             val pinSecurity = remember { PinSecurity(this@MainActivity) }
@@ -233,6 +235,7 @@ class MainActivity : FragmentActivity() {
         super.onResume()
         nowEpoch.longValue = System.currentTimeMillis()
         FinanceReminderScheduler.checkSoon(this)
+        JessiWidgetUpdater.request(this)
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -306,6 +309,11 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
     var periodOffset by rememberSaveable { mutableIntStateOf(0) }
     var balanceVisible by remember {
         mutableStateOf(settings.getBoolean("show_balance", true))
+    }
+    // Launcher tiles are outside Jessie's biometric gate. Amounts are
+    // hidden until the owner explicitly opts into widget visibility.
+    var widgetBalanceVisible by remember {
+        mutableStateOf(settings.getBoolean(JessiWidgetUpdater.BALANCE_VISIBLE_KEY, false))
     }
     var smsMonitoringEnabled by remember {
         mutableStateOf(settings.getBoolean("sms_monitoring_enabled", true))
@@ -381,6 +389,17 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
             "ACCOUNTS" -> {
                 tabName = Tab.ACCOUNTS.name
                 accountsShowBudgets = true
+                showSettings = false
+                periodOffset = 0
+            }
+            "BANK_ACCOUNTS" -> {
+                tabName = Tab.ACCOUNTS.name
+                accountsShowBudgets = false
+                showSettings = false
+                periodOffset = 0
+            }
+            "TXS" -> {
+                tabName = Tab.TXS.name
                 showSettings = false
                 periodOffset = 0
             }
@@ -714,6 +733,14 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                     darkMode = darkMode,
                     onToggleTheme = onToggleTheme,
                     balanceVisible = balanceVisible,
+                    widgetBalanceVisible = widgetBalanceVisible,
+                    onWidgetBalanceVisibilityChange = { value ->
+                        widgetBalanceVisible = value
+                        settings.edit().putBoolean(
+                            JessiWidgetUpdater.BALANCE_VISIBLE_KEY, value
+                        ).apply()
+                        JessiWidgetUpdater.request(context)
+                    },
                     onBalanceVisibilityChange = { value ->
                         balanceVisible = value
                         settings.edit().putBoolean("show_balance", value).apply()
@@ -1009,6 +1036,7 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                                 restorePreview = null
                                 periodOffset = 0
                                 FinanceReminderScheduler.checkSoon(context)
+                                JessiWidgetUpdater.request(context)
                                 Toast.makeText(context, "بازیابی اطلاعات موفق بود", Toast.LENGTH_LONG).show()
                             } catch (e: Exception) {
                                 Toast.makeText(context, "بازیابی انجام نشد؛ اطلاعات قبلی حفظ شدند: " +
@@ -1096,6 +1124,8 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
 private fun SettingsPage(
     darkMode: Boolean, onToggleTheme: () -> Unit,
     balanceVisible: Boolean, onBalanceVisibilityChange: (Boolean) -> Unit,
+    widgetBalanceVisible: Boolean,
+    onWidgetBalanceVisibilityChange: (Boolean) -> Unit,
     smsMonitoringEnabled: Boolean, onSmsMonitoringChange: (Boolean) -> Unit,
     reviewNotificationsEnabled: Boolean, onReviewNotificationsChange: (Boolean) -> Unit,
     onRenameCategory: (kind: String, old: String, name: String,
@@ -1190,6 +1220,19 @@ private fun SettingsPage(
                 title = "نمایش موجودی در داشبورد",
                 description = "موجودی کل، درآمد و هزینه را پنهان یا نمایش بده",
                 checked = balanceVisible, onChange = onBalanceVisibilityChange
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .35f))
+            SettingsToggle(
+                icon = Icons.Outlined.AccountBalanceWallet,
+                title = "نمایش موجودی روی ویجت",
+                description = "مبالغ روی صفحه اصلی گوشی، حتی بیرون از قفل جسی، دیده می‌شوند",
+                checked = widgetBalanceVisible,
+                onChange = onWidgetBalanceVisibilityChange
+            )
+            Text(
+                "برای افزودن ویجت: روی فضای خالی هوم‌اسکرین نگه دار، " +
+                    "Widgets را انتخاب کن و ویجت دلخواه جسی را اضافه کن.",
+                fontSize = 10.sp, color = jessiReadableText(muted)
             )
         }
 
