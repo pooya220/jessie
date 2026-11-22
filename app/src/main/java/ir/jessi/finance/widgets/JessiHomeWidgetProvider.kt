@@ -156,13 +156,13 @@ object JessiWidgetUpdater {
                 }
             )
             val tab = when (type) {
-                HomeWidgetKind.BALANCE, HomeWidgetKind.BUDGETS -> "ACCOUNTS"
+                HomeWidgetKind.BALANCE -> "BANK_ACCOUNTS"
+                HomeWidgetKind.BUDGETS -> "ACCOUNTS"
                 HomeWidgetKind.EXPENSES -> "TXS"
             }
             val open = Intent(app, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra(FinanceReminderScheduler.EXTRA_OPEN_TAB, tab)
-                putExtra("jessi_open_budgets", type == HomeWidgetKind.BUDGETS)
             }
             val pending = PendingIntent.getActivity(
                 app, id, open,
