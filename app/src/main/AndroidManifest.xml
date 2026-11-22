@@ -29,5 +29,24 @@
                 <action android:name="android.provider.Telephony.SMS_RECEIVED"/>
             </intent-filter>
         </receiver>
+        <!-- Native resizable widgets; financial data never leaves the device. -->
+        <receiver android:name=".widgets.JessiBalanceWidget"
+            android:exported="true" android:label="@string/jessi_widget_balance">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/jessi_widget_balance"/>
+        </receiver>
+        <receiver android:name=".widgets.JessiBudgetsWidget"
+            android:exported="true" android:label="@string/jessi_widget_budgets">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/jessi_widget_budgets"/>
+        </receiver>
+        <receiver android:name=".widgets.JessiExpensesWidget"
+            android:exported="true" android:label="@string/jessi_widget_expenses">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/jessi_widget_expenses"/>
+        </receiver>
     </application>
 </manifest>
