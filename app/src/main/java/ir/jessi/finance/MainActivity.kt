@@ -348,6 +348,7 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var diagnosticRefresh by remember { mutableIntStateOf(0) }
+    var dueReminderDiagnostic by remember { mutableStateOf("") }
     val currentDiagnostic = remember(nowEpoch, showSettings, diagnosticRefresh) {
         SmsDiagnostics.summary(context)
     }
@@ -834,6 +835,22 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                     diagnosticSummary = currentDiagnostic,
                     notificationBlocker = notificationBlocker,
                     pendingReviews = reviews.size,
+                    dueReminderDiagnostic = dueReminderDiagnostic,
+                    onTestDueReminder = {
+                        ioScope.launch {
+                            val report = withContext(Dispatchers.IO) {
+                                FinanceReminderScheduler.testInstallmentNotification(context) +
+                                    "\n" + FinanceReminderScheduler.dueDiagnostics(context)
+                            }
+                            dueReminderDiagnostic = report
+                            diagnosticRefresh++
+                            Toast.makeText(
+                                context,
+                                report.substringBefore('\n'),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    },
                     onTestNotification = {
                         val posted = SmsReviewNotifications.showTest(context)
                         diagnosticRefresh++
@@ -1158,6 +1175,8 @@ private fun SettingsPage(
     onSystemSettings: () -> Unit,
     diagnosticSummary: String, notificationBlocker: String?, pendingReviews: Int,
     onTestNotification: () -> Unit,
+    dueReminderDiagnostic: String,
+    onTestDueReminder: () -> Unit,
     onResendPending: () -> Unit,
     onNotificationSettings: () -> Unit,
     onRefreshDiagnostics: () -> Unit,
@@ -1286,6 +1305,27 @@ private fun SettingsPage(
                 description = "در روز سررسید هر قسط پرداخت‌نشده",
                 checked = installmentRemindersEnabled,
                 onChange = onInstallmentRemindersChange
+            )
+            OutlinedButton(
+                onClick = onTestDueReminder,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Outlined.NotificationsActive,
+                    contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(7.dp))
+                Text("تست و بررسی یادآور اقساط")
+            }
+            if (dueReminderDiagnostic.isNotBlank()) {
+                Text(
+                    dueReminderDiagnostic,
+                    fontSize = 11.sp,
+                    color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant)
+                )
+            }
+            Text(
+                "اگر اندروید بررسی پس‌زمینه را عقب بیندازد، جسی سررسیدهای " +
+                    "پرداخت‌نشده تا ۳ روز قبل را هم یک‌بار یادآوری می‌کند.",
+                fontSize = 10.sp, color = jessiReadableText(muted)
             )
             Text(
                 "جسی در پس‌زمینه بررسی می‌کند؛ ممکن است به‌خاطر مدیریت باتری اندروید، " +
