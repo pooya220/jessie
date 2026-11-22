@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="jessi_widget_balance">جسی • موجودی حساب‌ها</string>
+    <string name="jessi_widget_budgets">جسی • پیشرفت بودجه‌ها</string>
+    <string name="jessi_widget_expenses">جسی • نمودار هزینه‌ها</string>
+    <string name="jessi_widget_description">ویجت مالی جسی؛ برای بازکردن برنامه لمس کن</string>
+    <string name="jessi_widget_balance_desc">نمایش موجودی حساب‌ها در اندازه کوچک و بزرگ</string>
+    <string name="jessi_widget_budgets_desc">نمایش پیشرفت دسته‌های بودجه و درصد مصرف‌شده</string>
+    <string name="jessi_widget_expenses_desc">نمودار حلقه‌ای و سهم دسته‌های هزینه در دوره مالی</string>
+</resources>
