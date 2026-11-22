@@ -55,10 +55,24 @@ object FinanceReminderRules {
         )
     }
 
-    /** One alert for each unpaid installment whose SHAMSI date is today. */
-    fun installmentsDueToday(
-        debts: List<Debt>, today: Jalali.Date
+    /** Preserve the original today's rule for existing callers and unit tests. */
+    fun installmentsDueToday(debts: List<Debt>, today: Jalali.Date): List<InstallmentAlert> =
+        installmentsDueWithGrace(debts, today, 0)
+
+    /**
+     * WorkManager may be deferred by Android Doze/battery optimizations.
+     * Include dates from the last few calendar days so an unpaid installment
+     * is not silently lost when the worker misses midnight or its due day.
+     * Sent IDs still prevent duplicated reminders for the same installment.
+     */
+    fun installmentsDueWithGrace(
+        debts: List<Debt>, today: Jalali.Date, graceDays: Int = 3
     ): List<InstallmentAlert> = buildList {
+        val todayStart = JalaliDates.toEpoch(today) ?: return@buildList
+        val earliest = java.util.Calendar.getInstance().apply {
+            timeInMillis = todayStart
+            add(java.util.Calendar.DAY_OF_MONTH, -graceDays.coerceIn(0, 7))
+        }.timeInMillis
         for (debt in debts) {
             if (debt.direction != "I_OWE" || debt.installmentMonths <= 0 ||
                 debt.paidToman >= debt.totalToman || debt.totalToman <= 0L
@@ -66,7 +80,8 @@ object FinanceReminderRules {
             val first = JalaliDates.parse(debt.firstInstallmentJalali) ?: continue
             for (i in Installments.countPaid(debt) until debt.installmentMonths) {
                 val date = JalaliDates.addMonths(first, i)
-                if (date != today) continue
+                val dueEpoch = JalaliDates.toEpoch(date) ?: continue
+                if (dueEpoch !in earliest..todayStart) continue
                 val amount = (
                     Installments.cumulative(debt, i + 1) -
                     maxOf(Installments.cumulative(debt, i), debt.paidToman)
