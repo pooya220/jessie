@@ -41,6 +41,8 @@ object FinanceReminderScheduler {
     private const val NOW_WORK = "jessi_finance_reminders_check_v1"
     private const val CHANNEL_BUDGET = "jessi_budget_90_v1"
     private const val CHANNEL_INSTALLMENT = "jessi_installment_due_v1"
+    private const val DIAGNOSTICS_PREF = "jessi_reminder_diagnostics_v1"
+    private const val TEST_NOTIFICATION_ID = 8813
 
     fun start(context: Context) {
         ensureChannels(context)
@@ -83,6 +85,52 @@ object FinanceReminderScheduler {
             NotificationManager.IMPORTANCE_NONE
     }
 
+    /** A real independent notification test on the SAME channel as actual dues. */
+    fun testInstallmentNotification(context: Context): String {
+        val prefs = context.getSharedPreferences("jessi_finance_settings", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean(PREF_INSTALLMENT_ENABLED, true))
+            return "یادآوری اقساط در تنظیمات جسی خاموش است."
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
+                context, Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) return "مجوز اعلان اندروید داده نشده؛ دسترسی اعلان‌ها را فعال کن."
+        val manager = context.getSystemService(NotificationManager::class.java)
+        if (!manager.areNotificationsEnabled())
+            return "اعلان‌های جسی در تنظیمات گوشی مسدود شده‌اند."
+        ensureChannels(context)
+        if (manager.getNotificationChannel(CHANNEL_INSTALLMENT)?.importance ==
+            NotificationManager.IMPORTANCE_NONE
+        ) return "کانال «یادآوری سررسید اقساط» در تنظیمات اعلان اندروید خاموش است."
+        manager.notify("jessi_due_test", TEST_NOTIFICATION_ID,
+            NotificationCompat.Builder(context, CHANNEL_INSTALLMENT)
+                .setSmallIcon(R.drawable.ic_stat_jessi)
+                .setContentTitle("جسی • تست یادآوری قسط")
+                .setContentText("یادآور اقساط فعال است؛ این اعلان آزمایشی است و هیچ پرداختی ثبت نشده.")
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setContentIntent(openApp(context, "DEBTS"))
+                .setAutoCancel(true)
+                .build()
+        )
+        return "اعلان آزمایشی از کانال واقعی اقساط ارسال شد؛ پنل اعلان گوشی را چک کن."
+    }
+
+    suspend fun dueDiagnostics(context: Context): String {
+        val prefs = context.getSharedPreferences(
+            DIAGNOSTICS_PREF, Context.MODE_PRIVATE
+        )
+        val last = prefs.getLong("last_due_check", 0L)
+        val lastText = if (last <= 0L) "هنوز اجرا نشده"
+        else java.text.SimpleDateFormat("yyyy/MM/dd HH:mm", Locale("fa", "IR"))
+            .format(java.util.Date(last))
+        val due = FinanceReminderRules.installmentsDueWithGrace(
+            FinanceDatabase.get(context).dao().getDebts(),
+            Jalali.of(System.currentTimeMillis())
+        ).size
+        return "آخرین بررسی خودکار: $lastText • اقساطِ واجد شرایط امروز یا ۳ روز اخیر: $due"
+    }
+
     private fun openApp(context: Context, tab: String): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or
@@ -108,6 +156,8 @@ object FinanceReminderScheduler {
         )
         val now = System.currentTimeMillis()
         val manager = context.getSystemService(NotificationManager::class.java)
+        context.getSharedPreferences(DIAGNOSTICS_PREF, Context.MODE_PRIVATE)
+            .edit().putLong("last_due_check", now).apply()
 
         if (prefs.getBoolean(PREF_BUDGET_ENABLED, true) &&
             canNotify(context, CHANNEL_BUDGET)
@@ -147,7 +197,7 @@ object FinanceReminderScheduler {
         ) {
             val today = Jalali.of(now)
             val debts = dao.getDebts()
-            for (due in FinanceReminderRules.installmentsDueToday(debts, today)) {
+            for (due in FinanceReminderRules.installmentsDueWithGrace(debts, today)) {
                 synchronized(lock) {
                     if (sent.getBoolean(due.key, false)) return@synchronized
                     val amount = NumberFormat.getIntegerInstance(Locale.US)
@@ -155,10 +205,17 @@ object FinanceReminderScheduler {
                     manager.notify("jessi_due_" + due.debtId, 8812,
                         NotificationCompat.Builder(context, CHANNEL_INSTALLMENT)
                             .setSmallIcon(R.drawable.ic_stat_jessi)
-                            .setContentTitle("جسی • امروز سررسید قسط " + due.person + " است")
-                            .setContentText("قسط " + due.installmentNumber + " از " +
+                            .setContentTitle(
+                                if (due.dueDate == today)
+                                    "جسی • امروز سررسید قسط " + due.person + " است"
+                                else "جسی • قسط پرداخت‌نشده " + due.person
+                            )
+                            .setContentText(
+                                "قسط " + due.installmentNumber + " از " +
                                 due.installmentMonths + " • " + amount +
-                                " تومان؛ پرداخت را فراموش نکن.")
+                                " تومان؛ " + (if (due.dueDate == today)
+                                    "امروز سررسید است." else "سررسید گذشته؛ پرداخت را بررسی کن.")
+                            )
                             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                             .setCategory(NotificationCompat.CATEGORY_REMINDER)
                             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
