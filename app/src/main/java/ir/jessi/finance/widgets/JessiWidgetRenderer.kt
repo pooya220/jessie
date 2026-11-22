@@ -1,6 +1,7 @@
 package ir.jessi.finance.widgets
 
 import android.content.Context
+import ir.jessi.finance.data.Budget
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
