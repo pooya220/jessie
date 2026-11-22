@@ -13,6 +13,7 @@ import java.util.Date
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Build
+import android.os.SystemClock
 import ir.jessi.finance.sms.SmsReviewNotifications
 import ir.jessi.finance.notifications.FinanceReminderScheduler
 import ir.jessi.finance.widgets.JessiWidgetUpdater
@@ -107,10 +108,28 @@ private val financeAmber: Color @Composable get() =
 
 class MainActivity : FragmentActivity() {
     private val appLocked = mutableStateOf(true)
+    private var backgroundedAtElapsed = 0L
 
     override fun onStop() {
         super.onStop()
-        if (PinSecurity(this).isEnabled()) appLocked.value = true
+        // Do not re-lock instantly on a quick app switch. Time is monotonic,
+        // so changes to device wall clock cannot extend an unlocked session.
+        if (!appLocked.value && PinSecurity(this).isEnabled()) {
+            backgroundedAtElapsed = SystemClock.elapsedRealtime()
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val security = PinSecurity(this)
+        if (security.isEnabled() && !appLocked.value &&
+            ir.jessi.finance.security.LockTimeoutPolicy.hasExpired(
+                backgroundedAtElapsed,
+                SystemClock.elapsedRealtime(),
+                security.backgroundTimeoutMinutes()
+            )
+        ) appLocked.value = true
+        backgroundedAtElapsed = 0L
     }
 
     private fun promptBiometricUnlock(pinSecurity: PinSecurity, onSuccess: () -> Unit) {
@@ -329,6 +348,7 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var diagnosticRefresh by remember { mutableIntStateOf(0) }
+    var dueReminderDiagnostic by remember { mutableStateOf("") }
     val currentDiagnostic = remember(nowEpoch, showSettings, diagnosticRefresh) {
         SmsDiagnostics.summary(context)
     }
@@ -815,6 +835,22 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                     diagnosticSummary = currentDiagnostic,
                     notificationBlocker = notificationBlocker,
                     pendingReviews = reviews.size,
+                    dueReminderDiagnostic = dueReminderDiagnostic,
+                    onTestDueReminder = {
+                        ioScope.launch {
+                            val report = withContext(Dispatchers.IO) {
+                                FinanceReminderScheduler.testInstallmentNotification(context) +
+                                    "\n" + FinanceReminderScheduler.dueDiagnostics(context)
+                            }
+                            dueReminderDiagnostic = report
+                            diagnosticRefresh++
+                            Toast.makeText(
+                                context,
+                                report.substringBefore('\n'),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    },
                     onTestNotification = {
                         val posted = SmsReviewNotifications.showTest(context)
                         diagnosticRefresh++
@@ -1139,6 +1175,8 @@ private fun SettingsPage(
     onSystemSettings: () -> Unit,
     diagnosticSummary: String, notificationBlocker: String?, pendingReviews: Int,
     onTestNotification: () -> Unit,
+    dueReminderDiagnostic: String,
+    onTestDueReminder: () -> Unit,
     onResendPending: () -> Unit,
     onNotificationSettings: () -> Unit,
     onRefreshDiagnostics: () -> Unit,
@@ -1267,6 +1305,27 @@ private fun SettingsPage(
                 description = "در روز سررسید هر قسط پرداخت‌نشده",
                 checked = installmentRemindersEnabled,
                 onChange = onInstallmentRemindersChange
+            )
+            OutlinedButton(
+                onClick = onTestDueReminder,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Outlined.NotificationsActive,
+                    contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(7.dp))
+                Text("تست و بررسی یادآور اقساط")
+            }
+            if (dueReminderDiagnostic.isNotBlank()) {
+                Text(
+                    dueReminderDiagnostic,
+                    fontSize = 11.sp,
+                    color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant)
+                )
+            }
+            Text(
+                "اگر اندروید بررسی پس‌زمینه را عقب بیندازد، جسی سررسیدهای " +
+                    "پرداخت‌نشده تا ۳ روز قبل را هم یک‌بار یادآوری می‌کند.",
+                fontSize = 10.sp, color = jessiReadableText(muted)
             )
             Text(
                 "جسی در پس‌زمینه بررسی می‌کند؛ ممکن است به‌خاطر مدیریت باتری اندروید، " +
@@ -2270,19 +2329,144 @@ private fun TransactionsPage(
     txs: List<Transaction>, accounts: List<Account>,
     onEdit: (Transaction) -> Unit, onDelete: (Transaction) -> Unit
 ) {
-    val visible = txs.filter { it.kind != "TRANSFER_IN" }
-    val income = txs.filter { it.kind == "IN" }.sumOf { it.amountToman }
-    val expense = txs.filter { it.kind == "OUT" }.sumOf { it.amountToman }
+    var search by rememberSaveable { mutableStateOf("") }
+    var type by rememberSaveable { mutableStateOf(TransactionSearch.ALL) }
+    var selectedAccountId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var selectedCategory by rememberSaveable { mutableStateOf<String?>(null) }
+    var accountMenu by remember { mutableStateOf(false) }
+    var categoryMenu by remember { mutableStateOf(false) }
+    val types = listOf(
+        TransactionSearch.ALL to "همه",
+        TransactionSearch.INCOME to "درآمد",
+        TransactionSearch.EXPENSE to "هزینه",
+        TransactionSearch.TRANSFER to "انتقال",
+        TransactionSearch.DEBT to "اقساط",
+        TransactionSearch.GOAL to "اهداف"
+    )
+    val categories = remember(txs, type) {
+        txs.filter { row ->
+            when (type) {
+                TransactionSearch.INCOME -> row.kind == "IN"
+                TransactionSearch.EXPENSE -> row.kind == "OUT"
+                else -> row.kind != "TRANSFER_IN"
+            }
+        }.map { it.category }.filter { it.isNotBlank() }.distinct().sorted()
+    }
+    LaunchedEffect(accounts, categories) {
+        if (selectedAccountId != null && accounts.none { it.id == selectedAccountId })
+            selectedAccountId = null
+        if (selectedCategory != null && selectedCategory !in categories)
+            selectedCategory = null
+    }
+    val visible = remember(txs, accounts, search, type, selectedAccountId, selectedCategory) {
+        TransactionSearch.filter(
+            txs, accounts, search, type, selectedAccountId, selectedCategory
+        )
+    }
+    val income = visible.filter { it.kind == "IN" }.sumOf { it.amountToman }
+    val expense = visible.filter { it.kind == "OUT" }.sumOf { it.amountToman }
     FinanceSectionHero(
-        "تراکنش‌ها", "گردش مالی دوره انتخاب‌شده",
+        "تراکنش‌ها", "جست‌وجو و فیلتر گردش مالی دوره انتخاب‌شده",
         Icons.Filled.ReceiptLong,
         digitsFa(visible.size.toString()), "تراکنش", accent = financeBlue
     )
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        FinanceSummaryChip("درآمد", income, income = true, Modifier.weight(1f))
-        FinanceSummaryChip("هزینه", expense, income = false, Modifier.weight(1f))
+    Tile(Modifier.fillMaxWidth(), accent = financeBlue) {
+        OutlinedTextField(
+            value = search,
+            onValueChange = { search = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            shape = RoundedCornerShape(13.dp),
+            leadingIcon = {
+                Icon(Icons.Outlined.Search, contentDescription = null,
+                    modifier = Modifier.size(20.dp))
+            },
+            trailingIcon = if (search.isNotBlank()) ({
+                IconButton(onClick = { search = "" }) {
+                    Icon(Icons.Outlined.Close, contentDescription = "پاک‌کردن جست‌وجو")
+                }
+            }) else null,
+            placeholder = { Text("مبلغ، دسته، توضیح یا نام حساب…", fontSize = 12.sp) }
+        )
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            types.forEach { (code, label) ->
+                FilterChip(
+                    selected = type == code,
+                    onClick = { type = code; selectedCategory = null },
+                    label = { Text(label, fontSize = 11.sp) }
+                )
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.weight(1f)) {
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { accountMenu = true }
+                ) {
+                    Text(accounts.firstOrNull { it.id == selectedAccountId }?.title
+                        ?: "همه حساب‌ها", maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, fontSize = 11.sp)
+                }
+                DropdownMenu(expanded = accountMenu, onDismissRequest = { accountMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("همه حساب‌ها") },
+                        onClick = { selectedAccountId = null; accountMenu = false }
+                    )
+                    accounts.forEach { account ->
+                        DropdownMenuItem(text = { Text(account.title) }, onClick = {
+                            selectedAccountId = account.id
+                            accountMenu = false
+                        })
+                    }
+                }
+            }
+            Box(Modifier.weight(1f)) {
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { categoryMenu = true }
+                ) {
+                    Text(selectedCategory ?: "همه دسته‌ها", maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, fontSize = 11.sp)
+                }
+                DropdownMenu(expanded = categoryMenu, onDismissRequest = { categoryMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("همه دسته‌ها") },
+                        onClick = { selectedCategory = null; categoryMenu = false }
+                    )
+                    categories.forEach { category ->
+                        DropdownMenuItem(text = { Text(category) }, onClick = {
+                            selectedCategory = category
+                            categoryMenu = false
+                        })
+                    }
+                }
+            }
+        }
+        if (search.isNotBlank() || type != TransactionSearch.ALL ||
+            selectedAccountId != null || selectedCategory != null
+        ) {
+            TextButton(onClick = {
+                search = ""
+                type = TransactionSearch.ALL
+                selectedAccountId = null
+                selectedCategory = null
+            }) {
+                Text("پاک‌کردن همه فیلترها", color = jessiReadableText(financeBlue),
+                    fontSize = 11.sp)
+            }
+        }
     }
-    if (visible.isEmpty()) EmptyNote("برای ثبت اولین تراکنش روی + بزن.")
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        FinanceSummaryChip("درآمد نمایش‌داده‌شده", income, income = true, Modifier.weight(1f))
+        FinanceSummaryChip("هزینه نمایش‌داده‌شده", expense, income = false, Modifier.weight(1f))
+    }
+    if (visible.isEmpty()) EmptyNote(
+        if (txs.isEmpty()) "برای ثبت اولین تراکنش روی + بزن."
+        else "تراکنشی با این جست‌وجو و فیلتر پیدا نشد."
+    )
     visible.forEach { row ->
         TransactionTile(
             row, accounts, txs,

@@ -16,6 +16,17 @@ class PinSecurity(context: Context) {
     fun isEnabled(): Boolean = prefs.getBoolean("enabled", false) &&
         prefs.contains("salt") && prefs.contains("pin_hash")
 
+    /** Minutes the unlocked app may remain in background before requiring PIN/biometric again. */
+    fun backgroundTimeoutMinutes(): Int =
+        prefs.getInt("background_timeout_minutes", 5).takeIf {
+            it in listOf(0, 1, 3, 5, 10, 15)
+        } ?: 5
+
+    fun setBackgroundTimeoutMinutes(minutes: Int) {
+        require(minutes in listOf(0, 1, 3, 5, 10, 15))
+        prefs.edit().putInt("background_timeout_minutes", minutes).apply()
+    }
+
     fun biometricsEnabled(): Boolean = prefs.getBoolean("biometric", true)
     fun setBiometricsEnabled(enabled: Boolean) {
         prefs.edit().putBoolean("biometric", enabled).apply()
@@ -100,5 +111,15 @@ class PinSecurity(context: Context) {
         if (error != null) return error
         prefs.edit().clear().commit()
         return null
+    }
+}
+
+/** Pure background-window calculation based on monotonic Android elapsed time. */
+object LockTimeoutPolicy {
+    fun hasExpired(lastStopElapsed: Long, nowElapsed: Long, timeoutMinutes: Int): Boolean {
+        if (lastStopElapsed <= 0L) return false
+        if (timeoutMinutes == 0) return true
+        if (nowElapsed < lastStopElapsed) return true // reboot or unknown clock
+        return nowElapsed - lastStopElapsed >= timeoutMinutes.toLong() * 60_000L
     }
 }

@@ -2,6 +2,8 @@ package ir.jessi.finance.ui
 
 import androidx.biometric.BiometricManager
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -154,6 +156,7 @@ fun JessiSecuritySettings(
     val context = LocalContext.current
     var enabled by remember { mutableStateOf(security.isEnabled()) }
     var biometricEnabled by remember { mutableStateOf(security.biometricsEnabled()) }
+    var backgroundTimeout by remember { mutableIntStateOf(security.backgroundTimeoutMinutes()) }
     val biometricAvailable = remember {
         BiometricManager.from(context).canAuthenticate(
             BiometricManager.Authenticators.BIOMETRIC_WEAK
@@ -196,6 +199,31 @@ fun JessiSecuritySettings(
                         security.setBiometricsEnabled(it)
                     }
                 )
+            }
+            Text("قفل خودکار بعد از خروج", fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+            Text("اگر فقط چند ثانیه از جسی خارج شوی، تا پایان زمان انتخابی " +
+                "بدون ورود دوباره باز می‌شود. پس از بسته‌شدن کامل برنامه، ورود امن لازم است.",
+                fontSize = 11.sp,
+                color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                listOf(
+                    0 to "فوری", 1 to "۱ دقیقه", 3 to "۳ دقیقه",
+                    5 to "۵ دقیقه", 10 to "۱۰ دقیقه", 15 to "۱۵ دقیقه"
+                ).forEach { (minutes, label) ->
+                    FilterChip(
+                        selected = backgroundTimeout == minutes,
+                        onClick = {
+                            backgroundTimeout = minutes
+                            security.setBackgroundTimeoutMinutes(minutes)
+                        },
+                        label = { Text(label, fontSize = 11.sp) }
+                    )
+                }
             }
             OutlinedButton(onClick = { action = "change" }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Outlined.LockReset, contentDescription = null, modifier = Modifier.size(18.dp))
