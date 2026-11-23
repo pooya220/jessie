@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/jessi_widget_panel"
+    android:paddingTop="8dp" android:paddingBottom="7dp"
+    android:paddingLeft="10dp" android:paddingRight="10dp"
+    android:layoutDirection="rtl" android:orientation="vertical">
+    <View android:layout_width="32dp" android:layout_height="2dp"
+        android:layout_gravity="right" android:background="@drawable/jessi_widget_accent"/>
+    <LinearLayout android:layout_width="match_parent"
+        android:layout_height="24dp" android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView android:id="@+id/jessi_budget_heading"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="بودجه‌ها" android:textColor="#FFFFFF"
+            android:textSize="11sp" android:textStyle="bold" />
+        <TextView android:id="@+id/jessi_budget_period"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="دوره مالی" android:textColor="#A39AB9"
+            android:textSize="8sp" android:singleLine="true"/>
+    </LinearLayout>
+    <TextView android:id="@+id/jessi_budget_empty"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:gravity="center"
+        android:text="از تنظیمات جسی بودجه انتخاب کن"
+        android:textColor="#BEB5D3" android:textSize="10sp"
+        android:visibility="gone"/>
+    <LinearLayout android:id="@+id/jessi_budget_row_0"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:orientation="vertical"
+        android:gravity="center_vertical">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:id="@+id/jessi_budget_name_0"
+                android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="بودجه"
+                android:textColor="#F4F0FF" android:textSize="10sp"
+                android:singleLine="true" android:ellipsize="end"/>
+            <TextView android:id="@+id/jessi_budget_percent_0"
+                android:layout_width="44dp" android:layout_height="wrap_content"
+                android:gravity="left" android:text="۰٪"
+                android:textColor="#B69BFF" android:textSize="9sp"
+                android:singleLine="true"/>
+        </LinearLayout>
+        <ProgressBar android:id="@+id/jessi_budget_bar_0"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent" android:layout_height="3dp"
+            android:layout_marginTop="3dp"
+            android:max="1000" android:progress="0"
+            android:progressTint="#A69BFF"
+            android:progressBackgroundTint="#39334F" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/jessi_budget_row_1"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:orientation="vertical"
+        android:gravity="center_vertical">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:id="@+id/jessi_budget_name_1"
+                android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="بودجه"
+                android:textColor="#F4F0FF" android:textSize="10sp"
+                android:singleLine="true" android:ellipsize="end"/>
+            <TextView android:id="@+id/jessi_budget_percent_1"
+                android:layout_width="44dp" android:layout_height="wrap_content"
+                android:gravity="left" android:text="۰٪"
+                android:textColor="#B69BFF" android:textSize="9sp"
+                android:singleLine="true"/>
+        </LinearLayout>
+        <ProgressBar android:id="@+id/jessi_budget_bar_1"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent" android:layout_height="3dp"
+            android:layout_marginTop="3dp"
+            android:max="1000" android:progress="0"
+            android:progressTint="#A69BFF"
+            android:progressBackgroundTint="#39334F" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/jessi_budget_row_2"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:orientation="vertical"
+        android:gravity="center_vertical">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:id="@+id/jessi_budget_name_2"
+                android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="بودجه"
+                android:textColor="#F4F0FF" android:textSize="10sp"
+                android:singleLine="true" android:ellipsize="end"/>
+            <TextView android:id="@+id/jessi_budget_percent_2"
+                android:layout_width="44dp" android:layout_height="wrap_content"
+                android:gravity="left" android:text="۰٪"
+                android:textColor="#B69BFF" android:textSize="9sp"
+                android:singleLine="true"/>
+        </LinearLayout>
+        <ProgressBar android:id="@+id/jessi_budget_bar_2"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent" android:layout_height="3dp"
+            android:layout_marginTop="3dp"
+            android:max="1000" android:progress="0"
+            android:progressTint="#A69BFF"
+            android:progressBackgroundTint="#39334F" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/jessi_budget_row_3"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:orientation="vertical"
+        android:gravity="center_vertical">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:id="@+id/jessi_budget_name_3"
+                android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="بودجه"
+                android:textColor="#F4F0FF" android:textSize="10sp"
+                android:singleLine="true" android:ellipsize="end"/>
+            <TextView android:id="@+id/jessi_budget_percent_3"
+                android:layout_width="44dp" android:layout_height="wrap_content"
+                android:gravity="left" android:text="۰٪"
+                android:textColor="#B69BFF" android:textSize="9sp"
+                android:singleLine="true"/>
+        </LinearLayout>
+        <ProgressBar android:id="@+id/jessi_budget_bar_3"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent" android:layout_height="3dp"
+            android:layout_marginTop="3dp"
+            android:max="1000" android:progress="0"
+            android:progressTint="#A69BFF"
+            android:progressBackgroundTint="#39334F" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/jessi_budget_row_4"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:orientation="vertical"
+        android:gravity="center_vertical">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:id="@+id/jessi_budget_name_4"
+                android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="بودجه"
+                android:textColor="#F4F0FF" android:textSize="10sp"
+                android:singleLine="true" android:ellipsize="end"/>
+            <TextView android:id="@+id/jessi_budget_percent_4"
+                android:layout_width="44dp" android:layout_height="wrap_content"
+                android:gravity="left" android:text="۰٪"
+                android:textColor="#B69BFF" android:textSize="9sp"
+                android:singleLine="true"/>
+        </LinearLayout>
+        <ProgressBar android:id="@+id/jessi_budget_bar_4"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent" android:layout_height="3dp"
+            android:layout_marginTop="3dp"
+            android:max="1000" android:progress="0"
+            android:progressTint="#A69BFF"
+            android:progressBackgroundTint="#39334F" />
+    </LinearLayout>
+</LinearLayout>
