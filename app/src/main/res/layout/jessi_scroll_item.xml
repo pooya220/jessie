@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="48dp"
+    android:gravity="center_vertical" android:orientation="vertical"
+    android:paddingTop="5dp" android:paddingBottom="4dp">
+    <LinearLayout android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <TextView android:id="@+id/jessi_scroll_amount"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#C6A0FF" android:textSize="11sp"
+            android:maxLines="1" android:ellipsize="end"/>
+        <TextView android:id="@+id/jessi_scroll_item_title"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:gravity="right"
+            android:paddingLeft="5dp" android:textColor="#F5F1FF"
+            android:textStyle="bold" android:textSize="11sp"
+            android:maxLines="1" android:ellipsize="end"/>
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:orientation="horizontal"
+        android:gravity="center_vertical" android:layout_marginTop="3dp">
+        <TextView android:id="@+id/jessi_scroll_item_note"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#BBB2D0" android:textSize="9sp"
+            android:maxLines="1" android:ellipsize="end"/>
+        <ProgressBar android:id="@+id/jessi_scroll_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="5dp" android:layout_marginLeft="8dp"
+            android:indeterminate="false" android:max="100"
+            android:progressTint="#C79CFF"
+            android:progressBackgroundTint="#39334E"/>
+    </LinearLayout>
+</LinearLayout>
