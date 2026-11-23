@@ -3,6 +3,10 @@
     <string name="jessi_widget_balance">جسی • موجودی حساب‌ها</string>
     <string name="jessi_widget_budgets">جسی • پیشرفت بودجه‌ها</string>
     <string name="jessi_widget_expenses">جسی • نمودار هزینه‌ها</string>
+    <string name="jessi_widget_payments">جسی • فهرست اقساط</string>
+    <string name="jessi_widget_goals">جسی • اهداف پس‌انداز</string>
+    <string name="jessi_widget_payments_desc">فهرست قابل پیمایش اقساط پیش رو</string>
+    <string name="jessi_widget_goals_desc">فهرست قابل پیمایش پیشرفت اهداف پس‌انداز</string>
     <string name="jessi_widget_description">ویجت مالی جسی؛ برای بازکردن برنامه لمس کن</string>
     <string name="jessi_widget_balance_desc">نمایش موجودی حساب‌ها در اندازه کوچک و بزرگ</string>
     <string name="jessi_widget_budgets_desc">نمایش پیشرفت دسته‌های بودجه و درصد مصرف‌شده</string>

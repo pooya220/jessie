@@ -127,6 +127,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 if (row.id == 0L) dao.insertGoal(row) > 0L
                 else { dao.updateGoal(row); true }
             } catch (_: Exception) { false }
+            if (ok) JessiWidgetUpdater.request(getApplication())
             withContext(Dispatchers.Main) { onComplete(ok) }
         }
 
@@ -146,12 +147,14 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 if (archived) dao.archiveGoalIfEmpty(id)
                 else dao.setGoalArchived(id, false) > 0
             } catch (_: Exception) { false }
+            if (ok) JessiWidgetUpdater.request(getApplication())
             withContext(Dispatchers.Main) { onComplete(ok) }
         }
 
     fun deleteEmptyGoal(id: Long, onComplete: (Boolean) -> Unit) =
         viewModelScope.launch(Dispatchers.IO) {
             val ok = try { dao.deleteUnusedGoal(id) > 0 } catch (_: Exception) { false }
+            if (ok) JessiWidgetUpdater.request(getApplication())
             withContext(Dispatchers.Main) { onComplete(ok) }
         }
 
