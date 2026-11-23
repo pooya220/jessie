@@ -40,7 +40,9 @@ object JessiWidgetRenderer {
         widthDp: Int,
         heightDp: Int
     ): Bitmap {
-        val scale = min(2f, context.resources.displayMetrics.density.coerceAtLeast(1f))
+        // Small RemoteViews bitmaps avoid Binder transaction overflows when several
+        // widgets update together; fitCenter (not fitXY) keeps the donut round.
+        val scale = 1.2f
         val bitmap = Bitmap.createBitmap(
             (widthDp * scale).toInt().coerceAtLeast(1),
             (heightDp * scale).toInt().coerceAtLeast(1),
@@ -55,6 +57,7 @@ object JessiWidgetRenderer {
             HomeWidgetKind.BALANCE -> balance(canvas, w, h, model)
             HomeWidgetKind.BUDGETS -> budgets(canvas, w, h, model)
             HomeWidgetKind.EXPENSES -> expenses(canvas, w, h, model)
+            HomeWidgetKind.PAYMENTS, HomeWidgetKind.GOALS -> Unit
         }
         return bitmap
     }
@@ -150,23 +153,24 @@ object JessiWidgetRenderer {
     }
 
     private fun balance(c: Canvas, w: Float, h: Float, m: HomeWidgetSnapshot) {
-        title(c, w, "موجودی حساب‌ها", "جسی")
+        title(c, w, m.displayedTitle, "")
         val amount = when {
             !m.showBalance -> "••••••"
             m.accounts.isEmpty() -> "بدون حساب"
-            else -> shortAmount(m.balance)
+            else -> shortAmount(m.displayedBalance)
         }
         val large = w >= 260f
         val y = if (h < 120f) 66f else 79f
         text(c, amount, w - 16f, y, if (large) 28f else 23f, white, true,
             maxWidth = w - 32f)
         if (h < 125f) {
-            text(c, if (m.showBalance) "تومان" else "نمایش موجودی غیرفعال است",
-                w - 17f, h - 12f, 10f, muted, maxWidth = w - 30f)
+            text(c, if (m.showBalance) "تومان" else "موجودی پنهان",
+                w - 17f, h - 12f, 10f, muted, maxWidth = w - 92f)
             return
         }
-        text(c, if (m.showBalance) "تومان • جمع حساب‌ها"
-                else "از تنظیمات جسی نمایش موجودی را فعال کن",
+        text(c, if (m.showBalance) "تومان • " +
+                (if (m.selectedAccountIndex < 0) "جمع حساب‌ها" else "این حساب")
+                else "با دکمه چشم نمایش بده",
             w - 17f, y + 19f, 10f, muted, maxWidth = w - 30f)
         if (h > 170f && large) {
             val width = (w - 45f) / 2f
@@ -197,31 +201,39 @@ object JessiWidgetRenderer {
             empty(c, w, h, "هنوز سقف بودجه ثبت نکردی")
             return
         }
-        val rows = m.budgets.map { b ->
+        // Respect the owner's selected budget IDs and preserve their order.
+        // Five rows fit a 2×2 widget at ~155dp without cutting off the fifth.
+        val rows = m.widgetBudgets.map { b ->
             val spent = m.periodTransactions.asSequence()
                 .filter { it.kind == "OUT" && it.category == b.category }
                 .sumOf { it.amountToman.coerceAtLeast(0L) }
             Triple(b, spent, if (b.monthlyLimitToman > 0L)
                 spent.toDouble() / b.monthlyLimitToman else 0.0)
-        }.sortedWith(compareByDescending<Triple<Budget, Long, Double>> { it.third })
-        val rowHeight = if (h < 175f) 36f else 42f
-        val count = min(rows.size, ((h - 62f) / rowHeight).toInt().coerceAtLeast(1))
-        rows.take(count).forEachIndexed { i, (budget, spent, share) ->
-            val top = 46f + i * rowHeight
+        }
+        if (rows.isEmpty()) {
+            empty(c, w, h, "در تنظیمات جسی بودجه انتخاب کن")
+            return
+        }
+        val topY = 43f
+        // 5×21.2dp + header 43dp fits the original 155dp size.
+        val rowHeight = ((h - topY - 3f) / 5f).coerceAtMost(29f).coerceAtLeast(16f)
+        val count = min(rows.size, ((h - topY) / rowHeight).toInt().coerceAtLeast(1))
+        rows.take(count).forEachIndexed { i, (budget, _, share) ->
+            val top = topY + i * rowHeight
             val percent = (share * 100).toInt().coerceAtMost(999)
-            text(c, budget.category, w - 16f, top + 12f,
-                11.5f, white, true, maxWidth = w * .59f)
-            text(c, formatDecimal(percent.toDouble()) + "٪", 16f, top + 12f,
-                11f, if (share >= .90) pink else blue, true, right = false)
-            val left = 16f
-            val right = w - 16f
-            val bar = RectF(left, top + 20f, right, top + 27f)
-            c.drawRoundRect(bar, 5f, 5f,
+            text(c, budget.category, w - 15f, top + 9f,
+                10f, white, true, maxWidth = w * .64f)
+            text(c, formatDecimal(percent.toDouble()) + "٪", 15f, top + 9f,
+                9.5f, if (share >= .90) pink else blue, true, right = false)
+            val left = 15f
+            val right = w - 15f
+            val bar = RectF(left, top + 13f, right, top + 17f)
+            c.drawRoundRect(bar, 3f, 3f,
                 Paint(Paint.ANTI_ALIAS_FLAG).apply { color = track })
             if (share > 0) {
                 val filled = RectF(left, bar.top,
                     left + (right - left) * share.toFloat().coerceIn(0f, 1f), bar.bottom)
-                c.drawRoundRect(filled, 5f, 5f,
+                c.drawRoundRect(filled, 3f, 3f,
                     Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         shader = LinearGradient(left, 0f, right, 0f,
                             if (share >= 1.0) pink else lilac,
@@ -229,10 +241,6 @@ object JessiWidgetRenderer {
                             Shader.TileMode.CLAMP)
                     })
             }
-        }
-        if (count < rows.size && h >= 135f) {
-            text(c, "+ " + (rows.size - count) + " بودجه دیگر",
-                w - 16f, h - 6f, 9f, muted)
         }
     }
 
