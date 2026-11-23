@@ -9,7 +9,6 @@ import android.content.Intent
 import android.net.Uri
 import android.view.View
 import java.util.UUID
-import android.content.res.Configuration
 import android.os.Bundle
 import android.widget.RemoteViews
 import androidx.work.CoroutineWorker
@@ -217,37 +216,22 @@ object JessiWidgetUpdater {
                 updateScrollable(app, manager, type, id)
                 continue
             }
-            val opts = manager.getAppWidgetOptions(id)
-            val landscape = app.resources.configuration.orientation ==
-                Configuration.ORIENTATION_LANDSCAPE
-            val defaultWidth = if (type == HomeWidgetKind.EXPENSES) 290 else 185
-            val defaultHeight = if (type == HomeWidgetKind.BALANCE) 100 else 180
-            val proposedWidth = opts.getInt(
-                if (landscape) AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH
-                else AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, defaultWidth)
-            val proposedHeight = opts.getInt(
-                if (landscape) AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT
-                else AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, defaultHeight)
-            val w = proposedWidth.takeIf { it > 0 } ?: defaultWidth
-            val h = proposedHeight.takeIf { it > 0 } ?: defaultHeight
+
+            // The launcher receives REAL native text and progress views, not
+            // a bitmap stretched to fill the widget. Only the donut is drawn.
             val page = Math.floorMod(controls.getInt("page_$id", 0),
                 accounts.size + 1) - 1
             val visible = controls.getBoolean("visible_$id", snapshot.showBalance)
             val model = snapshot.copy(
                 showBalance = visible, selectedAccountIndex = page
             )
-            val bitmap = JessiWidgetRenderer.render(
-                app, type, model, w.coerceIn(140, 400), h.coerceIn(72, 300)
-            )
-            val views = RemoteViews(app.packageName, R.layout.jessi_home_widget)
-            views.setImageViewBitmap(R.id.jessi_widget_image, bitmap)
-            views.setContentDescription(
-                R.id.jessi_widget_image, when (type) {
-                    HomeWidgetKind.BALANCE -> "جسی؛ موجودی حساب‌ها"
-                    HomeWidgetKind.BUDGETS -> "جسی؛ نمودار پیشرفت بودجه‌ها"
-                    else -> "جسی؛ سهم دسته‌های هزینه"
-                }
-            )
+            val layout = when (type) {
+                HomeWidgetKind.BALANCE -> R.layout.jessi_widget_balance_native
+                HomeWidgetKind.BUDGETS -> R.layout.jessi_widget_budget_native
+                HomeWidgetKind.EXPENSES -> R.layout.jessi_widget_expense_native
+                else -> continue
+            }
+            val views = RemoteViews(app.packageName, layout)
             val tab = when (type) {
                 HomeWidgetKind.BALANCE -> "BANK_ACCOUNTS"
                 HomeWidgetKind.BUDGETS -> "ACCOUNTS"
@@ -262,40 +246,194 @@ object JessiWidgetUpdater {
                 app, id, open,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            views.setOnClickPendingIntent(R.id.jessi_widget_image, pending)
-            for (button in arrayOf(R.id.jessi_widget_eye, R.id.jessi_widget_previous,
-                R.id.jessi_widget_next)) {
-                views.setViewVisibility(button,
-                    if (type == HomeWidgetKind.BALANCE) View.VISIBLE else View.GONE)
-            }
-            if (type == HomeWidgetKind.BALANCE) {
-                val token = controls.getString("token_$id", null)
-                    ?: UUID.randomUUID().toString().also {
-                        controls.edit().putString("token_$id", it).apply()
-                    }
-                views.setImageViewResource(
-                    R.id.jessi_widget_eye,
-                    if (visible) R.drawable.jessi_widget_eye else R.drawable.jessi_widget_eye_off
+            when (type) {
+                HomeWidgetKind.BALANCE -> updateBalanceNative(
+                    app, views, id, controls, model, pending
                 )
-                listOf(
-                    Triple(R.id.jessi_widget_eye, "eye", 0),
-                    Triple(R.id.jessi_widget_previous, "prev", 1),
-                    Triple(R.id.jessi_widget_next, "next", 2)
-                ).forEach { (button, operation, offset) ->
-                    val intent = Intent(app, JessiBalanceWidget::class.java).apply {
-                        action = ACTION_CONTROL
-                        data = Uri.parse("jessi://widget/control/$id/$operation")
-                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
-                        putExtra("operation", operation)
-                        putExtra("token", token)
-                    }
-                    views.setOnClickPendingIntent(button,
-                        PendingIntent.getBroadcast(app, id * 10 + offset, intent,
-                            PendingIntent.FLAG_UPDATE_CURRENT or
-                                PendingIntent.FLAG_IMMUTABLE))
-                }
+                HomeWidgetKind.BUDGETS -> updateBudgetNative(views, model, pending)
+                HomeWidgetKind.EXPENSES -> updateExpenseNative(views, model, pending)
+                else -> Unit
             }
             manager.updateAppWidget(id, views)
+        }
+    }
+
+
+    private fun formatNumber(value: Number): String =
+        java.text.NumberFormat.getNumberInstance(java.util.Locale("fa", "IR"))
+            .format(value)
+
+    private fun prettyAmount(amount: Long): String {
+        val absolute = kotlin.math.abs(amount.toDouble())
+        val compact = java.text.NumberFormat.getNumberInstance(java.util.Locale("fa", "IR"))
+            .apply { maximumFractionDigits = 1 }
+        return when {
+            absolute >= 1_000_000_000.0 -> compact.format(amount / 1_000_000_000.0) + " میلیارد ت"
+            absolute >= 10_000_000.0 -> compact.format(amount / 1_000_000.0) + " میلیون ت"
+            else -> formatNumber(amount) + " ت"
+        }
+    }
+
+    private fun updateBalanceNative(
+        app: Context,
+        views: RemoteViews,
+        id: Int,
+        controls: android.content.SharedPreferences,
+        m: HomeWidgetSnapshot,
+        open: PendingIntent
+    ) {
+        views.setTextViewText(R.id.jessi_balance_title, m.displayedTitle)
+        views.setTextViewText(R.id.jessi_balance_amount,
+            if (!m.showBalance) "••••••"
+            else if (m.accounts.isEmpty()) "بدون حساب"
+            else prettyAmount(m.displayedBalance)
+        )
+        views.setTextViewText(R.id.jessi_balance_caption,
+            if (m.showBalance) "تومان • " +
+                (if (m.selectedAccountIndex < 0) "همه حساب‌ها" else
+                    m.displayedAccount?.bank.orEmpty().ifBlank { "موجودی حساب" })
+            else "موجودی پنهان"
+        )
+        val page = m.selectedAccountIndex + 2
+        val count = m.accounts.size + 1
+        views.setTextViewText(R.id.jessi_balance_page,
+            formatNumber(page) + "/" + formatNumber(count))
+        views.setImageViewResource(
+            R.id.jessi_widget_eye,
+            if (m.showBalance) R.drawable.jessi_widget_eye
+            else R.drawable.jessi_widget_eye_off
+        )
+        for (target in intArrayOf(R.id.jessi_balance_title,
+            R.id.jessi_balance_amount, R.id.jessi_balance_caption)) {
+            views.setOnClickPendingIntent(target, open)
+        }
+
+        // Per-widget, non-exported actions; prevent accidental navigation
+        // when interacting with the eye or the previous/next controls.
+        val token = controls.getString("token_$id", null)
+            ?: UUID.randomUUID().toString().also {
+                controls.edit().putString("token_$id", it).apply()
+            }
+        listOf(
+            Triple(R.id.jessi_widget_eye, "eye", 0),
+            Triple(R.id.jessi_widget_previous, "prev", 1),
+            Triple(R.id.jessi_widget_next, "next", 2)
+        ).forEach { (button, operation, offset) ->
+            val intent = Intent(app, JessiBalanceWidget::class.java).apply {
+                action = ACTION_CONTROL
+                data = Uri.parse("jessi://widget/control/$id/$operation")
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                putExtra("operation", operation)
+                putExtra("token", token)
+            }
+            views.setOnClickPendingIntent(button,
+                PendingIntent.getBroadcast(app, id * 10 + offset, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+        }
+    }
+
+    private val budgetRowIds = intArrayOf(
+        R.id.jessi_budget_row_0, R.id.jessi_budget_row_1,
+        R.id.jessi_budget_row_2, R.id.jessi_budget_row_3,
+        R.id.jessi_budget_row_4
+    )
+    private val budgetNameIds = intArrayOf(
+        R.id.jessi_budget_name_0, R.id.jessi_budget_name_1,
+        R.id.jessi_budget_name_2, R.id.jessi_budget_name_3,
+        R.id.jessi_budget_name_4
+    )
+    private val budgetPercentIds = intArrayOf(
+        R.id.jessi_budget_percent_0, R.id.jessi_budget_percent_1,
+        R.id.jessi_budget_percent_2, R.id.jessi_budget_percent_3,
+        R.id.jessi_budget_percent_4
+    )
+    private val budgetProgressIds = intArrayOf(
+        R.id.jessi_budget_bar_0, R.id.jessi_budget_bar_1,
+        R.id.jessi_budget_bar_2, R.id.jessi_budget_bar_3,
+        R.id.jessi_budget_bar_4
+    )
+
+    private fun updateBudgetNative(
+        views: RemoteViews, m: HomeWidgetSnapshot, open: PendingIntent
+    ) {
+        views.setTextViewText(R.id.jessi_budget_period, m.periodLabel)
+        views.setOnClickPendingIntent(R.id.jessi_budget_heading, open)
+        val rows = m.widgetBudgets
+        views.setViewVisibility(R.id.jessi_budget_empty,
+            if (rows.isEmpty()) View.VISIBLE else View.GONE)
+        for (i in 0 until 5) {
+            val budget = rows.getOrNull(i)
+            views.setViewVisibility(budgetRowIds[i],
+                if (budget == null) View.GONE else View.VISIBLE)
+            if (budget != null) {
+                val spent = m.periodTransactions.asSequence()
+                    .filter { it.kind == "OUT" && it.category == budget.category }
+                    .sumOf { it.amountToman.coerceAtLeast(0L) }
+                val fraction = if (budget.monthlyLimitToman > 0L)
+                    spent.toDouble() / budget.monthlyLimitToman.toDouble() else 0.0
+                val percent = (fraction * 100).toInt().coerceIn(0, 999)
+                views.setTextViewText(budgetNameIds[i], budget.category)
+                views.setTextViewText(budgetPercentIds[i],
+                    formatNumber(percent) + "٪")
+                views.setTextColor(budgetPercentIds[i],
+                    if (fraction >= .90) android.graphics.Color.rgb(255, 144, 190)
+                    else android.graphics.Color.rgb(176, 158, 255))
+                views.setProgressBar(budgetProgressIds[i], 1000,
+                    (fraction * 1000).toInt().coerceIn(0, 1000), false)
+                views.setOnClickPendingIntent(budgetRowIds[i], open)
+            }
+        }
+    }
+
+    private val expenseRowIds = intArrayOf(
+        R.id.jessi_expense_row_0, R.id.jessi_expense_row_1,
+        R.id.jessi_expense_row_2, R.id.jessi_expense_row_3
+    )
+    private val expenseNameIds = intArrayOf(
+        R.id.jessi_expense_name_0, R.id.jessi_expense_name_1,
+        R.id.jessi_expense_name_2, R.id.jessi_expense_name_3
+    )
+    private val expenseShareIds = intArrayOf(
+        R.id.jessi_expense_share_0, R.id.jessi_expense_share_1,
+        R.id.jessi_expense_share_2, R.id.jessi_expense_share_3
+    )
+    private val expenseDotIds = intArrayOf(
+        R.id.jessi_expense_dot_0, R.id.jessi_expense_dot_1,
+        R.id.jessi_expense_dot_2, R.id.jessi_expense_dot_3
+    )
+
+    private fun updateExpenseNative(
+        views: RemoteViews, m: HomeWidgetSnapshot, open: PendingIntent
+    ) {
+        views.setTextViewText(R.id.jessi_expense_period, m.periodLabel)
+        views.setOnClickPendingIntent(R.id.jessi_expense_heading, open)
+        val categories = m.expensesByCategory.filter { it.second > 0L }
+        val total = categories.sumOf { it.second }
+        val groups = if (categories.size <= 4) categories else
+            categories.take(3) + ("سایر" to categories.drop(3).sumOf { it.second })
+        views.setViewVisibility(R.id.jessi_expense_content,
+            if (total > 0L) View.VISIBLE else View.GONE)
+        views.setViewVisibility(R.id.jessi_expense_empty,
+            if (total > 0L) View.GONE else View.VISIBLE)
+        if (total <= 0L) return
+        views.setImageViewBitmap(R.id.jessi_expense_donut,
+            JessiWidgetRenderer.renderDonut(groups.map { it.second }))
+        views.setTextViewText(R.id.jessi_expense_total, prettyAmount(total))
+        views.setTextViewText(R.id.jessi_expense_center, "هزینه")
+        views.setOnClickPendingIntent(R.id.jessi_expense_donut, open)
+        views.setOnClickPendingIntent(R.id.jessi_expense_total, open)
+        for (i in 0 until 4) {
+            val entry = groups.getOrNull(i)
+            views.setViewVisibility(expenseRowIds[i],
+                if (entry == null) View.GONE else View.VISIBLE)
+            if (entry != null) {
+                views.setTextViewText(expenseNameIds[i], entry.first)
+                val percent = (100.0 * entry.second / total).toInt()
+                views.setTextViewText(expenseShareIds[i], formatNumber(percent) + "٪")
+                views.setTextColor(expenseDotIds[i],
+                    JessiWidgetRenderer.sliceColors[i])
+                views.setOnClickPendingIntent(expenseRowIds[i], open)
+            }
         }
     }
 

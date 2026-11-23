@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:layoutDirection="rtl"
+    android:paddingLeft="10dp" android:paddingRight="10dp"
+    android:paddingTop="8dp" android:paddingBottom="7dp"
+    android:background="@drawable/jessi_widget_panel">
+    <TextView android:layout_width="32dp" android:layout_height="2dp"
+        android:layout_gravity="right" android:background="@drawable/jessi_widget_accent"/>
+    <LinearLayout android:layout_width="match_parent"
+        android:layout_height="22dp" android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView android:id="@+id/jessi_expense_heading"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="سهم هزینه‌ها" android:textColor="#FFFFFF"
+            android:textStyle="bold" android:textSize="11sp"
+            android:singleLine="true"/>
+        <TextView android:id="@+id/jessi_expense_period"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="دوره مالی" android:textSize="8sp" android:textColor="#AEA4C7"
+            android:singleLine="true"/>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/jessi_expense_content"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:gravity="center_vertical"
+        android:visibility="gone" android:orientation="horizontal">
+        <LinearLayout android:layout_width="84dp" android:layout_height="match_parent"
+            android:orientation="vertical" android:gravity="center_horizontal|center_vertical">
+            <FrameLayout android:layout_width="79dp" android:layout_height="79dp">
+                <!-- Only the ring is an anti-aliased bitmap, not the complete UI. -->
+                <ImageView android:id="@+id/jessi_expense_donut"
+                    android:layout_width="match_parent" android:layout_height="match_parent"
+                    android:scaleType="fitCenter" android:contentDescription="نمودار حلقه‌ای هزینه‌ها"/>
+                <TextView android:id="@+id/jessi_expense_center"
+                    android:layout_width="match_parent" android:layout_height="match_parent"
+                    android:gravity="center" android:text="هزینه"
+                    android:textColor="#D5C9EF" android:textSize="8sp"
+                    android:textStyle="bold"/>
+            </FrameLayout>
+            <TextView android:id="@+id/jessi_expense_total"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:gravity="center" android:text="۰ تومان"
+                android:textColor="#F9F6FF" android:textStyle="bold"
+                android:textSize="10sp" android:singleLine="true"
+                android:ellipsize="end"/>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/jessi_expense_legend"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:orientation="vertical"
+            android:paddingRight="6dp">
+            <LinearLayout android:id="@+id/jessi_expense_row_0"
+                android:layout_width="match_parent" android:layout_height="0dp"
+                android:layout_weight="1" android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <TextView android:id="@+id/jessi_expense_dot_0"
+                    android:layout_width="10dp" android:layout_height="wrap_content"
+                    android:text="●" android:textSize="9sp" android:textColor="#BE88FF"/>
+                <TextView android:id="@+id/jessi_expense_name_0"
+                    android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true" android:ellipsize="end"
+                    android:text="دسته" android:textColor="#EAE4F6"
+                    android:textSize="9sp"/>
+                <TextView android:id="@+id/jessi_expense_share_0"
+                    android:layout_width="33dp" android:layout_height="wrap_content"
+                    android:gravity="left" android:singleLine="true"
+                    android:text="۰٪" android:textColor="#B8ABC9"
+                    android:textSize="8.5sp"/>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/jessi_expense_row_1"
+                android:layout_width="match_parent" android:layout_height="0dp"
+                android:layout_weight="1" android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <TextView android:id="@+id/jessi_expense_dot_1"
+                    android:layout_width="10dp" android:layout_height="wrap_content"
+                    android:text="●" android:textSize="9sp" android:textColor="#BE88FF"/>
+                <TextView android:id="@+id/jessi_expense_name_1"
+                    android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true" android:ellipsize="end"
+                    android:text="دسته" android:textColor="#EAE4F6"
+                    android:textSize="9sp"/>
+                <TextView android:id="@+id/jessi_expense_share_1"
+                    android:layout_width="33dp" android:layout_height="wrap_content"
+                    android:gravity="left" android:singleLine="true"
+                    android:text="۰٪" android:textColor="#B8ABC9"
+                    android:textSize="8.5sp"/>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/jessi_expense_row_2"
+                android:layout_width="match_parent" android:layout_height="0dp"
+                android:layout_weight="1" android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <TextView android:id="@+id/jessi_expense_dot_2"
+                    android:layout_width="10dp" android:layout_height="wrap_content"
+                    android:text="●" android:textSize="9sp" android:textColor="#BE88FF"/>
+                <TextView android:id="@+id/jessi_expense_name_2"
+                    android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true" android:ellipsize="end"
+                    android:text="دسته" android:textColor="#EAE4F6"
+                    android:textSize="9sp"/>
+                <TextView android:id="@+id/jessi_expense_share_2"
+                    android:layout_width="33dp" android:layout_height="wrap_content"
+                    android:gravity="left" android:singleLine="true"
+                    android:text="۰٪" android:textColor="#B8ABC9"
+                    android:textSize="8.5sp"/>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/jessi_expense_row_3"
+                android:layout_width="match_parent" android:layout_height="0dp"
+                android:layout_weight="1" android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <TextView android:id="@+id/jessi_expense_dot_3"
+                    android:layout_width="10dp" android:layout_height="wrap_content"
+                    android:text="●" android:textSize="9sp" android:textColor="#BE88FF"/>
+                <TextView android:id="@+id/jessi_expense_name_3"
+                    android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true" android:ellipsize="end"
+                    android:text="دسته" android:textColor="#EAE4F6"
+                    android:textSize="9sp"/>
+                <TextView android:id="@+id/jessi_expense_share_3"
+                    android:layout_width="33dp" android:layout_height="wrap_content"
+                    android:gravity="left" android:singleLine="true"
+                    android:text="۰٪" android:textColor="#B8ABC9"
+                    android:textSize="8.5sp"/>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+    <TextView android:id="@+id/jessi_expense_empty"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:gravity="center"
+        android:text="هنوز هزینه‌ای ثبت نشده"
+        android:textColor="#C0B6D5" android:textSize="10sp"
+        android:visibility="visible"/>
+</LinearLayout>

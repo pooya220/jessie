@@ -9,7 +9,7 @@
     android:targetCellWidth="2"
     android:targetCellHeight="2"
     android:updatePeriodMillis="1800000"
-    android:initialLayout="@layout/jessi_home_widget"
+    android:initialLayout="@layout/jessi_widget_budget_native"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:description="@string/jessi_widget_budgets_desc" />
