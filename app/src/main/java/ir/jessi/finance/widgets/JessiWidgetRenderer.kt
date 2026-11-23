@@ -174,13 +174,18 @@ object JessiWidgetRenderer {
             w - 17f, y + 19f, 10f, muted, maxWidth = w - 30f)
         if (h > 170f && large) {
             val width = (w - 45f) / 2f
-            metric(c, 16f, 115f, width, "درآمد دوره", shortAmount(m.income), teal)
-            metric(c, 29f + width, 115f, width, "هزینه دوره", shortAmount(m.expenses), pink)
+            metric(c, 16f, 115f, width, "درآمد دوره",
+                if (m.showBalance) shortAmount(m.income) else "•••", teal)
+            metric(c, 29f + width, 115f, width, "هزینه دوره",
+                if (m.showBalance) shortAmount(m.expenses) else "•••", pink)
             text(c, "دوره مالی: " + m.periodLabel,
                 w - 17f, h - 15f, 10f, muted, maxWidth = w - 30f)
         } else {
-            text(c, "درآمد " + shortAmount(m.income) + "  •  خرج " + shortAmount(m.expenses),
-                w - 17f, h - 17f, 10f, muted, maxWidth = w - 30f)
+            text(c,
+                if (m.showBalance)
+                    "درآمد " + shortAmount(m.income) + "  •  خرج " + shortAmount(m.expenses)
+                else "موجودی پنهان • ورق‌زدن حساب‌ها",
+                w - 17f, h - 17f, 10f, muted, maxWidth = w - 90f)
         }
     }
 
