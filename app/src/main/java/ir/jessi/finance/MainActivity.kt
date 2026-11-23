@@ -423,6 +423,11 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                 showSettings = false
                 periodOffset = 0
             }
+            "GOALS" -> {
+                tabName = Tab.GOALS.name
+                showSettings = false
+                periodOffset = 0
+            }
             "DEBTS" -> {
                 tabName = Tab.DEBTS.name
                 showSettings = false
@@ -750,6 +755,7 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
         ) {
             if (showSettings) {
                 SettingsPage(
+                    widgetBudgets = budgets,
                     darkMode = darkMode,
                     onToggleTheme = onToggleTheme,
                     balanceVisible = balanceVisible,
@@ -1158,6 +1164,7 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
 
 @Composable
 private fun SettingsPage(
+    widgetBudgets: List<Budget>,
     darkMode: Boolean, onToggleTheme: () -> Unit,
     balanceVisible: Boolean, onBalanceVisibilityChange: (Boolean) -> Unit,
     widgetBalanceVisible: Boolean,
@@ -1193,6 +1200,7 @@ private fun SettingsPage(
     var section by remember { mutableStateOf("home") }
     val titles = mapOf(
         "appearance" to "ظاهر و پس‌زمینه",
+        "widgets" to "تنظیمات ویجت‌ها",
         "categories" to "دسته‌بندی‌های درآمد و هزینه",
         "security" to "قفل ورود و امنیت",
         "sms" to "پیامک و اعلان‌ها",
@@ -1219,6 +1227,9 @@ private fun SettingsPage(
         if (section == "home") {
             SettingsNavRow(Icons.Outlined.Palette, "ظاهر و پس‌زمینه",
                 "تم، تصویر دلخواه، شدت هاله شیشه‌ای", financeAqua) { section = "appearance" }
+            SettingsNavRow(Icons.Outlined.Widgets, "تنظیمات ویجت‌ها",
+                "نمایش موجودی و انتخاب پنج بودجه برای هوم‌اسکرین",
+                financeBlue) { section = "widgets" }
             SettingsNavRow(Icons.Outlined.Category, "دسته‌بندی‌های درآمد و هزینه",
                 "افزودن، تغییر نام یا حذف دسته‌ها", financePurple) {
                 section = "categories"
@@ -1241,6 +1252,15 @@ private fun SettingsPage(
                 FinanceCategorySettings(onRename = onRenameCategory)
             }
         }
+        if (section == "widgets") {
+            Tile(Modifier.fillMaxWidth(), accent = financeBlue) {
+                JessiWidgetSettings(
+                    budgets = widgetBudgets,
+                    showBalance = widgetBalanceVisible,
+                    onShowBalance = onWidgetBalanceVisibilityChange
+                )
+            }
+        }
 
         if (section == "appearance") {
         Tile(Modifier.fillMaxWidth(), accent = financeAqua) {
@@ -1258,19 +1278,6 @@ private fun SettingsPage(
                 title = "نمایش موجودی در داشبورد",
                 description = "موجودی کل، درآمد و هزینه را پنهان یا نمایش بده",
                 checked = balanceVisible, onChange = onBalanceVisibilityChange
-            )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .35f))
-            SettingsToggle(
-                icon = Icons.Outlined.AccountBalanceWallet,
-                title = "نمایش موجودی روی ویجت",
-                description = "مبالغ روی صفحه اصلی گوشی، حتی بیرون از قفل جسی، دیده می‌شوند",
-                checked = widgetBalanceVisible,
-                onChange = onWidgetBalanceVisibilityChange
-            )
-            Text(
-                "برای افزودن ویجت: روی فضای خالی هوم‌اسکرین نگه دار، " +
-                    "Widgets را انتخاب کن و ویجت دلخواه جسی را اضافه کن.",
-                fontSize = 10.sp, color = jessiReadableText(muted)
             )
         }
 
