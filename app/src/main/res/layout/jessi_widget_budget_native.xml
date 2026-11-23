@@ -25,11 +25,11 @@
         android:layout_weight="1" android:gravity="center"
         android:text="از تنظیمات جسی بودجه انتخاب کن"
         android:textColor="#BEB5D3" android:textSize="10sp"
-        android:visibility="gone"/>
+        android:visibility="visible"/>
     <LinearLayout android:id="@+id/jessi_budget_row_0"
         android:layout_width="match_parent" android:layout_height="0dp"
-        android:layout_weight="1" android:orientation="vertical"
-        android:gravity="center_vertical">
+        android:layout_weight="1" android:visibility="gone"
+        android:orientation="vertical" android:gravity="center_vertical">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
             android:orientation="horizontal" android:gravity="center_vertical">
             <TextView android:id="@+id/jessi_budget_name_0"
@@ -53,8 +53,8 @@
     </LinearLayout>
     <LinearLayout android:id="@+id/jessi_budget_row_1"
         android:layout_width="match_parent" android:layout_height="0dp"
-        android:layout_weight="1" android:orientation="vertical"
-        android:gravity="center_vertical">
+        android:layout_weight="1" android:visibility="gone"
+        android:orientation="vertical" android:gravity="center_vertical">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
             android:orientation="horizontal" android:gravity="center_vertical">
             <TextView android:id="@+id/jessi_budget_name_1"
@@ -78,8 +78,8 @@
     </LinearLayout>
     <LinearLayout android:id="@+id/jessi_budget_row_2"
         android:layout_width="match_parent" android:layout_height="0dp"
-        android:layout_weight="1" android:orientation="vertical"
-        android:gravity="center_vertical">
+        android:layout_weight="1" android:visibility="gone"
+        android:orientation="vertical" android:gravity="center_vertical">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
             android:orientation="horizontal" android:gravity="center_vertical">
             <TextView android:id="@+id/jessi_budget_name_2"
@@ -103,8 +103,8 @@
     </LinearLayout>
     <LinearLayout android:id="@+id/jessi_budget_row_3"
         android:layout_width="match_parent" android:layout_height="0dp"
-        android:layout_weight="1" android:orientation="vertical"
-        android:gravity="center_vertical">
+        android:layout_weight="1" android:visibility="gone"
+        android:orientation="vertical" android:gravity="center_vertical">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
             android:orientation="horizontal" android:gravity="center_vertical">
             <TextView android:id="@+id/jessi_budget_name_3"
@@ -128,8 +128,8 @@
     </LinearLayout>
     <LinearLayout android:id="@+id/jessi_budget_row_4"
         android:layout_width="match_parent" android:layout_height="0dp"
-        android:layout_weight="1" android:orientation="vertical"
-        android:gravity="center_vertical">
+        android:layout_weight="1" android:visibility="gone"
+        android:orientation="vertical" android:gravity="center_vertical">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
             android:orientation="horizontal" android:gravity="center_vertical">
             <TextView android:id="@+id/jessi_budget_name_4"
