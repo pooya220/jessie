@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/jessi_scroll_row"
-    android:layout_width="match_parent" android:layout_height="42dp"
+    android:layout_width="match_parent" android:layout_height="36dp"
     android:layoutDirection="rtl" android:orientation="vertical"
-    android:gravity="center_vertical" android:paddingTop="3dp"
-    android:paddingBottom="3dp">
+    android:gravity="center_vertical" android:paddingTop="2dp"
+    android:paddingBottom="2dp">
     <LinearLayout android:layout_width="match_parent"
         android:layout_height="wrap_content" android:orientation="horizontal"
         android:gravity="center_vertical">
@@ -22,7 +22,7 @@
     </LinearLayout>
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal" android:gravity="center_vertical"
-        android:layout_marginTop="2dp">
+        android:layout_marginTop="1dp">
         <TextView android:id="@+id/jessi_scroll_item_note"
             android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:textColor="#AAA4C1" android:textSize="8.5sp"
