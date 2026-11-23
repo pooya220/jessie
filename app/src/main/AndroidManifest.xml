@@ -48,5 +48,24 @@
             <meta-data android:name="android.appwidget.provider"
                 android:resource="@xml/jessi_widget_expenses"/>
         </receiver>
+        <receiver android:name=".widgets.JessiPaymentsWidget"
+            android:exported="true" android:label="@string/jessi_widget_payments">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/jessi_widget_payments"/>
+        </receiver>
+        <receiver android:name=".widgets.JessiGoalsWidget"
+            android:exported="true" android:label="@string/jessi_widget_goals">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/jessi_widget_goals"/>
+        </receiver>
+        <service android:name=".widgets.JessiWidgetCollectionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_REMOTEVIEWS"/>
     </application>
 </manifest>
