@@ -23,6 +23,7 @@ import ir.jessi.finance.data.FinanceDatabase
 import ir.jessi.finance.data.FinancePeriodEngine
 import ir.jessi.finance.data.FinanceReminderRules
 import ir.jessi.finance.ui.Jalali
+import ir.jessi.finance.ui.JalaliDates
 import java.text.NumberFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -197,24 +198,34 @@ object FinanceReminderScheduler {
         ) {
             val today = Jalali.of(now)
             val debts = dao.getDebts()
-            for (due in FinanceReminderRules.installmentsDueWithGrace(debts, today)) {
+            // One daily reminder per debt, with every overdue installment
+            // included in the outstanding amount. Avoid a barrage of
+            // individual notifications for months-old unpaid installments.
+            val groups = FinanceReminderRules.installmentsDueOrOverdue(debts, today)
+                .groupBy { it.debtId }
+            for ((debtId, overdue) in groups) {
+                val due = overdue.minByOrNull {
+                    JalaliDates.toEpoch(it.dueDate) ?: Long.MAX_VALUE
+                } ?: continue
+                val todayKey = "installment_daily_" + debtId + "_" +
+                    today.year + "_" + today.month + "_" + today.day
                 synchronized(lock) {
-                    if (sent.getBoolean(due.key, false)) return@synchronized
+                    if (sent.getBoolean(todayKey, false)) return@synchronized
+                    val sum = overdue.sumOf { it.amountToman }
                     val amount = NumberFormat.getIntegerInstance(Locale.US)
-                        .format(due.amountToman)
-                    manager.notify("jessi_due_" + due.debtId, 8812,
+                        .format(sum)
+                    val hasLate = overdue.any { it.dueDate != today }
+                    val title = if (hasLate)
+                        "جسی • اقساط عقب‌افتاده " + due.person
+                    else "جسی • سررسید امروز " + due.person
+                    manager.notify("jessi_due_" + debtId, 8812,
                         NotificationCompat.Builder(context, CHANNEL_INSTALLMENT)
                             .setSmallIcon(R.drawable.ic_stat_jessi)
-                            .setContentTitle(
-                                if (due.dueDate == today)
-                                    "جسی • امروز سررسید قسط " + due.person + " است"
-                                else "جسی • قسط پرداخت‌نشده " + due.person
-                            )
+                            .setContentTitle(title)
                             .setContentText(
-                                "قسط " + due.installmentNumber + " از " +
-                                due.installmentMonths + " • " + amount +
-                                " تومان؛ " + (if (due.dueDate == today)
-                                    "امروز سررسید است." else "سررسید گذشته؛ پرداخت را بررسی کن.")
+                                amount + " تومان پرداخت‌نشده • " +
+                                overdue.size + " قسط سررسیدشده" +
+                                (if (hasLate) " • یادآوری روزانه" else "")
                             )
                             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                             .setCategory(NotificationCompat.CATEGORY_REMINDER)
@@ -223,7 +234,8 @@ object FinanceReminderScheduler {
                             .setAutoCancel(true)
                             .build()
                     )
-                    sent.edit().putBoolean(due.key, true).commit()
+                    // Saved only after the notification was posted.
+                    sent.edit().putBoolean(todayKey, true).commit()
                 }
             }
         }
