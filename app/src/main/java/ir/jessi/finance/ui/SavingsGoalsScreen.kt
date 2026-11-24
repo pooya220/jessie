@@ -39,6 +39,7 @@ private fun goalTone(category: String, dark: Boolean): Color = when (category) {
     "UNIVERSITY" -> if (dark) Color(0xFFD062FF) else violetLight
     "PURCHASE" -> if (dark) Color(0xFF43C8FF) else blueLight
     "EMERGENCY" -> if (dark) Color(0xFFFFC779) else amberLight
+    "FUND" -> if (dark) Color(0xFFBDA0FF) else violetLight
     "TRAVEL" -> if (dark) Color(0xFF36E8C4) else jadeLight
     else -> if (dark) Color(0xFF36E8C4) else jadeLight
 }
@@ -48,6 +49,7 @@ private fun goalCategoryText(type: String) = when (type) {
     "PURCHASE" -> "خرید"
     "TRAVEL" -> "سفر"
     "EMERGENCY" -> "صندوق اضطراری"
+    "FUND" -> "صندوق پس‌انداز ماهانه"
     else -> "پس‌انداز"
 }
 private fun goalIcon(type: String): ImageVector = when (type) {
@@ -55,6 +57,7 @@ private fun goalIcon(type: String): ImageVector = when (type) {
     "PURCHASE" -> Icons.Filled.ShoppingBag
     "TRAVEL" -> Icons.Filled.FlightTakeoff
     "EMERGENCY" -> Icons.Filled.Shield
+    "FUND" -> Icons.Filled.AccountBalanceWallet
     else -> Icons.Filled.Savings
 }
 
@@ -66,6 +69,7 @@ fun SavingsGoalsScreen(
     nowEpoch: Long,
     dark: Boolean,
     onAdd: () -> Unit,
+    onAddFund: () -> Unit,
     onEdit: (SavingsGoal) -> Unit,
     onDeposit: (SavingsGoal) -> Unit,
     onWithdraw: (SavingsGoal) -> Unit,
@@ -82,10 +86,22 @@ fun SavingsGoalsScreen(
         JalaliDates.addMonths(Jalali.Date(current.year, current.month, 1), 1)
     ) ?: (nowEpoch + 32L * 24 * 60 * 60 * 1000L)
     val monthlySaved = active.sumOf { SavingsGoalMath.monthlyProgress(movements, it.id, start, next) }
+    val funds = goals.filter { it.category == "FUND" && !it.archived }
+    val fundSaved = funds.sumOf { SavingsGoalMath.saved(movements, it.id) }
+    val fundMonthlyPlan = funds.sumOf { it.monthlyToman }
+    val fundMonthDeposits = movements.filter {
+        it.goalId in funds.map { g -> g.id } &&
+            it.operation == "DEPOSIT" && it.createdAt >= start && it.createdAt < next
+    }.sumOf { it.amountToman }
+    val fundMonthWithdrawals = movements.filter {
+        it.goalId in funds.map { g -> g.id } &&
+            it.operation == "WITHDRAW" && it.createdAt >= start && it.createdAt < next
+    }.sumOf { it.amountToman }
     val purple = if (dark) Color(0xFFD062FF) else violetLight
     val aqua = if (dark) Color(0xFF36E8C4) else jadeLight
     val textMuted = MaterialTheme.colorScheme.onSurfaceVariant
     var showArchived by rememberSaveable { mutableStateOf(false) }
+    var fundsOnly by rememberSaveable { mutableStateOf(false) }
 
     val shape = RoundedCornerShape(16.dp)
     val heroGradient = if (dark) Brush.linearGradient(
@@ -148,6 +164,50 @@ fun SavingsGoalsScreen(
         }
     }
 
+    // The fund mode is a true pocket ledger, backed by existing GoalMovement
+    // deposits and withdrawals, not a second balance that could double-count.
+    Row(Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        FilterChip(selected = !fundsOnly,
+            onClick = { fundsOnly = false },
+            label = { Text("همه هدف‌ها", fontSize = 11.sp) })
+        FilterChip(selected = fundsOnly,
+            onClick = { fundsOnly = true },
+            label = { Text("صندوق‌ها", fontSize = 11.sp) })
+        Spacer(Modifier.weight(1f))
+        TextButton(onClick = { fundsOnly = true; onAddFund() },
+            contentPadding = PaddingValues(horizontal = 5.dp)) {
+            Icon(Icons.Outlined.Add, contentDescription = null,
+                modifier = Modifier.size(15.dp))
+            Text("صندوق جدید", fontSize = 11.sp)
+        }
+    }
+    if (fundsOnly) {
+        GoalSurface(tone = purple, dark = dark) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null,
+                    tint = purple, modifier = Modifier.size(19.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("موجودی صندوق‌ها", fontSize = 12.sp,
+                    color = jessiReadableText(textMuted),
+                    modifier = Modifier.weight(1f))
+                Text(toman(fundSaved), fontWeight = FontWeight.ExtraBold,
+                    fontSize = 15.sp, color = jessiReadableText(purple))
+            }
+            Text("برنامه ماهانه: " + toman(fundMonthlyPlan),
+                fontSize = 11.sp, color = jessiReadableText(textMuted))
+            Text("واریز این ماه: " + toman(fundMonthDeposits) +
+                "   •   برداشت این ماه: " + toman(fundMonthWithdrawals),
+                fontSize = 10.sp, color = jessiReadableText(textMuted),
+                maxLines = 2)
+            Text("مبالغ فقط با تأیید واریز/برداشت جابه‌جا می‌شوند؛ " +
+                "برنامه ماهانه برداشت خودکار از حساب نیست.",
+                fontSize = 10.sp, color = jessiReadableText(textMuted),
+                maxLines = 2)
+        }
+    }
+
     if (goals.isEmpty()) {
         GoalSurface(tone = aqua, dark = dark) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -170,7 +230,8 @@ fun SavingsGoalsScreen(
                     modifier = Modifier.size(18.dp))
             })
     }
-    goals.filter { !it.archived || showArchived }.forEach { goal ->
+    goals.filter { (!fundsOnly || it.category == "FUND") &&
+        (!it.archived || showArchived) }.forEach { goal ->
         val tone = goalTone(goal.category, dark)
         val saved = SavingsGoalMath.saved(movements, goal.id)
         val monthSaved = SavingsGoalMath.monthlyProgress(movements, goal.id, start, next)
@@ -400,11 +461,14 @@ private fun GoalSurface(
 @Composable
 fun SavingsGoalFormDialog(
     initial: SavingsGoal?,
+    defaultCategory: String = "UNIVERSITY",
     onDismiss: () -> Unit,
     onSave: (SavingsGoal) -> Unit
 ) {
     var title by remember(initial) { mutableStateOf(initial?.title.orEmpty()) }
-    var kind by remember(initial) { mutableStateOf(initial?.category ?: "UNIVERSITY") }
+    var kind by remember(initial, defaultCategory) {
+        mutableStateOf(initial?.category ?: defaultCategory)
+    }
     var target by remember(initial) {
         mutableStateOf(initial?.targetToman?.takeIf { it > 0L }?.toString().orEmpty())
     }
@@ -424,7 +488,9 @@ fun SavingsGoalFormDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(24.dp),
-        title = { Text(if (initial == null) "هدف جدید" else "ویرایش هدف",
+        title = { Text(if (initial == null)
+            (if (defaultCategory == "FUND") "صندوق جدید" else "هدف جدید")
+            else "ویرایش هدف",
             fontWeight = FontWeight.ExtraBold, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) },
         text = {
             Column(Modifier.heightIn(max = 485.dp).verticalScroll(rememberScrollState()),
@@ -440,6 +506,7 @@ fun SavingsGoalFormDialog(
                         "PURCHASE" to "خرید",
                         "TRAVEL" to "سفر",
                         "EMERGENCY" to "اضطراری",
+                        "FUND" to "صندوق",
                         "OTHER" to "پس‌انداز"
                     ).forEach { (code, label) ->
                         FilterChip(selected = kind == code, onClick = { kind = code },
