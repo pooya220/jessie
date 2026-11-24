@@ -263,7 +263,15 @@ interface FinanceDao {
             val link = tx.groupId?.takeIf { it.startsWith("DEBT_REF:") }
                 ?.removePrefix("DEBT_REF:")?.toLongOrNull()
             val debt = if (link != null) {
-                findDebt(link)?.takeIf { it.direction == expectedDirection }
+                val linkedDebt = findDebt(link)
+                // The user may have deleted the parent debt while retaining its
+                // financial history. Explicitly deleting this orphan must still
+                // reverse its account effect; there is no debt left to adjust.
+                if (linkedDebt == null) {
+                    deleteTransaction(id)
+                    return true
+                }
+                linkedDebt.takeIf { it.direction == expectedDirection }
             } else {
                 getDebts().filter {
                     it.direction == expectedDirection &&
