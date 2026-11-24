@@ -40,7 +40,7 @@ class NextMonthInstallmentSelectorTest {
             listOf(a), Jalali.Date(1405, 10, 15)
         )
         assertEquals(1, items.size)
-        assertEquals(2, items.single().installmentIndex - 1 + 1)
+        assertEquals(1, items.single().installmentIndex)
         assertEquals(11, items.single().due.month)
     }
 }
