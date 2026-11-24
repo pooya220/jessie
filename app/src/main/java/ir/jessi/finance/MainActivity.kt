@@ -275,7 +275,10 @@ private sealed interface Editor {
     data class TxForm(val value: Transaction? = null) : Editor
     data class DebtForm(val value: Debt? = null) : Editor
     data class BudgetForm(val value: Budget? = null) : Editor
-    data class GoalForm(val value: SavingsGoal? = null) : Editor
+    data class GoalForm(
+        val value: SavingsGoal? = null,
+        val defaultCategory: String = "UNIVERSITY"
+    ) : Editor
     data class GoalMoney(val goal: SavingsGoal, val operation: String) : Editor
     data class Repay(val value: Debt) : Editor
     data class Review(val value: SmsReview) : Editor
@@ -1035,6 +1038,7 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                     goals = goals, movements = goalMovements, accounts = accounts,
                     nowEpoch = nowEpoch, dark = darkMode,
                     onAdd = { editor = Editor.GoalForm() },
+                    onAddFund = { editor = Editor.GoalForm(defaultCategory = "FUND") },
                     onEdit = { editor = Editor.GoalForm(it) },
                     onDeposit = { editor = Editor.GoalMoney(it, "DEPOSIT") },
                     onWithdraw = { editor = Editor.GoalMoney(it, "WITHDRAW") },
@@ -1137,6 +1141,7 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
         is Editor.BudgetForm -> BudgetDialog(e.value, budgets, dismiss = { editor = null }) { vm.saveBudget(it); editor = null }
         is Editor.GoalForm -> SavingsGoalFormDialog(
             initial = e.value,
+            defaultCategory = e.defaultCategory,
             onDismiss = { editor = null },
             onSave = { goal ->
                 vm.saveGoal(goal) { ok ->
