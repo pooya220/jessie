@@ -90,6 +90,10 @@ interface FinanceDao {
     @Query("SELECT * FROM accounts") suspend fun getAccounts(): List<Account>
     @Query("SELECT * FROM transactions") suspend fun getTransactions(): List<Transaction>
     @Query("SELECT * FROM debts") suspend fun getDebts(): List<Debt>
+    @Query("SELECT * FROM debts WHERE id=:id LIMIT 1") suspend fun findDebt(id: Long): Debt?
+    @Query("SELECT * FROM transactions WHERE id=:id LIMIT 1") suspend fun findTransaction(id: Long): Transaction?
+    @Query("SELECT COUNT(*) FROM goal_movements WHERE transactionId=:transactionId")
+    suspend fun countGoalMovementsForTransaction(transactionId: Long): Int
     @Query("SELECT * FROM budgets") suspend fun getBudgets(): List<Budget>
     @Query("SELECT * FROM sms_reviews") suspend fun getSmsReviews(): List<SmsReview>
     @Query("SELECT * FROM sms_ignored") suspend fun getIgnoredSms(): List<IgnoredSms>
@@ -191,15 +195,93 @@ interface FinanceDao {
     @Query("UPDATE budgets SET category=:to WHERE category=:from")
     suspend fun renameBudgetCategory(from: String, to: String)
     @Query("DELETE FROM budgets WHERE id=:id") suspend fun deleteBudget(id: Long)
+    /**
+     * All receivable collections/repayments are linked by debt ID without
+     * adding columns or changing existing user databases.
+     * Uses the current Room row, not an old UI snapshot.
+     */
     @androidx.room.Transaction suspend fun applyDebtPayment(row: Debt, amount: Long, accountId: Long) {
-        require(amount > 0 && amount <= row.totalToman - row.paidToman)
-        updateDebt(row.copy(paidToman = row.paidToman + amount))
-        insertTransaction(Transaction(
+        val latest = findDebt(row.id) ?: error("این بدهی یا طلب پیدا نشد")
+        require(amount > 0 && amount <= latest.totalToman - latest.paidToman)
+        require(getAccounts().any { it.id == accountId })
+        val txId = insertTransaction(Transaction(
             accountId = accountId, amountToman = amount,
-            kind = if (row.direction == "I_OWE") "DEBT_OUT" else "DEBT_IN",
-            category = if (row.direction == "I_OWE") "بازپرداخت بدهی" else "دریافت طلب",
-            note = row.person
+            kind = if (latest.direction == "I_OWE") "DEBT_OUT" else "DEBT_IN",
+            category = if (latest.direction == "I_OWE") "بازپرداخت بدهی" else "دریافت طلب",
+            note = latest.person, groupId = "DEBT_REF:${latest.id}"
         ))
+        check(txId > 0L)
+        updateDebt(latest.copy(paidToman = latest.paidToman + amount))
+    }
+
+    /**
+     * Convert a deposit into a receivable collection or record a new one,
+     * atomically. Existing incoming bank SMS is reclassified, NOT duplicated
+     * in the account balance or statistics.
+     */
+    @androidx.room.Transaction suspend fun collectReceivable(
+        debtId: Long, accountId: Long, amount: Long, note: String,
+        incomingTransactionId: Long = 0L
+    ): Boolean {
+        val debt = findDebt(debtId) ?: return false
+        if (debt.direction != "OWED_TO_ME" ||
+            amount <= 0L || amount > debt.totalToman - debt.paidToman ||
+            getAccounts().none { it.id == accountId }) return false
+        if (incomingTransactionId > 0L) {
+            val tx = findTransaction(incomingTransactionId) ?: return false
+            if (tx.kind != "IN" || tx.groupId != null || tx.amountToman != amount ||
+                tx.accountId != accountId) return false
+            updateTransaction(tx.copy(kind = "DEBT_IN",
+                category = "دریافت طلب", groupId = "DEBT_REF:$debtId",
+                note = note.ifBlank { debt.person }))
+        } else {
+            val saved = insertTransaction(Transaction(
+                accountId = accountId, amountToman = amount,
+                kind = "DEBT_IN", category = "دریافت طلب",
+                note = note.ifBlank { debt.person },
+                groupId = "DEBT_REF:$debtId"
+            ))
+            if (saved <= 0L) return false
+        }
+        updateDebt(debt.copy(paidToman = debt.paidToman + amount))
+        return true
+    }
+
+    /**
+     * Reverse a collection/repayment in the same transaction as its deletion
+     * so debt progress and account balance cannot silently diverge.
+     * Historical unlinked DEBT transactions are reversed only if one
+     * uniquely named debt can be identified; ambiguous cases are rejected.
+     * Savings-goal ledger entries remain immutable here.
+     */
+    @androidx.room.Transaction suspend fun deleteFinancialTransactionSafely(id: Long): Boolean {
+        val tx = findTransaction(id) ?: return false
+        if (countGoalMovementsForTransaction(id) > 0) return false
+        if (tx.kind in listOf("GOAL_IN", "GOAL_OUT")) return false
+        if (tx.kind == "DEBT_IN" || tx.kind == "DEBT_OUT") {
+            val expectedDirection = if (tx.kind == "DEBT_IN") "OWED_TO_ME" else "I_OWE"
+            val link = tx.groupId?.takeIf { it.startsWith("DEBT_REF:") }
+                ?.removePrefix("DEBT_REF:")?.toLongOrNull()
+            val debt = if (link != null) {
+                findDebt(link)?.takeIf { it.direction == expectedDirection }
+            } else {
+                getDebts().filter {
+                    it.direction == expectedDirection &&
+                    it.person.trim() == tx.note.trim()
+                }.singleOrNull()
+            } ?: return false
+            if (debt.paidToman < tx.amountToman) return false
+            updateDebt(debt.copy(paidToman = debt.paidToman - tx.amountToman))
+            deleteTransaction(id)
+            return true
+        }
+        // Transfers must be removed as one pair, not as a single bank leg.
+        val group = tx.groupId
+        if (group != null) {
+            if (group.startsWith("DEBT_REF:")) return false
+            deleteTransactionGroup(group)
+        } else deleteTransaction(id)
+        return true
     }
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertReview(row: SmsReview): Long
     @Query("SELECT * FROM sms_reviews WHERE id=:id LIMIT 1") suspend fun findReview(id: Long): SmsReview?
