@@ -60,6 +60,15 @@ object FinanceReminderRules {
         installmentsDueWithGrace(debts, today, 0)
 
     /**
+     * All still-unpaid installments with due dates on/before today.
+     * Used for once-a-day overdue reminders, even months after the due date.
+     * Never count future installments or already satisfied installments.
+     */
+    fun installmentsDueOrOverdue(
+        debts: List<Debt>, today: Jalali.Date
+    ): List<InstallmentAlert> = installmentsDueStartingAt(debts, today, 0L)
+
+    /**
      * WorkManager may be deferred by Android Doze/battery optimizations.
      * Include dates from the last few calendar days so an unpaid installment
      * is not silently lost when the worker misses midnight or its due day.
@@ -67,12 +76,19 @@ object FinanceReminderRules {
      */
     fun installmentsDueWithGrace(
         debts: List<Debt>, today: Jalali.Date, graceDays: Int = 3
-    ): List<InstallmentAlert> = buildList {
-        val todayStart = JalaliDates.toEpoch(today) ?: return@buildList
+    ): List<InstallmentAlert> {
+        val todayStart = JalaliDates.toEpoch(today) ?: return emptyList()
         val earliest = java.util.Calendar.getInstance().apply {
             timeInMillis = todayStart
             add(java.util.Calendar.DAY_OF_MONTH, -graceDays.coerceIn(0, 7))
         }.timeInMillis
+        return installmentsDueStartingAt(debts, today, earliest)
+    }
+
+    private fun installmentsDueStartingAt(
+        debts: List<Debt>, today: Jalali.Date, earliest: Long
+    ): List<InstallmentAlert> = buildList {
+        val todayStart = JalaliDates.toEpoch(today) ?: return@buildList
         for (debt in debts) {
             if (debt.direction != "I_OWE" || debt.installmentMonths <= 0 ||
                 debt.paidToman >= debt.totalToman || debt.totalToman <= 0L
