@@ -182,9 +182,13 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     fun acceptReview(
         row: SmsReview, accountId: Long, category: String, note: String,
-        unitChoice: String, onResult: (Boolean) -> Unit
+        unitChoice: String, receivableDebtId: Long? = null,
+        onResult: (Boolean) -> Unit
     ) = viewModelScope.launch(Dispatchers.IO) {
-        val saved = try { dao.approveReview(row.id, accountId, category, note, unitChoice) }
+        val saved = try {
+            dao.approveReview(row.id, accountId, category, note,
+                unitChoice, receivableDebtId)
+        }
         catch (_: Exception) { false }
         if (saved) {
             SmsReviewNotifications.cancel(getApplication(), row.id)
