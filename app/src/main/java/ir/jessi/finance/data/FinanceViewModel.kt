@@ -48,11 +48,33 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             JessiWidgetUpdater.request(getApplication())
         }
     }
-    fun deleteTransaction(row: Transaction) = viewModelScope.launch(Dispatchers.IO) {
-        if (row.groupId != null) dao.deleteTransactionGroup(row.groupId)
-        else dao.deleteTransaction(row.id)
-        FinanceReminderScheduler.checkSoon(getApplication())
-        JessiWidgetUpdater.request(getApplication())
+    fun deleteTransaction(
+        row: Transaction, onComplete: (Boolean) -> Unit = {}
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        val ok = runCatching { dao.deleteFinancialTransactionSafely(row.id) }
+            .getOrDefault(false)
+        if (ok) {
+            FinanceReminderScheduler.checkSoon(getApplication())
+            JessiWidgetUpdater.request(getApplication())
+        }
+        withContext(Dispatchers.Main) { onComplete(ok) }
+    }
+
+    fun collectReceivable(
+        debtId: Long, accountId: Long, amount: Long, note: String,
+        existingTransactionId: Long = 0L,
+        onComplete: (Boolean) -> Unit
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        val ok = runCatching {
+            dao.collectReceivable(
+                debtId, accountId, amount, note, existingTransactionId
+            )
+        }.getOrDefault(false)
+        if (ok) {
+            FinanceReminderScheduler.checkSoon(getApplication())
+            JessiWidgetUpdater.request(getApplication())
+        }
+        withContext(Dispatchers.Main) { onComplete(ok) }
     }
     fun saveDebt(row: Debt) = viewModelScope.launch(Dispatchers.IO) {
         if (row.id == 0L) dao.insertDebt(row) else dao.updateDebt(row)
