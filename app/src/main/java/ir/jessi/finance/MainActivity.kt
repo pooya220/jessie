@@ -1010,7 +1010,21 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                 }
                 Tab.TXS -> TransactionsPage(periodTransactions, accounts,
                     onEdit = { editor = Editor.TxForm(it) },
-                    onDelete = { row -> editor = Editor.Delete("این تراکنش حذف شود؟") { vm.deleteTransaction(row) } }
+                    onDelete = { row ->
+                        val debtLinked = row.kind in listOf("DEBT_IN", "DEBT_OUT")
+                        editor = Editor.Delete(
+                            if (debtLinked)
+                                "این وصول/بازپرداخت حذف شود؟ مبلغ از پرداخت‌شده طلب یا بدهی هم برمی‌گردد."
+                            else "این تراکنش حذف شود؟"
+                        ) {
+                            vm.deleteTransaction(row) { ok ->
+                                Toast.makeText(context,
+                                    if (ok) "تراکنش حذف شد و مانده‌ها به‌روز شدند"
+                                    else "حذف ممکن نیست؛ ارتباط مالی این تراکنش نامشخص یا محافظت‌شده است",
+                                    Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
                 )
                 Tab.DEBTS -> DebtsPage(debts, chosenPeriod, nowEpoch,
                     onEdit = { editor = Editor.DebtForm(it) },
@@ -1098,7 +1112,27 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
 
     when (val e = editor) {
         is Editor.AccountForm -> AccountDialog(e.value, dismiss = { editor = null }) { vm.saveAccount(it); editor = null }
-        is Editor.TxForm -> TransactionDialog(e.value, accounts, dismiss = { editor = null }, onSave = { vm.saveTransaction(it); editor = null }, onTransfer = { a, b, amount, note -> vm.transfer(a,b,amount,note); editor = null })
+        is Editor.TxForm -> TransactionDialog(
+            initial = e.value, accounts = accounts, debts = debts,
+            dismiss = { editor = null },
+            onSave = { vm.saveTransaction(it); editor = null },
+            onTransfer = { a, b, amount, note ->
+                vm.transfer(a,b,amount,note); editor = null
+            },
+            onCollect = { debtId, accountId, amount, note, existingTxId ->
+                vm.collectReceivable(debtId, accountId, amount, note, existingTxId) { ok ->
+                    Toast.makeText(context,
+                        if (ok) "وصول ثبت شد؛ مانده طلب و حساب با هم به‌روز شدند"
+                        else "وصول ثبت نشد؛ مبلغ و طلب انتخاب‌شده را بررسی کن",
+                        Toast.LENGTH_LONG).show()
+                    if (ok) {
+                        editor = null
+                        tabName = Tab.DEBTS.name
+                        showSettings = false
+                    }
+                }
+            }
+        )
         is Editor.DebtForm -> DebtDialog(e.value, dismiss = { editor = null }) { vm.saveDebt(it); editor = null }
         is Editor.BudgetForm -> BudgetDialog(e.value, budgets, dismiss = { editor = null }) { vm.saveBudget(it); editor = null }
         is Editor.GoalForm -> SavingsGoalFormDialog(
@@ -2478,7 +2512,7 @@ private fun TransactionsPage(
         TransactionTile(
             row, accounts, txs,
             if (row.kind in listOf("IN", "OUT")) ({ onEdit(row) }) else null,
-            if (row.kind in listOf("DEBT_IN", "DEBT_OUT", "GOAL_IN", "GOAL_OUT"))
+            if (row.kind in listOf("GOAL_IN", "GOAL_OUT"))
                 null else ({ onDelete(row) })
         )
     }
@@ -2852,8 +2886,11 @@ private fun AccountDialog(initial: Account?, dismiss: () -> Unit, save: (Account
 
 @Composable
 private fun TransactionDialog(
-    initial: Transaction?, accounts: List<Account>, dismiss: () -> Unit,
-    onSave: (Transaction) -> Unit, onTransfer: (Long, Long, Long, String) -> Unit
+    initial: Transaction?, accounts: List<Account>, debts: List<Debt>,
+    dismiss: () -> Unit,
+    onSave: (Transaction) -> Unit,
+    onTransfer: (Long, Long, Long, String) -> Unit,
+    onCollect: (Long, Long, Long, String, Long) -> Unit
 ) {
     var type by remember(initial) { mutableStateOf(initial?.kind ?: "OUT") }
     var accountId by remember(initial) { mutableStateOf(initial?.accountId ?: accounts.firstOrNull()?.id) }
@@ -2861,11 +2898,23 @@ private fun TransactionDialog(
     var category by remember(initial) { mutableStateOf(initial?.category ?: "سایر") }
     var amountStr by remember(initial) { mutableStateOf(initial?.amountToman?.toString().orEmpty()) }
     var note by remember(initial) { mutableStateOf(initial?.note.orEmpty()) }
+    var asCollection by remember(initial) { mutableStateOf(false) }
+    var receivableId by remember(initial) { mutableStateOf<Long?>(null) }
+    val receivables = remember(debts) {
+        debts.filter { it.direction == "OWED_TO_ME" && it.totalToman > it.paidToman }
+    }
+    val selectedReceivable = receivables.firstOrNull { it.id == receivableId }
     val amount = readToman(amountStr)
     val transfer = type == "TRANSFER_OUT"
-    val valid = amount != null && amount > 0 && accountId != null && (!transfer || (targetAccountId != null && targetAccountId != accountId))
+    val valid = amount != null && amount > 0 && accountId != null &&
+        (!transfer || (targetAccountId != null && targetAccountId != accountId)) &&
+        (!asCollection || (type == "IN" && selectedReceivable != null &&
+            amount <= selectedReceivable.totalToman - selectedReceivable.paidToman))
     EntryDialog(if (initial == null) "ثبت تراکنش" else "ویرایش تراکنش", valid, dismiss, {
         if (transfer) onTransfer(accountId!!, targetAccountId!!, amount!!, note)
+        else if (asCollection) onCollect(
+            receivableId!!, accountId!!, amount!!, note, initial?.id ?: 0L
+        )
         else onSave(Transaction(
             id = initial?.id ?: 0, accountId = accountId!!, amountToman = amount!!,
             kind = type, category = if (
@@ -2896,8 +2945,39 @@ private fun TransactionDialog(
         TextEntry("مبلغ به تومان", amountStr, { amountStr = it }, number = true)
         if (type == "OUT") SelectItem("دسته‌بندی", category, categories, { it }, { category = it })
         if (type == "IN") {
-            SelectItem("نوع درآمد", category, incomeCategories, { it }, { category = it })
-            if (category == "حقوق") Text("این واریز در حالت «از حقوق» دوره جدید مالی رو آغاز می‌کنه.", color = jessiReadableText(mint), fontSize = 11.sp)
+            Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                Checkbox(
+                    checked = asCollection,
+                    enabled = receivables.isNotEmpty(),
+                    onCheckedChange = { yes ->
+                        asCollection = yes
+                        if (yes && receivableId == null)
+                            receivableId = receivables.firstOrNull()?.id
+                    }
+                )
+                Column(Modifier.weight(1f)) {
+                    Text("این واریزی مربوط به وصول طلب است",
+                        fontSize = 12.sp,
+                        color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+                    Text("وصول از مبلغ طلب کم می‌شود و دوباره به موجودی افزوده نمی‌شود.",
+                        fontSize = 10.sp, color = jessiReadableText(muted))
+                }
+            }
+            if (asCollection) {
+                SelectItem("طلب مربوط", selectedReceivable, receivables,
+                    { it.person + " • مانده " + toman(it.totalToman - it.paidToman) },
+                    { receivableId = it.id })
+                if (selectedReceivable != null) Text(
+                    "مانده قابل وصول: " + toman(
+                        selectedReceivable.totalToman - selectedReceivable.paidToman
+                    ), fontSize = 11.sp, color = jessiReadableText(financeAqua))
+            } else {
+                SelectItem("نوع درآمد", category, incomeCategories, { it }, { category = it })
+                if (category == "حقوق") Text(
+                    "این واریز در حالت «از حقوق» دوره جدید مالی رو آغاز می‌کنه.",
+                    color = jessiReadableText(mint), fontSize = 11.sp)
+            }
         }
         TextEntry("توضیح (اختیاری)", note, { note = it })
     }
