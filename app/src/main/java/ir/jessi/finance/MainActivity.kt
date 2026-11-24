@@ -2406,103 +2406,145 @@ private fun TransactionsPage(
     }
     val income = visible.filter { it.kind == "IN" }.sumOf { it.amountToman }
     val expense = visible.filter { it.kind == "OUT" }.sumOf { it.amountToman }
-    FinanceSectionHero(
-        "تراکنش‌ها", "جست‌وجو و فیلتر گردش مالی دوره انتخاب‌شده",
-        Icons.Filled.ReceiptLong,
-        digitsFa(visible.size.toString()), "تراکنش", accent = financeBlue
-    )
-    Tile(Modifier.fillMaxWidth(), accent = financeBlue) {
+    var filtersExpanded by rememberSaveable { mutableStateOf(false) }
+    // Compact screen toolbar replaces three large stacked hero/filter/summary cards.
+    Row(
+        Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(Icons.Outlined.ReceiptLong, contentDescription = null,
+            tint = financeBlue, modifier = Modifier.size(21.dp))
+        Text("تراکنش‌ها", fontSize = 15.sp, fontWeight = FontWeight.Bold,
+            color = jessiReadableText(MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.weight(1f))
+        Text(digitsFa(visible.size.toString()) + " تراکنش",
+            fontSize = 10.sp, color = jessiReadableText(muted))
+    }
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
         OutlinedTextField(
-            value = search,
-            onValueChange = { search = it },
-            modifier = Modifier.fillMaxWidth(),
+            value = search, onValueChange = { search = it },
+            modifier = Modifier.weight(1f).height(48.dp),
             singleLine = true,
-            shape = RoundedCornerShape(13.dp),
+            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
+            shape = RoundedCornerShape(12.dp),
             leadingIcon = {
                 Icon(Icons.Outlined.Search, contentDescription = null,
-                    modifier = Modifier.size(20.dp))
+                    modifier = Modifier.size(17.dp))
             },
-            trailingIcon = if (search.isNotBlank()) ({
-                IconButton(onClick = { search = "" }) {
-                    Icon(Icons.Outlined.Close, contentDescription = "پاک‌کردن جست‌وجو")
+            trailingIcon = if (search.isNotEmpty()) ({
+                IconButton(onClick = { search = "" }, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Outlined.Close, contentDescription = "پاک‌کردن",
+                        modifier = Modifier.size(16.dp))
                 }
             }) else null,
-            placeholder = { Text("مبلغ، دسته، توضیح یا نام حساب…", fontSize = 12.sp) }
+            placeholder = { Text("جست‌وجوی تراکنش…", fontSize = 11.sp) }
         )
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            types.forEach { (code, label) ->
-                FilterChip(
-                    selected = type == code,
-                    onClick = { type = code; selectedCategory = null },
-                    label = { Text(label, fontSize = 11.sp) }
-                )
-            }
+        FilledTonalIconButton(onClick = { filtersExpanded = !filtersExpanded },
+            modifier = Modifier.size(42.dp)) {
+            Icon(if (filtersExpanded) Icons.Outlined.FilterAltOff
+                else Icons.Outlined.FilterAlt,
+                contentDescription = if (filtersExpanded) "بستن فیلترها" else "بازکردن فیلترها",
+                modifier = Modifier.size(20.dp))
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.weight(1f)) {
-                OutlinedButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { accountMenu = true }
+    }
+    if (filtersExpanded) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = .85f),
+            border = BorderStroke(1.dp, financeBlue.copy(alpha = .18f))
+        ) {
+            Column(Modifier.padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(accounts.firstOrNull { it.id == selectedAccountId }?.title
-                        ?: "همه حساب‌ها", maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, fontSize = 11.sp)
-                }
-                DropdownMenu(expanded = accountMenu, onDismissRequest = { accountMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text("همه حساب‌ها") },
-                        onClick = { selectedAccountId = null; accountMenu = false }
-                    )
-                    accounts.forEach { account ->
-                        DropdownMenuItem(text = { Text(account.title) }, onClick = {
-                            selectedAccountId = account.id
-                            accountMenu = false
-                        })
+                    types.forEach { (code, label) ->
+                        FilterChip(selected = type == code,
+                            onClick = { type = code; selectedCategory = null },
+                            label = { Text(label, fontSize = 10.sp) })
                     }
                 }
-            }
-            Box(Modifier.weight(1f)) {
-                OutlinedButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { categoryMenu = true }
-                ) {
-                    Text(selectedCategory ?: "همه دسته‌ها", maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, fontSize = 11.sp)
-                }
-                DropdownMenu(expanded = categoryMenu, onDismissRequest = { categoryMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text("همه دسته‌ها") },
-                        onClick = { selectedCategory = null; categoryMenu = false }
-                    )
-                    categories.forEach { category ->
-                        DropdownMenuItem(text = { Text(category) }, onClick = {
-                            selectedCategory = category
-                            categoryMenu = false
-                        })
+                Row(Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(Modifier.weight(1f)) {
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth().height(34.dp),
+                            contentPadding = PaddingValues(horizontal = 7.dp),
+                            onClick = { accountMenu = true }
+                        ) {
+                            Text(accounts.firstOrNull { it.id == selectedAccountId }?.title
+                                ?: "همه حساب‌ها", maxLines = 1,
+                                overflow = TextOverflow.Ellipsis, fontSize = 10.sp)
+                        }
+                        DropdownMenu(expanded = accountMenu,
+                            onDismissRequest = { accountMenu = false }) {
+                            DropdownMenuItem(text = { Text("همه حساب‌ها") },
+                                onClick = { selectedAccountId = null; accountMenu = false })
+                            accounts.forEach { account ->
+                                DropdownMenuItem(text = { Text(account.title) },
+                                    onClick = {
+                                        selectedAccountId = account.id
+                                        accountMenu = false
+                                    })
+                            }
+                        }
+                    }
+                    Box(Modifier.weight(1f)) {
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth().height(34.dp),
+                            contentPadding = PaddingValues(horizontal = 7.dp),
+                            onClick = { categoryMenu = true }
+                        ) {
+                            Text(selectedCategory ?: "همه دسته‌ها",
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                fontSize = 10.sp)
+                        }
+                        DropdownMenu(expanded = categoryMenu,
+                            onDismissRequest = { categoryMenu = false }) {
+                            DropdownMenuItem(text = { Text("همه دسته‌ها") },
+                                onClick = { selectedCategory = null; categoryMenu = false })
+                            categories.forEach { category ->
+                                DropdownMenuItem(text = { Text(category) },
+                                    onClick = {
+                                        selectedCategory = category
+                                        categoryMenu = false
+                                    })
+                            }
+                        }
                     }
                 }
-            }
-        }
-        if (search.isNotBlank() || type != TransactionSearch.ALL ||
-            selectedAccountId != null || selectedCategory != null
-        ) {
-            TextButton(onClick = {
-                search = ""
-                type = TransactionSearch.ALL
-                selectedAccountId = null
-                selectedCategory = null
-            }) {
-                Text("پاک‌کردن همه فیلترها", color = jessiReadableText(financeBlue),
-                    fontSize = 11.sp)
+                if (search.isNotBlank() || type != TransactionSearch.ALL ||
+                    selectedAccountId != null || selectedCategory != null
+                ) TextButton(
+                    modifier = Modifier.height(30.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                    onClick = {
+                        search = ""
+                        type = TransactionSearch.ALL
+                        selectedAccountId = null
+                        selectedCategory = null
+                    }
+                ) { Text("پاک‌کردن فیلترها", fontSize = 10.sp) }
             }
         }
     }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        FinanceSummaryChip("درآمد نمایش‌داده‌شده", income, income = true, Modifier.weight(1f))
-        FinanceSummaryChip("هزینه نمایش‌داده‌شده", expense, income = false, Modifier.weight(1f))
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 3.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("واریز: " + toman(income), fontSize = 10.sp,
+            color = jessiReadableText(financeAqua), maxLines = 1,
+            modifier = Modifier.weight(1f))
+        Text("برداشت: " + toman(expense), fontSize = 10.sp,
+            color = jessiReadableText(danger), maxLines = 1,
+            modifier = Modifier.weight(1f))
     }
     if (visible.isEmpty()) EmptyNote(
         if (txs.isEmpty()) "برای ثبت اولین تراکنش روی + بزن."
