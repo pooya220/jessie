@@ -125,11 +125,11 @@ object FinanceReminderScheduler {
         val lastText = if (last <= 0L) "هنوز اجرا نشده"
         else java.text.SimpleDateFormat("yyyy/MM/dd HH:mm", Locale("fa", "IR"))
             .format(java.util.Date(last))
-        val due = FinanceReminderRules.installmentsDueWithGrace(
+        val due = FinanceReminderRules.installmentsDueOrOverdue(
             FinanceDatabase.get(context).dao().getDebts(),
             Jalali.of(System.currentTimeMillis())
         ).size
-        return "آخرین بررسی خودکار: $lastText • اقساطِ واجد شرایط امروز یا ۳ روز اخیر: $due"
+        return "آخرین بررسی خودکار: $lastText • اقساط سررسیدشده و پرداخت‌نشده: $due"
     }
 
     private fun openApp(context: Context, tab: String): PendingIntent {
