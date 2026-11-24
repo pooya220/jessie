@@ -165,6 +165,19 @@ jobs:
             cp "$RUNNER_TEMP/jessi-verified-input/app-release.apk" \
               app/build/outputs/apk/release/app-release.apk
             echo "Restored SHA-256 pinned Jessie 0.11.22 build input." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$VERSION" == "0.11.23" ]]; then
+            mkdir -p "$RUNNER_TEMP/jessi-verified-input"
+            gh run download 45351652517 \
+              --repo "$GITHUB_REPOSITORY" \
+              --name jessi-signing-input-fa1427a18162dc647fa00c1c61b50b72e190f40f \
+              --dir "$RUNNER_TEMP/jessi-verified-input"
+            test -s "$RUNNER_TEMP/jessi-verified-input/app-release.apk"
+            printf '%s  %s\n' \
+              d8d624c5bdfdb8e3ceb60bf653a3ad293572ac3754a5af2fa97b8bd97df482e3 \
+              "$RUNNER_TEMP/jessi-verified-input/app-release.apk" | sha256sum --check --status
+            cp "$RUNNER_TEMP/jessi-verified-input/app-release.apk" \
+              app/build/outputs/apk/release/app-release.apk
+            echo "Restored SHA-256 pinned Jessie 0.11.23 build input." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Save APK signing input for offline permanent signer
