@@ -1179,10 +1179,10 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
         )
         is Editor.Repay -> RepayDialog(e.value, accounts, dismiss = { editor = null }) { amount, accountId -> vm.settleDebt(e.value, amount, accountId); editor = null }
         is Editor.Review -> ReviewDialog(
-            e.value, accounts,
+            e.value, accounts, debts,
             dismiss = { editor = null },
-            onAccept = { id, category, note, unit ->
-                vm.acceptReview(e.value, id, category, note, unit) { saved ->
+            onAccept = { id, category, note, unit, receivableDebtId ->
+                vm.acceptReview(e.value, id, category, note, unit, receivableDebtId) { saved ->
                     if (saved) {
                         editor = null
                         showSettings = false
@@ -3139,14 +3139,22 @@ private fun reviewAmountLabel(row: SmsReview): String {
 
 @Composable
 private fun ReviewDialog(
-    row: SmsReview, accounts: List<Account>, dismiss: () -> Unit,
-    onAccept: (Long, String, String, String) -> Unit, onReject: () -> Unit
+    row: SmsReview, accounts: List<Account>, debts: List<Debt>,
+    dismiss: () -> Unit,
+    onAccept: (Long, String, String, String, Long?) -> Unit,
+    onReject: () -> Unit
 ) {
     val isSimulation = SmsReviewPolicy.isSimulation(row.fingerprint)
     var testRegistrationConsent by remember(row.id) { mutableStateOf(false) }
     var accountId by remember(row.id) { mutableStateOf(row.accountGuess ?: accounts.firstOrNull()?.id) }
     var category by remember(row.id) { mutableStateOf(if (row.kind == "IN") "درآمد" else "سایر") }
     var note by remember(row.id) { mutableStateOf("") }
+    var asCollection by remember(row.id) { mutableStateOf(false) }
+    var receivableId by remember(row.id) { mutableStateOf<Long?>(null) }
+    val activeReceivables = debts.filter {
+        it.direction == "OWED_TO_ME" && it.totalToman > it.paidToman
+    }
+    val selectedReceivable = activeReceivables.firstOrNull { it.id == receivableId }
     val needsUnit = row.amountUnit == "UNKNOWN"
     var selectedUnit by remember(row.id) { mutableStateOf(if (needsUnit) "" else row.amountUnit) }
     val original = row.amountRaw.takeIf { it > 0L } ?: row.amountToman
@@ -3200,10 +3208,29 @@ private fun ReviewDialog(
                 else SelectItem("این تراکنش برای کدام حساب است؟",
                     accountId?.let { id -> accounts.firstOrNull { it.id == id } },
                     accounts, { it.title }, { accountId = it.id })
-                SelectItem("برای چه دسته‌ای بود؟", category,
+                if (row.kind == "IN" && activeReceivables.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = asCollection, onCheckedChange = { yes ->
+                            asCollection = yes
+                            if (yes && receivableId == null)
+                                receivableId = activeReceivables.firstOrNull()?.id
+                        })
+                        Text("این واریزی، وصول طلب است",
+                            fontSize = 12.sp,
+                            color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+                    }
+                    if (asCollection) {
+                        SelectItem("طلب مرتبط", selectedReceivable, activeReceivables,
+                            { it.person + " • مانده " + toman(it.totalToman - it.paidToman) },
+                            { receivableId = it.id })
+                        Text("موجودی حساب فقط یک‌بار افزایش پیدا می‌کند و طلب هم تسویه می‌شود.",
+                            fontSize = 10.sp, color = jessiReadableText(muted))
+                    }
+                }
+                if (!asCollection) SelectItem("برای چه دسته‌ای بود؟", category,
                     if (row.kind == "IN") incomeCategories else categories,
                     { it }, { category = it })
-                if (category == "حقوق" && row.kind == "IN") {
+                if (!asCollection && category == "حقوق" && row.kind == "IN") {
                     Text("این واریز می‌تونه دوره جدید رو در حالت «از حقوق» آغاز کنه.",
                         color = jessiReadableText(mint), fontSize = 11.sp)
                 }
@@ -3223,8 +3250,16 @@ private fun ReviewDialog(
         },
         confirmButton = {
             Button(
-                onClick = { accountId?.let { onAccept(it, category, note, selectedUnit) } },
+                onClick = {
+                    accountId?.let {
+                        onAccept(it, category, note, selectedUnit,
+                            if (asCollection) receivableId else null)
+                    }
+                },
                 enabled = accountId != null && selectedAmount > 0L &&
+                    (!asCollection || (selectedReceivable != null &&
+                        selectedAmount <= selectedReceivable.totalToman -
+                            selectedReceivable.paidToman)) &&
                     (!isSimulation || testRegistrationConsent)
             ) {
                 Text(if (isSimulation) "ثبت آزمایشی در آمار" else "ثبت تراکنش", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
