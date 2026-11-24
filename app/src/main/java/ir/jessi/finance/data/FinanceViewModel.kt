@@ -48,11 +48,33 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             JessiWidgetUpdater.request(getApplication())
         }
     }
-    fun deleteTransaction(row: Transaction) = viewModelScope.launch(Dispatchers.IO) {
-        if (row.groupId != null) dao.deleteTransactionGroup(row.groupId)
-        else dao.deleteTransaction(row.id)
-        FinanceReminderScheduler.checkSoon(getApplication())
-        JessiWidgetUpdater.request(getApplication())
+    fun deleteTransaction(
+        row: Transaction, onComplete: (Boolean) -> Unit = {}
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        val ok = runCatching { dao.deleteFinancialTransactionSafely(row.id) }
+            .getOrDefault(false)
+        if (ok) {
+            FinanceReminderScheduler.checkSoon(getApplication())
+            JessiWidgetUpdater.request(getApplication())
+        }
+        withContext(Dispatchers.Main) { onComplete(ok) }
+    }
+
+    fun collectReceivable(
+        debtId: Long, accountId: Long, amount: Long, note: String,
+        existingTransactionId: Long = 0L,
+        onComplete: (Boolean) -> Unit
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        val ok = runCatching {
+            dao.collectReceivable(
+                debtId, accountId, amount, note, existingTransactionId
+            )
+        }.getOrDefault(false)
+        if (ok) {
+            FinanceReminderScheduler.checkSoon(getApplication())
+            JessiWidgetUpdater.request(getApplication())
+        }
+        withContext(Dispatchers.Main) { onComplete(ok) }
     }
     fun saveDebt(row: Debt) = viewModelScope.launch(Dispatchers.IO) {
         if (row.id == 0L) dao.insertDebt(row) else dao.updateDebt(row)
@@ -160,9 +182,13 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     fun acceptReview(
         row: SmsReview, accountId: Long, category: String, note: String,
-        unitChoice: String, onResult: (Boolean) -> Unit
+        unitChoice: String, receivableDebtId: Long? = null,
+        onResult: (Boolean) -> Unit
     ) = viewModelScope.launch(Dispatchers.IO) {
-        val saved = try { dao.approveReview(row.id, accountId, category, note, unitChoice) }
+        val saved = try {
+            dao.approveReview(row.id, accountId, category, note,
+                unitChoice, receivableDebtId)
+        }
         catch (_: Exception) { false }
         if (saved) {
             SmsReviewNotifications.cancel(getApplication(), row.id)

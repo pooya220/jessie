@@ -275,7 +275,10 @@ private sealed interface Editor {
     data class TxForm(val value: Transaction? = null) : Editor
     data class DebtForm(val value: Debt? = null) : Editor
     data class BudgetForm(val value: Budget? = null) : Editor
-    data class GoalForm(val value: SavingsGoal? = null) : Editor
+    data class GoalForm(
+        val value: SavingsGoal? = null,
+        val defaultCategory: String = "UNIVERSITY"
+    ) : Editor
     data class GoalMoney(val goal: SavingsGoal, val operation: String) : Editor
     data class Repay(val value: Debt) : Editor
     data class Review(val value: SmsReview) : Editor
@@ -1010,7 +1013,21 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                 }
                 Tab.TXS -> TransactionsPage(periodTransactions, accounts,
                     onEdit = { editor = Editor.TxForm(it) },
-                    onDelete = { row -> editor = Editor.Delete("این تراکنش حذف شود؟") { vm.deleteTransaction(row) } }
+                    onDelete = { row ->
+                        val debtLinked = row.kind in listOf("DEBT_IN", "DEBT_OUT")
+                        editor = Editor.Delete(
+                            if (debtLinked)
+                                "این وصول/بازپرداخت حذف شود؟ مبلغ از پرداخت‌شده طلب یا بدهی هم برمی‌گردد."
+                            else "این تراکنش حذف شود؟"
+                        ) {
+                            vm.deleteTransaction(row) { ok ->
+                                Toast.makeText(context,
+                                    if (ok) "تراکنش حذف شد و مانده‌ها به‌روز شدند"
+                                    else "حذف ممکن نیست؛ ارتباط مالی این تراکنش نامشخص یا محافظت‌شده است",
+                                    Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
                 )
                 Tab.DEBTS -> DebtsPage(debts, chosenPeriod, nowEpoch,
                     onEdit = { editor = Editor.DebtForm(it) },
@@ -1021,6 +1038,7 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                     goals = goals, movements = goalMovements, accounts = accounts,
                     nowEpoch = nowEpoch, dark = darkMode,
                     onAdd = { editor = Editor.GoalForm() },
+                    onAddFund = { editor = Editor.GoalForm(defaultCategory = "FUND") },
                     onEdit = { editor = Editor.GoalForm(it) },
                     onDeposit = { editor = Editor.GoalMoney(it, "DEPOSIT") },
                     onWithdraw = { editor = Editor.GoalMoney(it, "WITHDRAW") },
@@ -1098,11 +1116,32 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
 
     when (val e = editor) {
         is Editor.AccountForm -> AccountDialog(e.value, dismiss = { editor = null }) { vm.saveAccount(it); editor = null }
-        is Editor.TxForm -> TransactionDialog(e.value, accounts, dismiss = { editor = null }, onSave = { vm.saveTransaction(it); editor = null }, onTransfer = { a, b, amount, note -> vm.transfer(a,b,amount,note); editor = null })
+        is Editor.TxForm -> TransactionDialog(
+            initial = e.value, accounts = accounts, debts = debts,
+            dismiss = { editor = null },
+            onSave = { vm.saveTransaction(it); editor = null },
+            onTransfer = { a, b, amount, note ->
+                vm.transfer(a,b,amount,note); editor = null
+            },
+            onCollect = { debtId, accountId, amount, note, existingTxId ->
+                vm.collectReceivable(debtId, accountId, amount, note, existingTxId) { ok ->
+                    Toast.makeText(context,
+                        if (ok) "وصول ثبت شد؛ مانده طلب و حساب با هم به‌روز شدند"
+                        else "وصول ثبت نشد؛ مبلغ و طلب انتخاب‌شده را بررسی کن",
+                        Toast.LENGTH_LONG).show()
+                    if (ok) {
+                        editor = null
+                        tabName = Tab.DEBTS.name
+                        showSettings = false
+                    }
+                }
+            }
+        )
         is Editor.DebtForm -> DebtDialog(e.value, dismiss = { editor = null }) { vm.saveDebt(it); editor = null }
         is Editor.BudgetForm -> BudgetDialog(e.value, budgets, dismiss = { editor = null }) { vm.saveBudget(it); editor = null }
         is Editor.GoalForm -> SavingsGoalFormDialog(
             initial = e.value,
+            defaultCategory = e.defaultCategory,
             onDismiss = { editor = null },
             onSave = { goal ->
                 vm.saveGoal(goal) { ok ->
@@ -1140,10 +1179,10 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
         )
         is Editor.Repay -> RepayDialog(e.value, accounts, dismiss = { editor = null }) { amount, accountId -> vm.settleDebt(e.value, amount, accountId); editor = null }
         is Editor.Review -> ReviewDialog(
-            e.value, accounts,
+            e.value, accounts, debts,
             dismiss = { editor = null },
-            onAccept = { id, category, note, unit ->
-                vm.acceptReview(e.value, id, category, note, unit) { saved ->
+            onAccept = { id, category, note, unit, receivableDebtId ->
+                vm.acceptReview(e.value, id, category, note, unit, receivableDebtId) { saved ->
                     if (saved) {
                         editor = null
                         showSettings = false
@@ -2372,103 +2411,145 @@ private fun TransactionsPage(
     }
     val income = visible.filter { it.kind == "IN" }.sumOf { it.amountToman }
     val expense = visible.filter { it.kind == "OUT" }.sumOf { it.amountToman }
-    FinanceSectionHero(
-        "تراکنش‌ها", "جست‌وجو و فیلتر گردش مالی دوره انتخاب‌شده",
-        Icons.Filled.ReceiptLong,
-        digitsFa(visible.size.toString()), "تراکنش", accent = financeBlue
-    )
-    Tile(Modifier.fillMaxWidth(), accent = financeBlue) {
+    var filtersExpanded by rememberSaveable { mutableStateOf(false) }
+    // Compact screen toolbar replaces three large stacked hero/filter/summary cards.
+    Row(
+        Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(Icons.Outlined.ReceiptLong, contentDescription = null,
+            tint = financeBlue, modifier = Modifier.size(21.dp))
+        Text("تراکنش‌ها", fontSize = 15.sp, fontWeight = FontWeight.Bold,
+            color = jessiReadableText(MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.weight(1f))
+        Text(digitsFa(visible.size.toString()) + " تراکنش",
+            fontSize = 10.sp, color = jessiReadableText(muted))
+    }
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
         OutlinedTextField(
-            value = search,
-            onValueChange = { search = it },
-            modifier = Modifier.fillMaxWidth(),
+            value = search, onValueChange = { search = it },
+            modifier = Modifier.weight(1f).height(48.dp),
             singleLine = true,
-            shape = RoundedCornerShape(13.dp),
+            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
+            shape = RoundedCornerShape(12.dp),
             leadingIcon = {
                 Icon(Icons.Outlined.Search, contentDescription = null,
-                    modifier = Modifier.size(20.dp))
+                    modifier = Modifier.size(17.dp))
             },
-            trailingIcon = if (search.isNotBlank()) ({
-                IconButton(onClick = { search = "" }) {
-                    Icon(Icons.Outlined.Close, contentDescription = "پاک‌کردن جست‌وجو")
+            trailingIcon = if (search.isNotEmpty()) ({
+                IconButton(onClick = { search = "" }, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Outlined.Close, contentDescription = "پاک‌کردن",
+                        modifier = Modifier.size(16.dp))
                 }
             }) else null,
-            placeholder = { Text("مبلغ، دسته، توضیح یا نام حساب…", fontSize = 12.sp) }
+            placeholder = { Text("جست‌وجوی تراکنش…", fontSize = 11.sp) }
         )
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            types.forEach { (code, label) ->
-                FilterChip(
-                    selected = type == code,
-                    onClick = { type = code; selectedCategory = null },
-                    label = { Text(label, fontSize = 11.sp) }
-                )
-            }
+        FilledTonalIconButton(onClick = { filtersExpanded = !filtersExpanded },
+            modifier = Modifier.size(42.dp)) {
+            Icon(if (filtersExpanded) Icons.Outlined.FilterAltOff
+                else Icons.Outlined.FilterAlt,
+                contentDescription = if (filtersExpanded) "بستن فیلترها" else "بازکردن فیلترها",
+                modifier = Modifier.size(20.dp))
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.weight(1f)) {
-                OutlinedButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { accountMenu = true }
+    }
+    if (filtersExpanded) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = .85f),
+            border = BorderStroke(1.dp, financeBlue.copy(alpha = .18f))
+        ) {
+            Column(Modifier.padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(accounts.firstOrNull { it.id == selectedAccountId }?.title
-                        ?: "همه حساب‌ها", maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, fontSize = 11.sp)
-                }
-                DropdownMenu(expanded = accountMenu, onDismissRequest = { accountMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text("همه حساب‌ها") },
-                        onClick = { selectedAccountId = null; accountMenu = false }
-                    )
-                    accounts.forEach { account ->
-                        DropdownMenuItem(text = { Text(account.title) }, onClick = {
-                            selectedAccountId = account.id
-                            accountMenu = false
-                        })
+                    types.forEach { (code, label) ->
+                        FilterChip(selected = type == code,
+                            onClick = { type = code; selectedCategory = null },
+                            label = { Text(label, fontSize = 10.sp) })
                     }
                 }
-            }
-            Box(Modifier.weight(1f)) {
-                OutlinedButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { categoryMenu = true }
-                ) {
-                    Text(selectedCategory ?: "همه دسته‌ها", maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, fontSize = 11.sp)
-                }
-                DropdownMenu(expanded = categoryMenu, onDismissRequest = { categoryMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text("همه دسته‌ها") },
-                        onClick = { selectedCategory = null; categoryMenu = false }
-                    )
-                    categories.forEach { category ->
-                        DropdownMenuItem(text = { Text(category) }, onClick = {
-                            selectedCategory = category
-                            categoryMenu = false
-                        })
+                Row(Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(Modifier.weight(1f)) {
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth().height(34.dp),
+                            contentPadding = PaddingValues(horizontal = 7.dp),
+                            onClick = { accountMenu = true }
+                        ) {
+                            Text(accounts.firstOrNull { it.id == selectedAccountId }?.title
+                                ?: "همه حساب‌ها", maxLines = 1,
+                                overflow = TextOverflow.Ellipsis, fontSize = 10.sp)
+                        }
+                        DropdownMenu(expanded = accountMenu,
+                            onDismissRequest = { accountMenu = false }) {
+                            DropdownMenuItem(text = { Text("همه حساب‌ها") },
+                                onClick = { selectedAccountId = null; accountMenu = false })
+                            accounts.forEach { account ->
+                                DropdownMenuItem(text = { Text(account.title) },
+                                    onClick = {
+                                        selectedAccountId = account.id
+                                        accountMenu = false
+                                    })
+                            }
+                        }
+                    }
+                    Box(Modifier.weight(1f)) {
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth().height(34.dp),
+                            contentPadding = PaddingValues(horizontal = 7.dp),
+                            onClick = { categoryMenu = true }
+                        ) {
+                            Text(selectedCategory ?: "همه دسته‌ها",
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                fontSize = 10.sp)
+                        }
+                        DropdownMenu(expanded = categoryMenu,
+                            onDismissRequest = { categoryMenu = false }) {
+                            DropdownMenuItem(text = { Text("همه دسته‌ها") },
+                                onClick = { selectedCategory = null; categoryMenu = false })
+                            categories.forEach { category ->
+                                DropdownMenuItem(text = { Text(category) },
+                                    onClick = {
+                                        selectedCategory = category
+                                        categoryMenu = false
+                                    })
+                            }
+                        }
                     }
                 }
-            }
-        }
-        if (search.isNotBlank() || type != TransactionSearch.ALL ||
-            selectedAccountId != null || selectedCategory != null
-        ) {
-            TextButton(onClick = {
-                search = ""
-                type = TransactionSearch.ALL
-                selectedAccountId = null
-                selectedCategory = null
-            }) {
-                Text("پاک‌کردن همه فیلترها", color = jessiReadableText(financeBlue),
-                    fontSize = 11.sp)
+                if (search.isNotBlank() || type != TransactionSearch.ALL ||
+                    selectedAccountId != null || selectedCategory != null
+                ) TextButton(
+                    modifier = Modifier.height(30.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                    onClick = {
+                        search = ""
+                        type = TransactionSearch.ALL
+                        selectedAccountId = null
+                        selectedCategory = null
+                    }
+                ) { Text("پاک‌کردن فیلترها", fontSize = 10.sp) }
             }
         }
     }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        FinanceSummaryChip("درآمد نمایش‌داده‌شده", income, income = true, Modifier.weight(1f))
-        FinanceSummaryChip("هزینه نمایش‌داده‌شده", expense, income = false, Modifier.weight(1f))
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 3.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("واریز: " + toman(income), fontSize = 10.sp,
+            color = jessiReadableText(financeAqua), maxLines = 1,
+            modifier = Modifier.weight(1f))
+        Text("برداشت: " + toman(expense), fontSize = 10.sp,
+            color = jessiReadableText(danger), maxLines = 1,
+            modifier = Modifier.weight(1f))
     }
     if (visible.isEmpty()) EmptyNote(
         if (txs.isEmpty()) "برای ثبت اولین تراکنش روی + بزن."
@@ -2478,7 +2559,7 @@ private fun TransactionsPage(
         TransactionTile(
             row, accounts, txs,
             if (row.kind in listOf("IN", "OUT")) ({ onEdit(row) }) else null,
-            if (row.kind in listOf("DEBT_IN", "DEBT_OUT", "GOAL_IN", "GOAL_OUT"))
+            if (row.kind in listOf("GOAL_IN", "GOAL_OUT"))
                 null else ({ onDelete(row) })
         )
     }
@@ -2852,8 +2933,11 @@ private fun AccountDialog(initial: Account?, dismiss: () -> Unit, save: (Account
 
 @Composable
 private fun TransactionDialog(
-    initial: Transaction?, accounts: List<Account>, dismiss: () -> Unit,
-    onSave: (Transaction) -> Unit, onTransfer: (Long, Long, Long, String) -> Unit
+    initial: Transaction?, accounts: List<Account>, debts: List<Debt>,
+    dismiss: () -> Unit,
+    onSave: (Transaction) -> Unit,
+    onTransfer: (Long, Long, Long, String) -> Unit,
+    onCollect: (Long, Long, Long, String, Long) -> Unit
 ) {
     var type by remember(initial) { mutableStateOf(initial?.kind ?: "OUT") }
     var accountId by remember(initial) { mutableStateOf(initial?.accountId ?: accounts.firstOrNull()?.id) }
@@ -2861,11 +2945,23 @@ private fun TransactionDialog(
     var category by remember(initial) { mutableStateOf(initial?.category ?: "سایر") }
     var amountStr by remember(initial) { mutableStateOf(initial?.amountToman?.toString().orEmpty()) }
     var note by remember(initial) { mutableStateOf(initial?.note.orEmpty()) }
+    var asCollection by remember(initial) { mutableStateOf(false) }
+    var receivableId by remember(initial) { mutableStateOf<Long?>(null) }
+    val receivables = remember(debts) {
+        debts.filter { it.direction == "OWED_TO_ME" && it.totalToman > it.paidToman }
+    }
+    val selectedReceivable = receivables.firstOrNull { it.id == receivableId }
     val amount = readToman(amountStr)
     val transfer = type == "TRANSFER_OUT"
-    val valid = amount != null && amount > 0 && accountId != null && (!transfer || (targetAccountId != null && targetAccountId != accountId))
+    val valid = amount != null && amount > 0 && accountId != null &&
+        (!transfer || (targetAccountId != null && targetAccountId != accountId)) &&
+        (!asCollection || (type == "IN" && selectedReceivable != null &&
+            amount <= selectedReceivable.totalToman - selectedReceivable.paidToman))
     EntryDialog(if (initial == null) "ثبت تراکنش" else "ویرایش تراکنش", valid, dismiss, {
         if (transfer) onTransfer(accountId!!, targetAccountId!!, amount!!, note)
+        else if (asCollection) onCollect(
+            receivableId!!, accountId!!, amount!!, note, initial?.id ?: 0L
+        )
         else onSave(Transaction(
             id = initial?.id ?: 0, accountId = accountId!!, amountToman = amount!!,
             kind = type, category = if (
@@ -2896,8 +2992,39 @@ private fun TransactionDialog(
         TextEntry("مبلغ به تومان", amountStr, { amountStr = it }, number = true)
         if (type == "OUT") SelectItem("دسته‌بندی", category, categories, { it }, { category = it })
         if (type == "IN") {
-            SelectItem("نوع درآمد", category, incomeCategories, { it }, { category = it })
-            if (category == "حقوق") Text("این واریز در حالت «از حقوق» دوره جدید مالی رو آغاز می‌کنه.", color = jessiReadableText(mint), fontSize = 11.sp)
+            Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                Checkbox(
+                    checked = asCollection,
+                    enabled = receivables.isNotEmpty(),
+                    onCheckedChange = { yes ->
+                        asCollection = yes
+                        if (yes && receivableId == null)
+                            receivableId = receivables.firstOrNull()?.id
+                    }
+                )
+                Column(Modifier.weight(1f)) {
+                    Text("این واریزی مربوط به وصول طلب است",
+                        fontSize = 12.sp,
+                        color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+                    Text("وصول از مبلغ طلب کم می‌شود و دوباره به موجودی افزوده نمی‌شود.",
+                        fontSize = 10.sp, color = jessiReadableText(muted))
+                }
+            }
+            if (asCollection) {
+                SelectItem("طلب مربوط", selectedReceivable, receivables,
+                    { it.person + " • مانده " + toman(it.totalToman - it.paidToman) },
+                    { receivableId = it.id })
+                if (selectedReceivable != null) Text(
+                    "مانده قابل وصول: " + toman(
+                        selectedReceivable.totalToman - selectedReceivable.paidToman
+                    ), fontSize = 11.sp, color = jessiReadableText(financeAqua))
+            } else {
+                SelectItem("نوع درآمد", category, incomeCategories, { it }, { category = it })
+                if (category == "حقوق") Text(
+                    "این واریز در حالت «از حقوق» دوره جدید مالی رو آغاز می‌کنه.",
+                    color = jessiReadableText(mint), fontSize = 11.sp)
+            }
         }
         TextEntry("توضیح (اختیاری)", note, { note = it })
     }
@@ -3012,14 +3139,22 @@ private fun reviewAmountLabel(row: SmsReview): String {
 
 @Composable
 private fun ReviewDialog(
-    row: SmsReview, accounts: List<Account>, dismiss: () -> Unit,
-    onAccept: (Long, String, String, String) -> Unit, onReject: () -> Unit
+    row: SmsReview, accounts: List<Account>, debts: List<Debt>,
+    dismiss: () -> Unit,
+    onAccept: (Long, String, String, String, Long?) -> Unit,
+    onReject: () -> Unit
 ) {
     val isSimulation = SmsReviewPolicy.isSimulation(row.fingerprint)
     var testRegistrationConsent by remember(row.id) { mutableStateOf(false) }
     var accountId by remember(row.id) { mutableStateOf(row.accountGuess ?: accounts.firstOrNull()?.id) }
     var category by remember(row.id) { mutableStateOf(if (row.kind == "IN") "درآمد" else "سایر") }
     var note by remember(row.id) { mutableStateOf("") }
+    var asCollection by remember(row.id) { mutableStateOf(false) }
+    var receivableId by remember(row.id) { mutableStateOf<Long?>(null) }
+    val activeReceivables = debts.filter {
+        it.direction == "OWED_TO_ME" && it.totalToman > it.paidToman
+    }
+    val selectedReceivable = activeReceivables.firstOrNull { it.id == receivableId }
     val needsUnit = row.amountUnit == "UNKNOWN"
     var selectedUnit by remember(row.id) { mutableStateOf(if (needsUnit) "" else row.amountUnit) }
     val original = row.amountRaw.takeIf { it > 0L } ?: row.amountToman
@@ -3073,10 +3208,29 @@ private fun ReviewDialog(
                 else SelectItem("این تراکنش برای کدام حساب است؟",
                     accountId?.let { id -> accounts.firstOrNull { it.id == id } },
                     accounts, { it.title }, { accountId = it.id })
-                SelectItem("برای چه دسته‌ای بود؟", category,
+                if (row.kind == "IN" && activeReceivables.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = asCollection, onCheckedChange = { yes ->
+                            asCollection = yes
+                            if (yes && receivableId == null)
+                                receivableId = activeReceivables.firstOrNull()?.id
+                        })
+                        Text("این واریزی، وصول طلب است",
+                            fontSize = 12.sp,
+                            color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+                    }
+                    if (asCollection) {
+                        SelectItem("طلب مرتبط", selectedReceivable, activeReceivables,
+                            { it.person + " • مانده " + toman(it.totalToman - it.paidToman) },
+                            { receivableId = it.id })
+                        Text("موجودی حساب فقط یک‌بار افزایش پیدا می‌کند و طلب هم تسویه می‌شود.",
+                            fontSize = 10.sp, color = jessiReadableText(muted))
+                    }
+                }
+                if (!asCollection) SelectItem("برای چه دسته‌ای بود؟", category,
                     if (row.kind == "IN") incomeCategories else categories,
                     { it }, { category = it })
-                if (category == "حقوق" && row.kind == "IN") {
+                if (!asCollection && category == "حقوق" && row.kind == "IN") {
                     Text("این واریز می‌تونه دوره جدید رو در حالت «از حقوق» آغاز کنه.",
                         color = jessiReadableText(mint), fontSize = 11.sp)
                 }
@@ -3096,8 +3250,16 @@ private fun ReviewDialog(
         },
         confirmButton = {
             Button(
-                onClick = { accountId?.let { onAccept(it, category, note, selectedUnit) } },
+                onClick = {
+                    accountId?.let {
+                        onAccept(it, category, note, selectedUnit,
+                            if (asCollection) receivableId else null)
+                    }
+                },
                 enabled = accountId != null && selectedAmount > 0L &&
+                    (!asCollection || (selectedReceivable != null &&
+                        selectedAmount <= selectedReceivable.totalToman -
+                            selectedReceivable.paidToman)) &&
                     (!isSimulation || testRegistrationConsent)
             ) {
                 Text(if (isSimulation) "ثبت آزمایشی در آمار" else "ثبت تراکنش", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))

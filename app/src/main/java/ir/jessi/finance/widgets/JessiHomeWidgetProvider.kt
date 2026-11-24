@@ -443,10 +443,10 @@ object JessiWidgetUpdater {
     ) {
         val views = RemoteViews(app.packageName, R.layout.jessi_scroll_widget)
         views.setTextViewText(R.id.jessi_scroll_title,
-            if (type == HomeWidgetKind.PAYMENTS) "☐ سررسید اقساط" else "اهداف پس‌انداز")
+            if (type == HomeWidgetKind.PAYMENTS) "☐ اقساط ماه بعد" else "اهداف پس‌انداز")
         views.setTextViewText(R.id.jessi_scroll_empty,
             if (type == HomeWidgetKind.PAYMENTS)
-                "قسط پرداخت‌نشده‌ای ثبت نشده" else "هدف فعالی ثبت نشده")
+                "برای ماه بعد قسطی ثبت نشده" else "هدف فعالی ثبت نشده")
         val serviceIntent = Intent(app, JessiWidgetCollectionService::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
             putExtra(JessiWidgetCollectionService.EXTRA_TYPE, type.name)

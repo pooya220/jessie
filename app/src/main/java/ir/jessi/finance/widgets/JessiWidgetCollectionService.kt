@@ -65,32 +65,24 @@ private class JessiWidgetListFactory(
 
     private fun pretty(value: Long): String = number.format(value) + " ت"
 
+    /**
+     * Next *calendar Jalali month*, not all future installments.
+     * Paid installments and earlier overdue items are excluded from
+     * this widget (overdue notices remain in the notification worker).
+     */
     private fun unpaidInstallments(debts: List<Debt>): List<WidgetListRow> =
-        buildList<Pair<WidgetListRow, Long>> {
-            debts.filter { it.direction == "I_OWE" && it.installmentMonths > 0 &&
-                it.totalToman > it.paidToman && it.totalToman > 0L
-            }.forEach { debt ->
-                val first = JalaliDates.parse(debt.firstInstallmentJalali) ?: return@forEach
-                val paidCount = Installments.countPaid(debt)
-                for (i in paidCount until debt.installmentMonths.coerceAtMost(120)) {
-                    val due = JalaliDates.addMonths(first, i)
-                    val epoch = JalaliDates.toEpoch(due) ?: continue
-                    val remaining = (
-                        Installments.cumulative(debt, i + 1) -
-                            maxOf(Installments.cumulative(debt, i), debt.paidToman)
-                    ).coerceAtLeast(0L)
-                    if (remaining == 0L) continue
-                    add(WidgetListRow(
-                        id = (debt.id shl 8) + i,
-                        title = "☐ " + debt.person,
-                        amount = pretty(remaining),
-                        note = "قسط " + (i + 1) + "/" + debt.installmentMonths +
-                            " • " + due.year + "/" + due.month + "/" + due.day,
-                        progress = -1, tab = "DEBTS"
-                    ) to epoch)
-                }
-            }
-        }.sortedBy { it.second }.take(60).map { it.first }
+        NextMonthInstallmentSelector.select(
+            debts, ir.jessi.finance.ui.Jalali.of(System.currentTimeMillis())
+        ).take(60).map { item ->
+            WidgetListRow(
+                id = (item.debtId shl 8) + item.installmentIndex,
+                title = "☐ " + item.person,
+                amount = pretty(item.amountToman),
+                note = "قسط " + (item.installmentIndex + 1) + "/" + item.totalCount +
+                    " • " + item.due.year + "/" + item.due.month + "/" + item.due.day,
+                progress = -1, tab = "DEBTS"
+            )
+        }
 
     private fun goalRows(goals: List<SavingsGoal>, movements: List<GoalMovement>) =
         goals.asSequence().filterNot { it.archived }
