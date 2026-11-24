@@ -297,7 +297,8 @@ interface FinanceDao {
     }
 
     @androidx.room.Transaction suspend fun approveReview(
-        id: Long, accountId: Long, category: String, note: String, unitChoice: String
+        id: Long, accountId: Long, category: String, note: String,
+        unitChoice: String, receivableDebtId: Long? = null
     ): Boolean {
         val row = findReview(id) ?: return false
         // Simulations may affect balances/stats ONLY through explicit review approval.
@@ -309,14 +310,28 @@ interface FinanceDao {
             else -> return false
         }
         if (amount <= 0L || amount > 100_000_000_000L) return false
+        val debt = if (receivableDebtId != null) {
+            if (row.kind != "IN") return false
+            val active = findDebt(receivableDebtId) ?: return false
+            if (active.direction != "OWED_TO_ME" ||
+                amount > active.totalToman - active.paidToman) return false
+            active
+        } else null
         val saved = insertTransaction(Transaction(
             accountId = accountId, amountToman = amount,
-            kind = row.kind, category = category,
-            note = SmsReviewPolicy.noteFor(row.fingerprint, note, row.sender),
+            kind = if (debt != null) "DEBT_IN" else row.kind,
+            category = if (debt != null) "دریافت طلب" else category,
+            note = if (debt != null) note.ifBlank { debt.person }
+                else SmsReviewPolicy.noteFor(row.fingerprint, note, row.sender),
             createdAt = row.receivedAt,
-            source = SmsReviewPolicy.sourceFor(row.fingerprint), dedupKey = row.fingerprint
+            source = SmsReviewPolicy.sourceFor(row.fingerprint),
+            dedupKey = row.fingerprint,
+            groupId = debt?.let { "DEBT_REF:${it.id}" }
         ))
-        if (saved > 0L) deleteReview(id)
+        if (saved > 0L) {
+            if (debt != null) updateDebt(debt.copy(paidToman = debt.paidToman + amount))
+            deleteReview(id)
+        }
         return saved > 0L
     }
 
