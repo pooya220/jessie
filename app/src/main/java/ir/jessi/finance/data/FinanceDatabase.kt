@@ -250,11 +250,14 @@ interface FinanceDao {
     /**
      * Reverse a collection/repayment in the same transaction as its deletion
      * so debt progress and account balance cannot silently diverge.
-     * Historical unlinked DEBT transactions are reversed only if one
-     * uniquely named debt can be identified; ambiguous cases are rejected.
+     * Historical unlinked DEBT transactions can be deleted when their parent
+     * no longer exists. Ambiguous or inconsistent debt links require explicit
+     * confirmation to delete just the ledger entry, without altering any debt.
      * Savings-goal ledger entries remain immutable here.
      */
-    @androidx.room.Transaction suspend fun deleteFinancialTransactionSafely(id: Long): Boolean {
+    @androidx.room.Transaction suspend fun deleteFinancialTransactionSafely(
+        id: Long, allowUnresolvedDebtDeletion: Boolean = false
+    ): Boolean {
         val tx = findTransaction(id) ?: return false
         if (countGoalMovementsForTransaction(id) > 0) return false
         if (tx.kind in listOf("GOAL_IN", "GOAL_OUT")) return false
@@ -262,24 +265,30 @@ interface FinanceDao {
             val expectedDirection = if (tx.kind == "DEBT_IN") "OWED_TO_ME" else "I_OWE"
             val link = tx.groupId?.takeIf { it.startsWith("DEBT_REF:") }
                 ?.removePrefix("DEBT_REF:")?.toLongOrNull()
-            val debt = if (link != null) {
-                val linkedDebt = findDebt(link)
-                // The user may have deleted the parent debt while retaining its
-                // financial history. Explicitly deleting this orphan must still
-                // reverse its account effect; there is no debt left to adjust.
-                if (linkedDebt == null) {
-                    deleteTransaction(id)
-                    return true
-                }
-                linkedDebt.takeIf { it.direction == expectedDirection }
+            val candidates = if (link != null) {
+                listOfNotNull(findDebt(link))
             } else {
                 getDebts().filter {
                     it.direction == expectedDirection &&
                     it.person.trim() == tx.note.trim()
-                }.singleOrNull()
-            } ?: return false
-            if (debt.paidToman < tx.amountToman) return false
-            updateDebt(debt.copy(paidToman = debt.paidToman - tx.amountToman))
+                }
+            }
+            if (candidates.isEmpty()) {
+                // Includes legacy collections created before DEBT_REF existed.
+                deleteTransaction(id)
+                return true
+            }
+            val debt = candidates.singleOrNull()?.takeIf {
+                it.direction == expectedDirection &&
+                    tx.amountToman > 0L && it.paidToman >= tx.amountToman
+            }
+            if (debt == null) {
+                // Never guess which other debt should change. The user can
+                // explicitly remove this ledger entry after a second warning.
+                if (!allowUnresolvedDebtDeletion) return false
+            } else {
+                updateDebt(debt.copy(paidToman = debt.paidToman - tx.amountToman))
+            }
             deleteTransaction(id)
             return true
         }
