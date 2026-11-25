@@ -61,6 +61,18 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         withContext(Dispatchers.Main) { onComplete(ok) }
     }
 
+    fun editDebtPayment(row: Transaction, accountId: Long, amount: Long, note: String,
+        allowUnresolved: Boolean, onComplete: (Boolean) -> Unit
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        val ok = runCatching { dao.editDebtPayment(row.id, accountId, amount, note, allowUnresolved) }
+            .getOrDefault(false)
+        if (ok) {
+            FinanceReminderScheduler.checkSoon(getApplication())
+            JessiWidgetUpdater.request(getApplication())
+        }
+        withContext(Dispatchers.Main) { onComplete(ok) }
+    }
+
     fun collectReceivable(
         debtId: Long, accountId: Long, amount: Long, note: String,
         existingTransactionId: Long = 0L,
@@ -88,12 +100,14 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         FinanceReminderScheduler.checkSoon(getApplication())
         JessiWidgetUpdater.request(getApplication())
     }
-    fun settleDebt(row: Debt, amount: Long, accountId: Long) = viewModelScope.launch(Dispatchers.IO) {
-        if (amount <= 0 || amount > row.totalToman - row.paidToman) return@launch
-        dao.applyDebtPayment(row, amount, accountId)
-        FinanceReminderScheduler.cancelDebt(getApplication(), row.id)
-        FinanceReminderScheduler.checkSoon(getApplication())
-        JessiWidgetUpdater.request(getApplication())
+    fun settleDebt(row: Debt, amount: Long, accountId: Long, onComplete: (Boolean) -> Unit = {}) = viewModelScope.launch(Dispatchers.IO) {
+        val ok = runCatching { dao.applyDebtPayment(row, amount, accountId) }.isSuccess
+        if (ok) {
+            FinanceReminderScheduler.cancelDebt(getApplication(), row.id)
+            FinanceReminderScheduler.checkSoon(getApplication())
+            JessiWidgetUpdater.request(getApplication())
+        }
+        withContext(Dispatchers.Main) { onComplete(ok) }
     }
     fun saveBudget(row: Budget) = viewModelScope.launch(Dispatchers.IO) {
         if (row.id == 0L) dao.insertBudget(row) else dao.updateBudget(row)
