@@ -33,7 +33,7 @@ fun FinancialTrendChart(periods: List<FinancePeriod>, selectedIndex: Int, transa
     val trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .6f)
     val shown = periods.drop(selectedIndex).take(6).reversed()
     val incomes = shown.map { p -> transactions.filter { p.contains(it.createdAt) && it.kind == "IN" }.sumOf { it.amountToman } }
-    val expenses = shown.map { p -> transactions.filter { p.contains(it.createdAt) && it.kind == "OUT" }.sumOf { it.amountToman } }
+    val expenses = shown.map { p -> transactions.filter { p.contains(it.createdAt) && it.isExpense() }.sumOf { it.amountToman } }
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("روند درآمد و هزینه", fontSize = 13.sp, fontWeight = FontWeight.Bold,
@@ -79,13 +79,7 @@ fun FinancialTrendChart(periods: List<FinancePeriod>, selectedIndex: Int, transa
 
 @Composable
 fun SpendingCategoryChart(transactions: List<Transaction>) {
-    val spent = transactions.filter { it.kind == "OUT" }
-        .groupBy { it.category }
-        .mapValues { (_, items) -> items.sumOf { it.amountToman } }
-        .toList().sortedByDescending { it.second }
-    val top = spent.take(4)
-    val rest = spent.drop(4).sumOf { it.second }
-    val rows = if (rest > 0L) top + ("سایر" to rest) else top
+    val rows = expenseBreakdown(transactions, FinanceCategories.chartHiddenExpenses)
     val total = rows.sumOf { it.second }
     val dark = MaterialTheme.colorScheme.background.red < .1f
     val colors = if (dark)
@@ -104,7 +98,7 @@ fun SpendingCategoryChart(transactions: List<Transaction>) {
             // In RTL the first column is on the right, matching the reference legend.
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 if (rows.isEmpty()) {
-                    Text("هنوز هزینه‌ای در این دوره ثبت نشده.",
+                    Text("هزینه‌ای از دسته‌های انتخاب‌شده برای نمایش وجود ندارد.",
                         color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 11.sp)
                 } else {
                     rows.forEachIndexed { index, (label, amount) ->
@@ -112,7 +106,7 @@ fun SpendingCategoryChart(transactions: List<Transaction>) {
                             Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
-                            Box(Modifier.size(8.dp).background(colors[index], RoundedCornerShape(3.dp)))
+                            Box(Modifier.size(8.dp).background(colors[index % colors.size], RoundedCornerShape(3.dp)))
                             Text(label, Modifier.weight(1f), fontSize = 11.sp,
                                 maxLines = 1, color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
                             Text(digitsFa((100 * amount / total.coerceAtLeast(1L)).toString()) + "٪",
@@ -130,7 +124,7 @@ fun SpendingCategoryChart(transactions: List<Transaction>) {
                         var angle = -90f
                         rows.forEachIndexed { i, item ->
                             val sweep = 360f * item.second.toFloat() / total
-                            drawArc(colors[i], angle + 1f, (sweep - 2f).coerceAtLeast(0f),
+                            drawArc(colors[i % colors.size], angle + 1f, (sweep - 2f).coerceAtLeast(0f),
                                 false, style = ring)
                             angle += sweep
                         }

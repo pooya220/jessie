@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import org.json.JSONArray
+import ir.jessi.finance.data.DEBT_EXPENSE_CATEGORY
 
 /**
  * The user's locally editable income and expense pickers. Category labels in
@@ -33,12 +34,22 @@ object FinanceCategories {
     private const val PREF_NAME = "jessi_finance_categories_v1"
     private const val EXPENSE_KEY = "expense"
     private const val INCOME_KEY = "income"
+    private const val CHART_HIDDEN_KEY = "chart_hidden_expenses"
     private const val MAX_LABEL_LENGTH = 36
     private const val MAX_CATEGORIES = 80
 
     private var context: Context? = null
     private var expenseState by mutableStateOf(expenseDefaults)
     private var incomeState by mutableStateOf(incomeDefaults)
+    private var chartHiddenState by mutableStateOf(setOf(DEBT_EXPENSE_CATEGORY))
+
+    val chartHiddenExpenses: Set<String> get() = chartHiddenState
+
+    fun setChartVisible(label: String, visible: Boolean) {
+        chartHiddenState = if (visible) chartHiddenState - label else chartHiddenState + label
+        context?.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)?.edit()
+            ?.putStringSet(CHART_HIDDEN_KEY, chartHiddenState.toSet())?.apply()
+    }
 
     val expense: List<String> get() = expenseState
     val income: List<String> get() = incomeState
@@ -75,6 +86,8 @@ object FinanceCategories {
         context = appContext.applicationContext
         expenseState = load(EXPENSE)
         incomeState = load(INCOME)
+        chartHiddenState = saved.getStringSet(CHART_HIDDEN_KEY, setOf(DEBT_EXPENSE_CATEGORY))
+            ?.toSet() ?: setOf(DEBT_EXPENSE_CATEGORY)
     }
 
     /** Reads the saved category preferences without relying on an Activity. */
@@ -124,6 +137,10 @@ object FinanceCategories {
         validation(kind, name, old)?.let { return it }
         val list = if (kind == INCOME) income else expense
         save(kind, list.map { if (it == old) name.trim() else it })
+        if (kind == EXPENSE && old in chartHiddenState) {
+            setChartVisible(name.trim(), false)
+            setChartVisible(old, true)
+        }
         return null
     }
 

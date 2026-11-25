@@ -142,7 +142,7 @@ data class HomeWidgetSnapshot(
     val income: Long get() = periodTransactions.asSequence()
         .filter { it.kind == "IN" }.sumOf { it.amountToman }
     val expenses: Long get() = periodTransactions.asSequence()
-        .filter { it.kind == "OUT" }.sumOf { it.amountToman }
+        .filter { it.kind == "OUT" || it.kind == "DEBT_OUT" }.sumOf { it.amountToman }
 
     val expensesByCategory: List<Pair<String, Long>> get() =
         periodTransactions.asSequence().filter { it.kind == "OUT" }

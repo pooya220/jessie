@@ -24,6 +24,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
+import androidx.compose.ui.Alignment
+import ir.jessi.finance.data.DEBT_EXPENSE_CATEGORY
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +44,8 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun FinanceCategorySettings(
     onRename: (kind: String, old: String, name: String,
-        callback: (Boolean, String?) -> Unit) -> Unit
+        callback: (Boolean, String?) -> Unit) -> Unit,
+    historicalExpenseCategories: List<String> = emptyList()
 ) {
     var kind by rememberSaveable { mutableStateOf(FinanceCategories.EXPENSE) }
     var input by rememberSaveable { mutableStateOf("") }
@@ -112,6 +116,22 @@ fun FinanceCategorySettings(
         message?.let {
             Text(it, fontSize = 11.sp,
                 color = jessiReadableText(MaterialTheme.colorScheme.error))
+        }
+        if (kind == FinanceCategories.EXPENSE) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .25f))
+            Text("نمایش در نمودار داشبورد", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text("خاموش کردن هر دسته فقط نمودار تفکیک هزینه‌ها را تغییر می‌دهد؛ جمع هزینه و موجودی ثابت می‌مانند.",
+                fontSize = 11.sp, color = jessiReadableText(MaterialTheme.colorScheme.onSurfaceVariant))
+            val chartLabels = (labels + historicalExpenseCategories + DEBT_EXPENSE_CATEGORY).distinct()
+            chartLabels.forEach { label ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(label, modifier = Modifier.weight(1f), fontSize = 13.sp)
+                    Switch(checked = label !in FinanceCategories.chartHiddenExpenses,
+                        onCheckedChange = { FinanceCategories.setChartVisible(label, it) })
+                }
+            }
+            Text("مدیریت دسته‌بندی‌ها", fontWeight = FontWeight.Bold, fontSize = 14.sp)
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .25f))
         labels.forEach { label ->

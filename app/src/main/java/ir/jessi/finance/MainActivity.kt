@@ -760,6 +760,7 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
             if (showSettings) {
                 SettingsPage(
                     widgetBudgets = budgets,
+                    historicalExpenseCategories = txs.filter { it.isExpense() }.map { it.expenseChartCategory() }.distinct(),
                     darkMode = darkMode,
                     onToggleTheme = onToggleTheme,
                     balanceVisible = balanceVisible,
@@ -1012,10 +1013,7 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                         )
                     }
                 }
-                Tab.TXS -> TransactionsPage(periodTransactions, accounts, debts,
-                    onAssign = { ids, debtId, callback ->
-                        vm.assignWithdrawalsToDebt(ids, debtId, callback)
-                    },
+                Tab.TXS -> TransactionsPage(periodTransactions, accounts,
                     onEdit = { editor = if (it.kind in listOf("DEBT_IN", "DEBT_OUT")) Editor.DebtPaymentForm(it) else Editor.TxForm(it) },
                     onDelete = { row ->
                         val debtLinked = row.kind in listOf("DEBT_IN", "DEBT_OUT")
@@ -1254,6 +1252,7 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
 @Composable
 private fun SettingsPage(
     widgetBudgets: List<Budget>,
+    historicalExpenseCategories: List<String>,
     darkMode: Boolean, onToggleTheme: () -> Unit,
     balanceVisible: Boolean, onBalanceVisibilityChange: (Boolean) -> Unit,
     widgetBalanceVisible: Boolean,
@@ -1320,7 +1319,7 @@ private fun SettingsPage(
                 "نمایش موجودی و انتخاب پنج بودجه برای هوم‌اسکرین",
                 financeBlue) { section = "widgets" }
             SettingsNavRow(Icons.Outlined.Category, "دسته‌بندی‌های درآمد و هزینه",
-                "افزودن، تغییر نام یا حذف دسته‌ها", financePurple) {
+                "مدیریت دسته‌ها و نمایش در نمودار", financePurple) {
                 section = "categories"
             }
             SettingsNavRow(Icons.Outlined.Lock, "قفل ورود و امنیت",
@@ -1338,7 +1337,8 @@ private fun SettingsPage(
         }
         if (section == "categories") {
             Tile(Modifier.fillMaxWidth(), accent = financePurple) {
-                FinanceCategorySettings(onRename = onRenameCategory)
+                FinanceCategorySettings(onRename = onRenameCategory,
+                    historicalExpenseCategories = historicalExpenseCategories)
             }
         }
         if (section == "widgets") {
@@ -1926,7 +1926,7 @@ private fun Dashboard(
     val total = accounts.sumOf { accountBalance(it.id, it.openingToman, txs) }
     val current = txs.filter { currentPeriod.contains(it.createdAt) }
     val income = current.filter { it.kind == "IN" }.sumOf { it.amountToman }
-    val expense = current.filter { it.kind == "OUT" }.sumOf { it.amountToman }
+    val expense = current.filter { it.isExpense() }.sumOf { it.amountToman }
     // Next Jalali month's actual payment obligations: scheduled installments and
     // ordinary dated debts, regardless of their name or note. Exclude claims and
     // undated or fully-settled records. Do not include the total lifetime balance.
@@ -2464,56 +2464,9 @@ private fun PaymentLinkPicker(
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 private fun TransactionsPage(
-    txs: List<Transaction>, accounts: List<Account>, debts: List<Debt>,
-    onAssign: (List<Long>, Long, (Boolean) -> Unit) -> Unit,
+    txs: List<Transaction>, accounts: List<Account>,
     onEdit: (Transaction) -> Unit, onDelete: (Transaction) -> Unit
 ) {
-    var selecting by remember { mutableStateOf(false) }
-    var selectedIds by remember { mutableStateOf(emptySet<Long>()) }
-    var showAssignment by remember { mutableStateOf(false) }
-    var debtId by remember { mutableStateOf<Long?>(null) }
-    var savingAssignment by remember { mutableStateOf(false) }
-    var assignmentError by remember { mutableStateOf(false) }
-    val selectedRows = txs.filter { it.id in selectedIds && it.kind == "OUT" && it.groupId == null }
-    val selectedTotal = selectedRows.sumOf { it.amountToman }
-    val availableDebts = paymentLinkTargets(debts, "OUT")
-    val target = availableDebts.firstOrNull { it.id == debtId }
-    BackHandler(enabled = selecting && !showAssignment) { selecting = false; selectedIds = emptySet() }
-    if (showAssignment) AlertDialog(
-        onDismissRequest = { if (!savingAssignment) showAssignment = false },
-        title = { Text("ثبت پرداخت تجمیعی") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(digitsFa(selectedRows.size.toString()) + " برداشت • " + toman(selectedTotal))
-                PaymentLinkPicker("OUT", availableDebts, target, selectedTotal) {
-                    debtId = it.id; assignmentError = false
-                }
-                Text("برداشت‌ها با حساب و تاریخ اصلی حفظ می‌شوند و دوباره از موجودی کم نمی‌شوند.", fontSize = 11.sp)
-                if (assignmentError) Text("ثبت انجام نشد؛ مبلغ یا وضعیت تراکنش‌ها تغییر کرده است.",
-                    color = MaterialTheme.colorScheme.error)
-            }
-        },
-        confirmButton = {
-            Button(enabled = !savingAssignment && target != null && selectedTotal > 0 &&
-                selectedTotal <= paymentLinkRemaining(target, "OUT") && selectedRows.size == selectedIds.size,
-                onClick = {
-                    val id = debtId ?: return@Button
-                    savingAssignment = true
-                    onAssign(selectedRows.map { it.id }, id) { ok ->
-                        savingAssignment = false
-                        if (ok) {
-                            showAssignment = false
-                            selecting = false
-                            selectedIds = emptySet()
-                        } else assignmentError = true
-                    }
-                }) { Text("ثبت پرداخت") }
-        },
-        dismissButton = {
-            TextButton(enabled = !savingAssignment, onClick = { showAssignment = false }) { Text("انصراف") }
-        }
-    )
     var search by rememberSaveable { mutableStateOf("") }
     var type by rememberSaveable { mutableStateOf(TransactionSearch.ALL) }
     var selectedAccountId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -2525,17 +2478,18 @@ private fun TransactionsPage(
         TransactionSearch.INCOME to "درآمد",
         TransactionSearch.EXPENSE to "هزینه",
         TransactionSearch.TRANSFER to "انتقال",
-        TransactionSearch.DEBT to "اقساط",
+        TransactionSearch.DEBT to "بدهی و اقساط",
         TransactionSearch.GOAL to "اهداف"
     )
     val categories = remember(txs, type) {
         txs.filter { row ->
             when (type) {
                 TransactionSearch.INCOME -> row.kind == "IN"
-                TransactionSearch.EXPENSE -> row.kind == "OUT"
+                TransactionSearch.EXPENSE -> row.isExpense()
                 else -> row.kind != "TRANSFER_IN"
             }
-        }.map { it.category }.filter { it.isNotBlank() }.distinct().sorted()
+        }.map { if (it.isExpense()) it.expenseChartCategory() else it.category }
+            .filter { it.isNotBlank() }.distinct().sorted()
     }
     LaunchedEffect(accounts, categories) {
         if (selectedAccountId != null && accounts.none { it.id == selectedAccountId })
@@ -2549,7 +2503,7 @@ private fun TransactionsPage(
         )
     }
     val income = visible.filter { it.kind == "IN" }.sumOf { it.amountToman }
-    val expense = visible.filter { it.kind == "OUT" }.sumOf { it.amountToman }
+    val expense = visible.filter { it.isExpense() }.sumOf { it.amountToman }
     var filtersExpanded by rememberSaveable { mutableStateOf(false) }
     // Compact screen toolbar replaces three large stacked hero/filter/summary cards.
     Row(
@@ -2690,44 +2644,14 @@ private fun TransactionsPage(
             color = jessiReadableText(danger), maxLines = 1,
             modifier = Modifier.weight(1f))
     }
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        TextButton(onClick = {
-            selecting = !selecting
-            if (!selecting) selectedIds = emptySet()
-        }) { Text(if (selecting) "لغو انتخاب" else "انتخاب برداشت‌ها") }
-        if (selecting) {
-            Text(toman(selectedTotal), modifier = Modifier.weight(1f), fontSize = 11.sp)
-            Button(enabled = selectedRows.isNotEmpty() && availableDebts.isNotEmpty(), onClick = {
-                debtId = availableDebts.firstOrNull()?.id
-                assignmentError = false
-                showAssignment = true
-            }) { Text("ثبت پرداخت") }
-        }
-    }
     if (visible.isEmpty()) EmptyNote(
         if (txs.isEmpty()) "برای ثبت اولین تراکنش روی + بزن."
         else "تراکنشی با این جست‌وجو و فیلتر پیدا نشد."
     )
     visible.forEach { row ->
-        val eligible = row.kind == "OUT" && row.groupId == null
-        val toggle = {
-            selectedIds = if (row.id in selectedIds) selectedIds - row.id else selectedIds + row.id
-        }
-        Row(Modifier.fillMaxWidth().then(if (eligible) Modifier.combinedClickable(
-            onClick = { if (selecting) toggle() else onEdit(row) },
-            onLongClick = { selecting = true; selectedIds = selectedIds + row.id }
-        ) else Modifier), verticalAlignment = Alignment.CenterVertically) {
-            if (selecting && eligible) Checkbox(checked = row.id in selectedIds, onCheckedChange = { toggle() })
-            Box(Modifier.weight(1f)) {
-                TransactionTile(
-                    row, accounts, txs,
-                    if (!selecting && row.kind in listOf("IN", "OUT", "DEBT_IN", "DEBT_OUT")) ({ onEdit(row) }) else null,
-                    if (selecting || row.kind in listOf("GOAL_IN", "GOAL_OUT"))
-                        null else ({ onDelete(row) })
-                )
-            }
-        }
+        TransactionTile(row, accounts, txs,
+            if (row.kind in listOf("IN", "OUT", "DEBT_IN", "DEBT_OUT")) ({ onEdit(row) }) else null,
+            if (row.kind in listOf("GOAL_IN", "GOAL_OUT")) null else ({ onDelete(row) }))
     }
 }
 
@@ -2747,6 +2671,7 @@ private fun TransactionTile(
             (accounts.firstOrNull { it.id == transferTarget }?.title ?: "حساب دیگر")
         row.kind == "GOAL_OUT" -> "کنارگذاشتن برای هدف"
         row.kind == "GOAL_IN" -> "بازگشت پول از هدف"
+        row.kind == "DEBT_OUT" -> DEBT_EXPENSE_CATEGORY
         else -> row.category
     }
     val tone = when {
