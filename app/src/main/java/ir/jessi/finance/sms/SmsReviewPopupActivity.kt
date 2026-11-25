@@ -26,6 +26,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import ir.jessi.finance.data.Account
+import ir.jessi.finance.data.Debt
+import ir.jessi.finance.notifications.FinanceReminderScheduler
+import ir.jessi.finance.widgets.JessiWidgetUpdater
 import ir.jessi.finance.data.FinanceDatabase
 import ir.jessi.finance.data.SmsReview
 import ir.jessi.finance.data.SmsReviewPolicy
@@ -128,14 +131,16 @@ private fun ReviewPopupContent(reviewId: Long, dismiss: () -> Unit) {
     var loadError by remember(reviewId) { mutableStateOf(false) }
     var row by remember(reviewId) { mutableStateOf<SmsReview?>(null) }
     var accounts by remember(reviewId) { mutableStateOf<List<Account>>(emptyList()) }
+    var debts by remember(reviewId) { mutableStateOf<List<Debt>>(emptyList()) }
     LaunchedEffect(reviewId) {
         try {
             val data = withContext(Dispatchers.IO) {
                 val dao = FinanceDatabase.get(context).dao()
-                dao.findReview(reviewId) to dao.getAccounts()
+                Triple(dao.findReview(reviewId), dao.getAccounts(), dao.getDebts())
             }
             row = data.first
             accounts = data.second
+            debts = data.third
         } catch (_: Exception) {
             loadError = true
         } finally {
@@ -168,14 +173,14 @@ private fun ReviewPopupContent(reviewId: Long, dismiss: () -> Unit) {
                 Text("این پیامک قبلاً ثبت یا نادیده گرفته شده است.", fontSize = 12.sp)
                 TextButton(onClick = dismiss) { Text("بستن") }
             }
-            else -> PopupReviewForm(row!!, accounts, dismiss)
+            else -> PopupReviewForm(row!!, accounts, debts, dismiss)
         }
     }
 }
 
 @Composable
 private fun PopupReviewForm(
-    row: SmsReview, accounts: List<Account>, dismiss: () -> Unit
+    row: SmsReview, accounts: List<Account>, debts: List<Debt>, dismiss: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -196,9 +201,14 @@ private fun PopupReviewForm(
     var saving by remember(row.id) { mutableStateOf(false) }
     var error by remember(row.id) { mutableStateOf<String?>(null) }
 
+    val eligibleDebts = debts.filter { it.totalToman > it.paidToman &&
+        (if (isIncome) it.direction == "OWED_TO_ME" else row.kind == "OUT" && it.direction == "I_OWE" && it.installmentMonths > 0) }
+    var linkDebt by remember(row.id) { mutableStateOf(false) }
+    var debtId by remember(row.id) { mutableStateOf<Long?>(null) }
+    val selectedDebt = eligibleDebts.firstOrNull { it.id == debtId }
     val amount = when (unit) {
         "TOMAN" -> rawAmount
-        "RIAL" -> if (rawAmount % 10L == 0L) rawAmount / 10L else 0L
+        "RIAL" -> BankSmsParser.rialToToman(rawAmount)
         else -> 0L
     }
     val accent = if (isIncome) Color(0xFF00B992) else Color(0xFFFFAA55)
@@ -252,7 +262,20 @@ private fun PopupReviewForm(
             onSelected = { accountId = it.toLongOrNull() }
         )
     }
-    PopupChoice(
+    if (eligibleDebts.isNotEmpty()) {
+        FilterChip(selected = linkDebt, onClick = {
+            linkDebt = !linkDebt
+            if (linkDebt && debtId == null) debtId = eligibleDebts.firstOrNull()?.id
+        }, label = { Text(if (isIncome) "وصول طلب" else "پرداخت قسط") })
+        if (linkDebt) {
+            PopupChoice(if (isIncome) "طلب مرتبط" else "قسط مرتبط",
+                selectedDebt?.person ?: "انتخاب", eligibleDebts.map { it.id.toString() to
+                    (it.person + " • مانده " + toman(it.totalToman - it.paidToman)) },
+                onSelected = { debtId = it.toLongOrNull() })
+            Text("مبلغ فقط یک‌بار در حساب ثبت و از مانده بدهی/طلب کم می‌شود.", fontSize = 11.sp)
+        }
+    }
+    if (!linkDebt) PopupChoice(
         "دسته‌بندی", category,
         (if (isIncome) incomeCategories else categories).map { it to it },
         onSelected = { category = it }
@@ -310,11 +333,13 @@ private fun PopupReviewForm(
                     val saved = try {
                         withContext(Dispatchers.IO) {
                             FinanceDatabase.get(context).dao().approveReview(
-                                row.id, id, category, note, unit
+                                row.id, id, category, note, unit, if (linkDebt) debtId else null
                             )
                         }
                     } catch (_: Exception) { false }
                     if (saved) {
+                        FinanceReminderScheduler.checkSoon(context)
+                        JessiWidgetUpdater.request(context)
                         SmsReviewNotifications.cancel(context, row.id)
                         dismiss()
                     } else {
@@ -324,6 +349,7 @@ private fun PopupReviewForm(
                 }
             },
             enabled = !saving && accountId != null && amount > 0L &&
+                (!linkDebt || (selectedDebt != null && amount <= selectedDebt.totalToman - selectedDebt.paidToman)) &&
                 (!isSimulation || testConsent),
             shape = RoundedCornerShape(12.dp)
         ) {
