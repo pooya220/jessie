@@ -247,6 +247,36 @@ interface FinanceDao {
         return true
     }
 
+    /** Edit one payment in place, keeping its identity, source, and date.
+     * Account balances are derived from the ledger, so moving a payment to
+     * another account automatically reverses its effect on the old account.
+     */
+    @androidx.room.Transaction suspend fun editDebtPayment(
+        id: Long, accountId: Long, amount: Long, note: String,
+        allowUnresolved: Boolean = false
+    ): Boolean {
+        val tx = findTransaction(id) ?: return false
+        if (tx.kind !in listOf("DEBT_IN", "DEBT_OUT") ||
+            countGoalMovementsForTransaction(id) > 0 ||
+            amount !in 1L..100_000_000_000L ||
+            getAccounts().none { it.id == accountId }) return false
+        val direction = if (tx.kind == "DEBT_IN") "OWED_TO_ME" else "I_OWE"
+        val link = tx.groupId?.takeIf { it.startsWith("DEBT_REF:") }
+            ?.removePrefix("DEBT_REF:")?.toLongOrNull()
+        val parent = link?.let { findDebt(it) }
+        if (parent != null) {
+            if (parent.direction != direction || parent.paidToman < tx.amountToman) return false
+            val paidWithoutThis = parent.paidToman - tx.amountToman
+            if (amount > parent.totalToman - paidWithoutThis) return false
+            updateDebt(parent.copy(paidToman = paidWithoutThis + amount))
+        } else if (amount != tx.amountToman && !allowUnresolved) {
+            // Do not guess which other debt a legacy entry belonged to.
+            return false
+        }
+        updateTransaction(tx.copy(accountId = accountId, amountToman = amount, note = note))
+        return true
+    }
+
     /**
      * Reverse a collection/repayment in the same transaction as its deletion
      * so debt progress and account balance cannot silently diverge.
