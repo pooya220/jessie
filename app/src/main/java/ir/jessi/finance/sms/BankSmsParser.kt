@@ -17,7 +17,7 @@ object BankSmsParser {
     // The explicit currency amount must not be confused with a reported balance.
     private val currencyAmount = Regex("""([0-9][0-9,٬،. ]{0,24})\s*(ریال|تومان)""")
     // Some banks send only a negative amount on a line, followed by date and balance.
-    private val negativeLine = Regex("""^(?:مبلغ\s*[:：]?\s*)?([0-9][0-9,٬،.]{0,20})\s*[-−]\s*$""")
+    private val signedLine = Regex("""^(?:مبلغ\s*[:：]?\s*)?([0-9][0-9,٬،.]{0,20})\s*([+＋\-−])\s*$""")
     private val jalaliDate = Regex("""14[0-9]{2}/[0-9]{1,2}/[0-9]{1,2}""")
 
     private val incoming = listOf("واریز", "واریزی", "بستانکار", "وارد شد", "دریافت شد")
@@ -49,6 +49,9 @@ object BankSmsParser {
         return clean.toLongOrNull()?.takeIf { it > 0L }
     }
 
+    /** Financial storage uses whole tomans; round a confirmed rial amount to nearest toman. */
+    fun rialToToman(raw: Long): Long = raw / 10L + if (raw % 10L >= 5L) 1L else 0L
+
     private fun validAmount(toman: Long): Boolean = toman in 1..100_000_000_000L
 
     fun parse(raw: String, sender: String = ""): Result? {
@@ -77,19 +80,20 @@ object BankSmsParser {
             val match = candidates.first()
             val amount = number(match.groupValues[1]) ?: return null
             val unit = if (match.groupValues[2] == "ریال") RIAL else TOMAN
-            if (unit == RIAL && amount % 10L != 0L) return null
-            val toman = if (unit == RIAL) amount / 10L else amount
+            val toman = if (unit == RIAL) rialToToman(amount) else amount
             if (!validAmount(toman)) return null
             return Result(toman, if (credit) "IN" else "OUT", amount, unit, bank)
         }
 
-        // The only accepted no-unit case: signed debit, a Jalali date, and balance.
+        // Signed credit/debit with a Jalali date and balance requires manual unit selection.
         // Do not infer Rial/Toman. User MUST choose the unit before posting.
-        if (credit || !text.contains("مانده") || !jalaliDate.containsMatchIn(text)) return null
+        if (!text.contains("مانده") || !jalaliDate.containsMatchIn(text)) return null
         val line = text.lineSequence().map { it.trim() }
-            .mapNotNull { negativeLine.matchEntire(it) }.firstOrNull() ?: return null
+            .mapNotNull { signedLine.matchEntire(it) }.toList().singleOrNull() ?: return null
         val amount = number(line.groupValues[1]) ?: return null
         if (!validAmount(amount)) return null
-        return Result(0L, "OUT", amount, UNKNOWN, bank)
+        val kind = if (line.groupValues[2] in listOf("+", "＋")) "IN" else "OUT"
+        if ((credit && kind != "IN") || (debit && kind != "OUT")) return null
+        return Result(0L, kind, amount, UNKNOWN, bank)
     }
 }
