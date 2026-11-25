@@ -74,6 +74,19 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         withContext(Dispatchers.Main) { onComplete(ok) }
     }
 
+    fun saveAllocatedWithdrawal(existingId: Long, accountId: Long, amount: Long, note: String,
+        allocations: Map<Long, Long>, onComplete: (Boolean) -> Unit
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        val ok = runCatching {
+            dao.saveAllocatedWithdrawal(existingId, accountId, amount, note, allocations)
+        }.getOrDefault(false)
+        if (ok) runCatching {
+            FinanceReminderScheduler.checkSoon(getApplication())
+            JessiWidgetUpdater.request(getApplication())
+        }
+        withContext(Dispatchers.Main) { onComplete(ok) }
+    }
+
     fun assignWithdrawalsToDebt(ids: List<Long>, debtId: Long, onComplete: (Boolean) -> Unit) =
         viewModelScope.launch(Dispatchers.IO) {
             val ok = runCatching { dao.assignWithdrawalsToDebt(ids, debtId) }.getOrDefault(false)

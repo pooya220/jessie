@@ -46,6 +46,47 @@ data class Debt(
 fun Transaction.debtReferenceId(): Long? = groupId?.takeIf { it.startsWith("DEBT_REF:") }
     ?.removePrefix("DEBT_REF:")?.substringBefore(':')?.toLongOrNull()
 
+/** A split payment is one ledger row with several explicit debt allocations.
+ * Existing DEBT_REF links, including grouped withdrawals, remain compatible. */
+fun Transaction.debtAllocations(): Map<Long, Long> {
+    val group = groupId.orEmpty()
+    if (!group.startsWith("DEBT_MULTI:"))
+        return debtReferenceId()?.let { mapOf(it to amountToman) }.orEmpty()
+    val result = linkedMapOf<Long, Long>()
+    for (item in group.removePrefix("DEBT_MULTI:").split(",")) {
+        val pair = item.split("=")
+        if (pair.size != 2) return emptyMap()
+        val id = pair[0].toLongOrNull() ?: return emptyMap()
+        val amount = pair[1].toLongOrNull() ?: return emptyMap()
+        if (id <= 0 || amount !in 1L..100_000_000_000L || result.put(id, amount) != null)
+            return emptyMap()
+    }
+    return result.takeIf { validDebtAllocationTotal(it, amountToman) }.orEmpty()
+}
+
+fun validDebtAllocationTotal(allocations: Map<Long, Long>, amount: Long): Boolean {
+    if (amount !in 1L..100_000_000_000L || allocations.isEmpty()) return false
+    var remaining = amount
+    for ((id, share) in allocations) {
+        if (id <= 0L || share <= 0L || share > remaining) return false
+        remaining -= share
+    }
+    return remaining == 0L
+}
+
+fun encodeDebtAllocations(allocations: Map<Long, Long>): String =
+    if (allocations.size == 1) "DEBT_REF:" + allocations.keys.single()
+    else "DEBT_MULTI:" + allocations.toSortedMap().entries.joinToString(",") { "${it.key}=${it.value}" }
+
+/** The previous allocation is credited back for editing, without allowing new
+ * payments past the next installment. Preserve existing historical amounts. */
+fun Debt.editablePaymentLimit(previous: Long): Long {
+    if (previous < 0L || previous > paidToman) return 0L
+    val baseline = copy(paidToman = paidToman - previous)
+    return maxOf(previous, baseline.paymentPeriodRemaining())
+        .coerceAtMost((totalToman - baseline.paidToman).coerceAtLeast(0L))
+}
+
 fun Debt.paymentPeriodRemaining(): Long =
     if (installmentMonths > 0) ir.jessi.finance.ui.Installments.nextAmount(this)
     else (totalToman - paidToman).coerceAtLeast(0L)
@@ -289,6 +330,40 @@ interface FinanceDao {
         return true
     }
 
+    /** Allocate one existing withdrawal among distinct debts atomically.
+     * Validate every old and new link before changing any row. */
+    @androidx.room.Transaction suspend fun saveAllocatedWithdrawal(
+        existingId: Long, accountId: Long, amount: Long, note: String,
+        allocations: Map<Long, Long>
+    ): Boolean {
+        if (!validDebtAllocationTotal(allocations, amount) ||
+            getAccounts().none { it.id == accountId }) return false
+        val tx = findTransaction(existingId) ?: return false
+        if (countGoalMovementsForTransaction(existingId) > 0) return false
+        val previous = when (tx.kind) {
+            "OUT" -> if (tx.groupId == null) emptyMap() else return false
+            "DEBT_OUT" -> tx.debtAllocations().takeIf {
+                validDebtAllocationTotal(it, tx.amountToman)
+            } ?: return false
+            else -> return false
+        }
+        val updated = mutableListOf<Debt>()
+        for (id in previous.keys + allocations.keys) {
+            val debt = findDebt(id) ?: return false
+            val old = previous[id] ?: 0L
+            val share = allocations[id] ?: 0L
+            if (debt.direction != "I_OWE" || old > debt.paidToman ||
+                share > debt.editablePaymentLimit(old)) return false
+            updated.add(debt.copy(paidToman = debt.paidToman - old + share))
+        }
+        for (debt in updated) updateDebt(debt)
+        val group = if (previous == allocations && tx.groupId?.startsWith("DEBT_REF:") == true)
+            tx.groupId else encodeDebtAllocations(allocations)
+        updateTransaction(tx.copy(accountId = accountId, amountToman = amount,
+            kind = "DEBT_OUT", category = "بازپرداخت بدهی", note = note, groupId = group))
+        return true
+    }
+
     /** Reclassify existing withdrawals as one payment batch. No new ledger rows,
      * no duplicate account deduction, and all changes commit together. */
     @androidx.room.Transaction suspend fun assignWithdrawalsToDebt(
@@ -325,6 +400,7 @@ interface FinanceDao {
             countGoalMovementsForTransaction(id) > 0 ||
             amount !in 1L..100_000_000_000L ||
             getAccounts().none { it.id == accountId }) return false
+        if (tx.groupId?.startsWith("DEBT_MULTI:") == true) return false
         val direction = if (tx.kind == "DEBT_IN") "OWED_TO_ME" else "I_OWE"
         val link = tx.debtReferenceId()
         val parent = link?.let { findDebt(it) }
@@ -355,6 +431,19 @@ interface FinanceDao {
         val tx = findTransaction(id) ?: return false
         if (countGoalMovementsForTransaction(id) > 0) return false
         if (tx.kind in listOf("GOAL_IN", "GOAL_OUT")) return false
+        if (tx.kind == "DEBT_OUT" && tx.groupId?.startsWith("DEBT_MULTI:") == true) {
+            val allocations = tx.debtAllocations()
+            if (!validDebtAllocationTotal(allocations, tx.amountToman)) return false
+            val updated = mutableListOf<Debt>()
+            for ((debtId, share) in allocations) {
+                val debt = findDebt(debtId) ?: return false
+                if (debt.direction != "I_OWE" || debt.paidToman < share) return false
+                updated.add(debt.copy(paidToman = debt.paidToman - share))
+            }
+            for (debt in updated) updateDebt(debt)
+            deleteTransaction(id)
+            return true
+        }
         if (tx.kind == "DEBT_IN" || tx.kind == "DEBT_OUT") {
             val expectedDirection = if (tx.kind == "DEBT_IN") "OWED_TO_ME" else "I_OWE"
             val link = tx.debtReferenceId()

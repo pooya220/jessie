@@ -1142,6 +1142,13 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
             onTransfer = { a, b, amount, note ->
                 vm.transfer(a,b,amount,note); editor = null
             },
+            onAllocate = { existingId, accountId, amount, note, allocations, done ->
+                vm.saveAllocatedWithdrawal(existingId, accountId, amount, note, allocations) { ok ->
+                    done(ok)
+                    Toast.makeText(context, if (ok) "پرداخت‌ها ثبت شدند" else "مبلغ یا مانده بدهی‌ها را بررسی کن", Toast.LENGTH_LONG).show()
+                    if (ok) editor = null
+                }
+            },
             onLink = { debtId, accountId, amount, note, existingTxId, kind, done ->
                 vm.saveLinkedDebtTransaction(debtId, accountId, amount, note, existingTxId, kind) { ok ->
                     done(ok)
@@ -1199,7 +1206,20 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                 Toast.makeText(context, if (ok) "پرداخت ثبت شد و موجودی به‌روز شد" else "ثبت پرداخت انجام نشد؛ مبلغ و حساب را بررسی کن", Toast.LENGTH_LONG).show()
             }
         }
-        is Editor.DebtPaymentForm -> DebtPaymentEditDialog(e.value, accounts, debts, txs,
+        is Editor.DebtPaymentForm -> if (e.value.kind == "DEBT_OUT" &&
+            e.value.debtAllocations().isNotEmpty() &&
+            e.value.debtAllocations().all { (id, share) ->
+                debts.any { it.id == id && it.direction == "I_OWE" && it.paidToman >= share }
+            }) {
+            AllocatedWithdrawalEditDialog(e.value, accounts, debts, dismiss = { editor = null },
+                onSave = { accountId, amount, note, allocations, done ->
+                    vm.saveAllocatedWithdrawal(e.value.id, accountId, amount, note, allocations) { ok ->
+                        done(ok)
+                        if (ok) editor = null
+                        Toast.makeText(context, if (ok) "تقسیم پرداخت اصلاح شد" else "ویرایش انجام نشد؛ مانده بدهی‌ها را بررسی کن", Toast.LENGTH_LONG).show()
+                    }
+                })
+        } else DebtPaymentEditDialog(e.value, accounts, debts, txs,
             dismiss = { editor = null },
             onSave = { accountId, amount, note, allowUnresolved ->
                 vm.editDebtPayment(e.value, accountId, amount, note, allowUnresolved) { ok ->
@@ -2806,7 +2826,7 @@ private fun DebtsPage(
     val completed = debts.filter { it.paidToman >= it.totalToman }
     val active = debts.filter { it.paidToman < it.totalToman }
     val debtIds = debts.map { it.id }.toSet()
-    val payments = txs.filter { it.kind in listOf("DEBT_OUT", "DEBT_IN") && it.debtReferenceId() in debtIds }
+    val payments = txs.filter { it.kind in listOf("DEBT_OUT", "DEBT_IN") && it.debtAllocations().keys.any { id -> id in debtIds } }
         .sortedByDescending { it.createdAt }
     var history by rememberSaveable { mutableStateOf(false) }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2941,12 +2961,18 @@ private fun DebtsPage(
                 "پرداخت تجمیعی • " + digitsFa(batch.size.toString()) + " برداشت • " + toman(batch.sumOf { it.amountToman }),
                 fontWeight = FontWeight.Bold, fontSize = 12.sp, color = jessiReadableText(financePurple))
             batch.forEach { payment ->
+            val links = payment.debtAllocations()
             val parent = debts.firstOrNull { payment.debtReferenceId() == it.id }
             Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = .87f)) {
                 Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(parent?.person ?: payment.note, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(if (links.size > 1) "پرداخت چند بدهی / قسط" else parent?.person ?: payment.note,
+                            fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        if (links.size > 1) links.forEach { (id, share) ->
+                            Text((debts.firstOrNull { it.id == id }?.person ?: "بدهی حذف‌شده") +
+                                " • " + toman(share), fontSize = 10.sp, color = jessiReadableText(muted))
+                        }
                         Text(Jalali.of(payment.createdAt).toString(), fontSize = 10.sp, color = jessiReadableText(muted))
                     }
                     Text(toman(payment.amountToman), color = jessiReadableText(if (payment.kind == "DEBT_OUT") danger else mint), fontSize = 12.sp)
@@ -3116,13 +3142,97 @@ private fun AccountDialog(initial: Account?, dismiss: () -> Unit, save: (Account
     }
 }
 
+private fun allocationValues(entries: Map<Long, String>): Map<Long, Long> =
+    entries.mapValues { (_, value) -> readToman(value) ?: 0L }
+
+private fun allocationValid(entries: Map<Long, String>, amount: Long?,
+    targets: List<Debt>, previous: Map<Long, Long>): Boolean {
+    val values = allocationValues(entries)
+    return amount != null && validDebtAllocationTotal(values, amount) &&
+        values.all { (id, share) ->
+            targets.any { it.id == id && share <= it.editablePaymentLimit(previous[id] ?: 0L) }
+        }
+}
+
+@Composable
+private fun MultiPaymentLinkPicker(
+    debts: List<Debt>, previous: Map<Long, Long>, amount: Long?,
+    entries: Map<Long, String>, onChange: (Map<Long, String>) -> Unit
+) {
+    val targets = debts.filter { it.direction == "I_OWE" &&
+        it.editablePaymentLimit(previous[it.id] ?: 0L) > 0L }
+    val values = allocationValues(entries)
+    val allocated = values.values.sum()
+    val remaining = (amount ?: 0L) - allocated
+    Text("بدهی یا قسط مرتبط", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    entries.forEach { (id, value) ->
+        val debt = targets.firstOrNull { it.id == id }
+        val limit = debt?.editablePaymentLimit(previous[id] ?: 0L) ?: 0L
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(debt?.person ?: "بدهی ناموجود", Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                TextButton(onClick = { onChange(entries - id) }) { Text("حذف") }
+            }
+            Text("مانده قابل تخصیص: " + toman(limit), fontSize = 11.sp, color = jessiReadableText(muted))
+            if (debt != null && debt.installmentMonths > 0) {
+                val baseline = debt.copy(paidToman = debt.paidToman - (previous[id] ?: 0L))
+                Text("سررسید قسط: " + (Installments.nextDate(baseline)?.toString() ?: ""),
+                    fontSize = 10.sp, color = jessiReadableText(muted))
+            }
+            TextEntry("مبلغ این پرداخت (تومان)", value, { onChange(entries + (id to it)) }, number = true)
+            if ((values[id] ?: 0L) > limit) Text("مبلغ بیشتر از مانده قابل پرداخت است.",
+                fontSize = 11.sp, color = jessiReadableText(danger))
+        }
+    }
+    val available = targets.filter { it.id !in entries }
+    if (available.isNotEmpty()) SelectItem<Debt>("افزودن بدهی یا قسط", null, available,
+        { it.person + " • " + toman(it.editablePaymentLimit(previous[it.id] ?: 0L)) }) { debt ->
+        val share = minOf(remaining.coerceAtLeast(0L), debt.editablePaymentLimit(previous[debt.id] ?: 0L))
+        onChange(entries + (debt.id to if (share > 0L) share.toString() else ""))
+    }
+    if (targets.isEmpty()) Text("بدهی یا قسط فعالی وجود ندارد.", fontSize = 11.sp)
+    Text("جمع تخصیص: " + toman(allocated), color = jessiReadableText(financeAqua), fontSize = 12.sp)
+    Text(if (remaining >= 0L) "مبلغ باقیمانده برای تخصیص: " + toman(remaining)
+        else "مبلغ اضافه: " + toman(-remaining),
+        fontSize = 12.sp, color = jessiReadableText(if (remaining == 0L) mint else danger))
+}
+
+@Composable
+private fun AllocatedWithdrawalEditDialog(
+    payment: Transaction, accounts: List<Account>, debts: List<Debt>,
+    dismiss: () -> Unit,
+    onSave: (Long, Long, String, Map<Long, Long>, (Boolean) -> Unit) -> Unit
+) {
+    val previous = payment.debtAllocations()
+    var entries by remember(payment) { mutableStateOf(previous.mapValues { it.value.toString() }) }
+    var accountId by remember(payment) { mutableStateOf(payment.accountId) }
+    var amountStr by remember(payment) { mutableStateOf(payment.amountToman.toString()) }
+    var note by remember(payment) { mutableStateOf(payment.note) }
+    var saving by remember(payment) { mutableStateOf(false) }
+    val amount = readToman(amountStr)
+    val valid = !saving && accounts.any { it.id == accountId } &&
+        allocationValid(entries, amount, debts, previous)
+    EntryDialog("ویرایش پرداخت بدهی یا قسط", valid, dismiss, {
+        saving = true
+        onSave(accountId, amount!!, note, allocationValues(entries)) { saving = false }
+    }) {
+        SelectItem("کسر از حساب", accounts.firstOrNull { it.id == accountId }, accounts,
+            { it.title }, { accountId = it.id })
+        TextEntry("مبلغ تراکنش (تومان)", amountStr, { amountStr = it }, number = true)
+        MultiPaymentLinkPicker(debts, previous, amount, entries) { entries = it }
+        TextEntry("توضیح", note, { note = it })
+        Text("پرداخت قبلی جایگزین می‌شود؛ مبلغ دوباره کسر نمی‌شود.", fontSize = 11.sp, color = jessiReadableText(muted))
+    }
+}
+
 @Composable
 private fun TransactionDialog(
     initial: Transaction?, accounts: List<Account>, debts: List<Debt>,
     dismiss: () -> Unit,
     onSave: (Transaction) -> Unit,
     onTransfer: (Long, Long, Long, String) -> Unit,
-    onLink: (Long, Long, Long, String, Long, String, (Boolean) -> Unit) -> Unit
+    onLink: (Long, Long, Long, String, Long, String, (Boolean) -> Unit) -> Unit,
+    onAllocate: (Long, Long, Long, String, Map<Long, Long>, (Boolean) -> Unit) -> Unit
 ) {
     var savingLink by remember(initial) { mutableStateOf(false) }
     var type by remember(initial) { mutableStateOf(initial?.kind ?: "OUT") }
@@ -3133,6 +3243,8 @@ private fun TransactionDialog(
     var note by remember(initial) { mutableStateOf(initial?.note.orEmpty()) }
     var asCollection by remember(initial) { mutableStateOf(false) }
     var receivableId by remember(initial) { mutableStateOf<Long?>(null) }
+    val multi = initial != null && type == "OUT" && initial.groupId == null
+    var allocations by remember(initial) { mutableStateOf(emptyMap<Long, String>()) }
     val receivables = paymentLinkTargets(debts, type)
     val selectedReceivable = receivables.firstOrNull { it.id == receivableId }
     val amount = readToman(amountStr)
@@ -3140,13 +3252,15 @@ private fun TransactionDialog(
     val limit = selectedReceivable?.let { paymentLinkRemaining(it, type) } ?: 0L
     val valid = !savingLink && amount != null && amount in 1L..100_000_000_000L && accountId != null &&
         (!transfer || (targetAccountId != null && targetAccountId != accountId)) &&
-        (!asCollection || (type in listOf("IN", "OUT") && selectedReceivable != null &&
-            amount <= limit))
+        (!asCollection || if (multi) allocationValid(allocations, amount, debts, emptyMap())
+            else (type in listOf("IN", "OUT") && selectedReceivable != null && amount <= limit))
     EntryDialog(if (initial == null) "ثبت تراکنش" else "ویرایش تراکنش", valid, dismiss, {
         if (transfer) onTransfer(accountId!!, targetAccountId!!, amount!!, note)
         else if (asCollection) {
             savingLink = true
-            onLink(receivableId!!, accountId!!, amount!!, note, initial?.id ?: 0L, type) {
+            if (multi) onAllocate(initial!!.id, accountId!!, amount!!, note, allocationValues(allocations)) {
+                savingLink = false
+            } else onLink(receivableId!!, accountId!!, amount!!, note, initial?.id ?: 0L, type) {
                 savingLink = false
             }
         }
@@ -3205,7 +3319,9 @@ private fun TransactionDialog(
                 }
             }
             if (asCollection) {
-                PaymentLinkPicker(type, receivables, selectedReceivable, amount) {
+                if (multi) MultiPaymentLinkPicker(debts, emptyMap(), amount, allocations) {
+                    allocations = it
+                } else PaymentLinkPicker(type, receivables, selectedReceivable, amount) {
                     receivableId = it.id
                 }
             } else if (type == "OUT") {
