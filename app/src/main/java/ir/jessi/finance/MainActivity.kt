@@ -3139,6 +3139,9 @@ private fun RepayDialog(debt: Debt, accounts: List<Account>, dismiss: () -> Unit
         if (debt.installmentMonths > 0) Text("مبلغ قسط بعد: ${toman(Installments.nextAmount(debt))}", color = jessiReadableText(mint), fontSize = 12.sp)
         if (accounts.isEmpty()) Text("برای ثبت پرداخت، ابتدا یک حساب بساز.", color = jessiReadableText(danger))
         else SelectItem("حساب مرتبط", accountId?.let { id -> accounts.firstOrNull { it.id == id } }, accounts, { it.title }, { accountId = it.id })
+        if (balance > 0L) OutlinedButton(onClick = { amountStr = balance.toString() }, modifier = Modifier.fillMaxWidth()) {
+            Text("کل مبلغ باقی‌مانده • ${toman(balance)}")
+        }
         TextEntry("مبلغ پرداخت یا دریافت (تومان)", amountStr, { amountStr = it }, number = true)
         Text("این مبلغ هم در مانده حساب اعمال می‌شود؛ اما به عنوان هزینه روزمره یا درآمد ماهانه دسته‌بندی نمی‌شود.", fontSize = 11.sp, color = jessiReadableText(muted))
     }
@@ -3166,7 +3169,9 @@ private fun ReviewDialog(
     var asCollection by remember(row.id) { mutableStateOf(false) }
     var receivableId by remember(row.id) { mutableStateOf<Long?>(null) }
     val activeReceivables = debts.filter {
-        it.direction == "OWED_TO_ME" && it.totalToman > it.paidToman
+        it.totalToman > it.paidToman &&
+            if (row.kind == "IN") it.direction == "OWED_TO_ME"
+            else row.kind == "OUT" && it.direction == "I_OWE" && it.installmentMonths > 0
     }
     val selectedReceivable = activeReceivables.firstOrNull { it.id == receivableId }
     val needsUnit = row.amountUnit == "UNKNOWN"
@@ -3174,7 +3179,7 @@ private fun ReviewDialog(
     val original = row.amountRaw.takeIf { it > 0L } ?: row.amountToman
     val selectedAmount = when (selectedUnit) {
         "TOMAN" -> original
-        "RIAL" -> if (original % 10L == 0L) original / 10L else 0L
+        "RIAL" -> BankSmsParser.rialToToman(original)
         else -> 0L
     }
     AlertDialog(
@@ -3214,7 +3219,7 @@ private fun ReviewDialog(
                         )
                     }
                     if (selectedUnit == "RIAL" && original % 10L != 0L) {
-                        Text("مبلغ ریالی به تومانِ صحیح قابل تبدیل نیست؛ این مورد را دستی بررسی کن.",
+                        Text("مبلغ ریالی به نزدیک‌ترین تومان صحیح گرد می‌شود.",
                             fontSize = 11.sp, color = jessiReadableText(danger))
                     }
                 }
@@ -3222,22 +3227,22 @@ private fun ReviewDialog(
                 else SelectItem("این تراکنش برای کدام حساب است؟",
                     accountId?.let { id -> accounts.firstOrNull { it.id == id } },
                     accounts, { it.title }, { accountId = it.id })
-                if (row.kind == "IN" && activeReceivables.isNotEmpty()) {
+                if (row.kind in listOf("IN", "OUT") && activeReceivables.isNotEmpty()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = asCollection, onCheckedChange = { yes ->
                             asCollection = yes
                             if (yes && receivableId == null)
                                 receivableId = activeReceivables.firstOrNull()?.id
                         })
-                        Text("این واریزی، وصول طلب است",
+                        Text(if (row.kind == "IN") "این واریزی، وصول طلب است" else "این برداشت، پرداخت قسط است",
                             fontSize = 12.sp,
                             color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
                     }
                     if (asCollection) {
-                        SelectItem("طلب مرتبط", selectedReceivable, activeReceivables,
+                        SelectItem(if (row.kind == "IN") "طلب مرتبط" else "قسط مرتبط", selectedReceivable, activeReceivables,
                             { it.person + " • مانده " + toman(it.totalToman - it.paidToman) },
                             { receivableId = it.id })
-                        Text("موجودی حساب فقط یک‌بار افزایش پیدا می‌کند و طلب هم تسویه می‌شود.",
+                        Text(if (row.kind == "IN") "موجودی حساب فقط یک‌بار افزایش پیدا می‌کند و مانده طلب کم می‌شود." else "موجودی حساب فقط یک‌بار کم می‌شود و مبلغ از مانده اقساط کسر می‌شود.",
                             fontSize = 10.sp, color = jessiReadableText(muted))
                     }
                 }
