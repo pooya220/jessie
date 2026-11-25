@@ -1021,10 +1021,24 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                             else "این تراکنش حذف شود؟"
                         ) {
                             vm.deleteTransaction(row) { ok ->
-                                Toast.makeText(context,
-                                    if (ok) "تراکنش حذف شد و مانده‌ها به‌روز شدند"
-                                    else "حذف ممکن نیست؛ ارتباط مالی این تراکنش نامشخص یا محافظت‌شده است",
-                                    Toast.LENGTH_LONG).show()
+                                if (ok) {
+                                    Toast.makeText(context, "تراکنش حذف شد و مانده‌ها به‌روز شدند",
+                                        Toast.LENGTH_LONG).show()
+                                } else if (debtLinked) {
+                                    editor = Editor.Delete(
+                                        "ارتباط این وصول/بازپرداخت با طلب یا بدهی مشخص نیست. فقط همین تراکنش و اثر آن بر موجودی حساب حذف شود؟ سایر بدهی‌ها تغییر نمی‌کنند."
+                                    ) {
+                                        vm.deleteTransaction(row, allowUnresolvedDebtDeletion = true) { removed ->
+                                            Toast.makeText(context,
+                                                if (removed) "تراکنش حذف شد و موجودی اصلاح شد"
+                                                else "این تراکنش محافظت‌شده است یا حذف آن انجام نشد",
+                                                Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                } else {
+                                    Toast.makeText(context, "این تراکنش محافظت‌شده است یا حذف آن انجام نشد",
+                                        Toast.LENGTH_LONG).show()
+                                }
                             }
                         }
                     }
