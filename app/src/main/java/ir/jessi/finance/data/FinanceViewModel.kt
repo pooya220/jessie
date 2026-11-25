@@ -49,9 +49,10 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
     fun deleteTransaction(
-        row: Transaction, onComplete: (Boolean) -> Unit = {}
+        row: Transaction, allowUnresolvedDebtDeletion: Boolean = false,
+        onComplete: (Boolean) -> Unit = {}
     ) = viewModelScope.launch(Dispatchers.IO) {
-        val ok = runCatching { dao.deleteFinancialTransactionSafely(row.id) }
+        val ok = runCatching { dao.deleteFinancialTransactionSafely(row.id, allowUnresolvedDebtDeletion) }
             .getOrDefault(false)
         if (ok) {
             FinanceReminderScheduler.checkSoon(getApplication())
