@@ -43,6 +43,15 @@ class BankSmsParserTest {
         assertEquals(BankSmsParser.UNKNOWN, r?.amountUnit)
     }
 
+    @Test fun structuredSignedCreditRequiresUnitAndUsesAmountNotBalance() {
+        val r = BankSmsParser.parse("\u202A300359900000\u202C\n342,556,778+\n1405/9/3-18:57\nمانده:344,453,466")
+        assertEquals("IN", r?.kind)
+        assertEquals(342_556_778L, r?.amountRaw)
+        assertEquals(BankSmsParser.UNKNOWN, r?.amountUnit)
+        assertEquals(34_255_678L, BankSmsParser.rialToToman(342_556_778L))
+        assertNull(BankSmsParser.parse("342,556,778+"))
+    }
+
     @Test fun newerSinaMessageUsesDebitNotRemainingBalance() {
         val body = """
             بانک سينا
