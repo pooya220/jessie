@@ -1043,7 +1043,7 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                         }
                     }
                 )
-                Tab.DEBTS -> DebtsPage(debts, chosenPeriod, nowEpoch,
+                Tab.DEBTS -> DebtsPage(debts, txs, chosenPeriod, nowEpoch,
                     onEdit = { editor = Editor.DebtForm(it) },
                     onPay = { editor = Editor.Repay(it) },
                     onDelete = { row -> editor = Editor.Delete("این بدهی یا طلب حذف شود؟") { vm.deleteDebt(row.id) } }
@@ -2661,7 +2661,7 @@ private fun TransactionTile(
 
 @Composable
 private fun DebtsPage(
-    debts: List<Debt>, period: FinancePeriod, nowEpoch: Long,
+    debts: List<Debt>, txs: List<Transaction>, period: FinancePeriod, nowEpoch: Long,
     onEdit: (Debt) -> Unit, onPay: (Debt) -> Unit, onDelete: (Debt) -> Unit
 ) {
     val totalOwed = debts.filter { it.direction == "I_OWE" }
@@ -2671,8 +2671,19 @@ private fun DebtsPage(
         Icons.Filled.EventNote, toman(totalOwed), "بدهی باقی‌مانده",
         accent = financePurple
     )
-    if (debts.isEmpty()) EmptyNote("فعلاً بدهی یا طلبی ثبت نشده.")
-    debts.forEach { row ->
+    val completed = debts.filter { it.installmentMonths > 0 && it.paidToman >= it.totalToman }
+    val active = debts.filterNot { it.installmentMonths > 0 && it.paidToman >= it.totalToman }
+    val installmentIds = debts.filter { it.installmentMonths > 0 }.map { "DEBT_REF:${it.id}" }.toSet()
+    val payments = txs.filter { it.kind in listOf("DEBT_OUT", "DEBT_IN") && it.groupId in installmentIds }
+        .sortedByDescending { it.createdAt }
+    var history by rememberSaveable { mutableStateOf(false) }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilterChip(selected = !history, onClick = { history = false }, label = { Text("فعال") })
+        FilterChip(selected = history, onClick = { history = true }, label = { Text("تاریخچه اقساط (${digitsFa(completed.size.toString())})") })
+    }
+    if (history && completed.isEmpty() && payments.isEmpty()) EmptyNote("هنوز سابقه پرداخت قسطی ثبت نشده.")
+    if (!history && active.isEmpty()) EmptyNote("فعلاً بدهی یا طلب فعالی ثبت نشده.")
+    (if (history) completed else active).forEach { row ->
         val remaining = (row.totalToman - row.paidToman).coerceAtLeast(0)
         val mine = row.direction == "I_OWE"
         val tone = if (mine) financePurple else financeAqua
@@ -2756,7 +2767,7 @@ private fun DebtsPage(
                 if (row.note.isNotBlank()) Text(row.note, fontSize = 10.sp,
                     color = jessiReadableText(muted), maxLines = 2,
                     overflow = TextOverflow.Ellipsis)
-                Row(verticalAlignment = Alignment.CenterVertically,
+                if (!history) Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     if (remaining > 0L) {
                         FilledTonalButton(
@@ -2783,6 +2794,22 @@ private fun DebtsPage(
                             contentDescription = "حذف بدهی", tint = danger,
                             modifier = Modifier.size(17.dp))
                     }
+                }
+            }
+        }
+    }
+    if (history && payments.isNotEmpty()) {
+        Text("سوابق پرداخت اقساط", fontWeight = FontWeight.Bold, color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+        payments.forEach { payment ->
+            val parent = debts.firstOrNull { payment.groupId == "DEBT_REF:${it.id}" }
+            Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = .87f)) {
+                Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(parent?.person ?: payment.note, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(Jalali.of(payment.createdAt).toString(), fontSize = 10.sp, color = jessiReadableText(muted))
+                    }
+                    Text(toman(payment.amountToman), color = jessiReadableText(if (payment.kind == "DEBT_OUT") danger else mint), fontSize = 12.sp)
                 }
             }
         }
