@@ -281,6 +281,7 @@ private sealed interface Editor {
     ) : Editor
     data class GoalMoney(val goal: SavingsGoal, val operation: String) : Editor
     data class Repay(val value: Debt) : Editor
+    data class DebtPaymentForm(val value: Transaction) : Editor
     data class Review(val value: SmsReview) : Editor
     data class Delete(val title: String, val action: () -> Unit) : Editor
 }
@@ -1012,7 +1013,7 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                     }
                 }
                 Tab.TXS -> TransactionsPage(periodTransactions, accounts,
-                    onEdit = { editor = Editor.TxForm(it) },
+                    onEdit = { editor = if (it.kind in listOf("DEBT_IN", "DEBT_OUT")) Editor.DebtPaymentForm(it) else Editor.TxForm(it) },
                     onDelete = { row ->
                         val debtLinked = row.kind in listOf("DEBT_IN", "DEBT_OUT")
                         editor = Editor.Delete(
@@ -1046,6 +1047,7 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                 Tab.DEBTS -> DebtsPage(debts, txs, chosenPeriod, nowEpoch,
                     onEdit = { editor = Editor.DebtForm(it) },
                     onPay = { editor = Editor.Repay(it) },
+                    onEditPayment = { editor = Editor.DebtPaymentForm(it) },
                     onDelete = { row -> editor = Editor.Delete("این بدهی یا طلب حذف شود؟") { vm.deleteDebt(row.id) } }
                 )
                 Tab.GOALS -> SavingsGoalsScreen(
@@ -1191,7 +1193,21 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                 }
             }
         )
-        is Editor.Repay -> RepayDialog(e.value, accounts, dismiss = { editor = null }) { amount, accountId -> vm.settleDebt(e.value, amount, accountId); editor = null }
+        is Editor.Repay -> RepayDialog(e.value, accounts, txs, dismiss = { editor = null }) { amount, accountId ->
+            vm.settleDebt(e.value, amount, accountId) { ok ->
+                if (ok) editor = null
+                Toast.makeText(context, if (ok) "پرداخت ثبت شد و موجودی به‌روز شد" else "ثبت پرداخت انجام نشد؛ مبلغ و حساب را بررسی کن", Toast.LENGTH_LONG).show()
+            }
+        }
+        is Editor.DebtPaymentForm -> DebtPaymentEditDialog(e.value, accounts, debts, txs,
+            dismiss = { editor = null },
+            onSave = { accountId, amount, note, allowUnresolved ->
+                vm.editDebtPayment(e.value, accountId, amount, note, allowUnresolved) { ok ->
+                    if (ok) editor = null
+                    Toast.makeText(context, if (ok) "پرداخت و موجودی اصلاح شد" else "ویرایش انجام نشد؛ ارتباط بدهی و مبلغ را بررسی کن", Toast.LENGTH_LONG).show()
+                }
+            }
+        )
         is Editor.Review -> ReviewDialog(
             e.value, accounts, debts,
             dismiss = { editor = null },
@@ -2572,7 +2588,7 @@ private fun TransactionsPage(
     visible.forEach { row ->
         TransactionTile(
             row, accounts, txs,
-            if (row.kind in listOf("IN", "OUT")) ({ onEdit(row) }) else null,
+            if (row.kind in listOf("IN", "OUT", "DEBT_IN", "DEBT_OUT")) ({ onEdit(row) }) else null,
             if (row.kind in listOf("GOAL_IN", "GOAL_OUT"))
                 null else ({ onDelete(row) })
         )
@@ -2662,7 +2678,7 @@ private fun TransactionTile(
 @Composable
 private fun DebtsPage(
     debts: List<Debt>, txs: List<Transaction>, period: FinancePeriod, nowEpoch: Long,
-    onEdit: (Debt) -> Unit, onPay: (Debt) -> Unit, onDelete: (Debt) -> Unit
+    onEdit: (Debt) -> Unit, onPay: (Debt) -> Unit, onEditPayment: (Transaction) -> Unit, onDelete: (Debt) -> Unit
 ) {
     val totalOwed = debts.filter { it.direction == "I_OWE" }
         .sumOf { (it.totalToman - it.paidToman).coerceAtLeast(0) }
@@ -2672,7 +2688,8 @@ private fun DebtsPage(
         accent = financePurple
     )
     val completed = debts.filter { it.installmentMonths > 0 && it.paidToman >= it.totalToman }
-    val active = debts.filterNot { it.installmentMonths > 0 && it.paidToman >= it.totalToman }
+    val active = debts.filter { it.paidToman < it.totalToman || it.installmentMonths <= 0 }
+    // Completed installment plans are visible only after opening History.
     val installmentIds = debts.filter { it.installmentMonths > 0 }.map { "DEBT_REF:${it.id}" }.toSet()
     val payments = txs.filter { it.kind in listOf("DEBT_OUT", "DEBT_IN") && it.groupId in installmentIds }
         .sortedByDescending { it.createdAt }
@@ -2810,6 +2827,9 @@ private fun DebtsPage(
                         Text(Jalali.of(payment.createdAt).toString(), fontSize = 10.sp, color = jessiReadableText(muted))
                     }
                     Text(toman(payment.amountToman), color = jessiReadableText(if (payment.kind == "DEBT_OUT") danger else mint), fontSize = 12.sp)
+                    IconButton(onClick = { onEditPayment(payment) }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Outlined.Edit, contentDescription = "ویرایش پرداخت قسط", modifier = Modifier.size(17.dp))
+                    }
                 }
             }
         }
@@ -3152,11 +3172,11 @@ private fun BudgetDialog(initial: Budget?, existing: List<Budget>, dismiss: () -
 }
 
 @Composable
-private fun RepayDialog(debt: Debt, accounts: List<Account>, dismiss: () -> Unit, onPay: (Long, Long) -> Unit) {
+private fun RepayDialog(debt: Debt, accounts: List<Account>, txs: List<Transaction>, dismiss: () -> Unit, onPay: (Long, Long) -> Unit) {
     var amountStr by remember(debt) { mutableStateOf(
         if (debt.installmentMonths > 0) Installments.nextAmount(debt).takeIf { it > 0L }?.toString().orEmpty() else ""
     ) }
-    var accountId by remember(debt) { mutableStateOf(accounts.firstOrNull()?.id) }
+    var accountId by remember(debt) { mutableStateOf<Long?>(if (accounts.size == 1) accounts.firstOrNull()?.id else null) }
     val amount = readToman(amountStr)
     val balance = debt.totalToman - debt.paidToman
     EntryDialog(if (debt.direction == "I_OWE") "ثبت بازپرداخت" else "ثبت وصول طلب", amount != null && amount > 0 && amount <= balance && accountId != null, dismiss, {
@@ -3165,12 +3185,48 @@ private fun RepayDialog(debt: Debt, accounts: List<Account>, dismiss: () -> Unit
         Text("مانده: ${toman(balance)}", color = jessiReadableText(mint))
         if (debt.installmentMonths > 0) Text("مبلغ قسط بعد: ${toman(Installments.nextAmount(debt))}", color = jessiReadableText(mint), fontSize = 12.sp)
         if (accounts.isEmpty()) Text("برای ثبت پرداخت، ابتدا یک حساب بساز.", color = jessiReadableText(danger))
-        else SelectItem("حساب مرتبط", accountId?.let { id -> accounts.firstOrNull { it.id == id } }, accounts, { it.title }, { accountId = it.id })
+        else SelectItem(if (debt.direction == "I_OWE") "کسر از حساب" else "واریز به حساب", accountId?.let { id -> accounts.firstOrNull { it.id == id } }, accounts, { it.title + " • " + toman(accountBalance(it.id, it.openingToman, txs)) }, { accountId = it.id })
         if (balance > 0L) OutlinedButton(onClick = { amountStr = balance.toString() }, modifier = Modifier.fillMaxWidth()) {
             Text("کل مبلغ باقی‌مانده • ${toman(balance)}")
         }
         TextEntry("مبلغ پرداخت یا دریافت (تومان)", amountStr, { amountStr = it }, number = true)
         Text("این مبلغ هم در مانده حساب اعمال می‌شود؛ اما به عنوان هزینه روزمره یا درآمد ماهانه دسته‌بندی نمی‌شود.", fontSize = 11.sp, color = jessiReadableText(muted))
+    }
+}
+
+@Composable
+private fun DebtPaymentEditDialog(
+    payment: Transaction, accounts: List<Account>, debts: List<Debt>, txs: List<Transaction>,
+    dismiss: () -> Unit, onSave: (Long, Long, String, Boolean) -> Unit
+) {
+    var accountId by remember(payment) { mutableStateOf<Long?>(payment.accountId) }
+    var amountStr by remember(payment) { mutableStateOf(payment.amountToman.toString()) }
+    var note by remember(payment) { mutableStateOf(payment.note) }
+    var confirmUnlinked by remember(payment) { mutableStateOf(false) }
+    val parentId = payment.groupId?.takeIf { it.startsWith("DEBT_REF:") }?.removePrefix("DEBT_REF:")?.toLongOrNull()
+    val parent = debts.firstOrNull { it.id == parentId }
+    val amount = readToman(amountStr)
+    val maxAmount = parent?.let { it.totalToman - it.paidToman + payment.amountToman }
+    val unresolvedChange = parent == null && amount != payment.amountToman
+    val valid = amount != null && amount in 1L..100_000_000_000L &&
+        accounts.any { it.id == accountId } && (maxAmount == null || amount <= maxAmount) &&
+        (!unresolvedChange || confirmUnlinked)
+    EntryDialog(if (payment.kind == "DEBT_OUT") "ویرایش پرداخت بدهی یا قسط" else "ویرایش وصول طلب",
+        valid, dismiss, { onSave(accountId!!, amount!!, note, confirmUnlinked) }) {
+        if (parent != null) {
+            Text(parent.person, fontWeight = FontWeight.Bold)
+            Text("حداکثر مبلغ قابل ثبت: " + toman(maxAmount!!), color = jessiReadableText(mint))
+        }
+        SelectItem(if (payment.kind == "DEBT_OUT") "کسر از حساب" else "واریز به حساب",
+            accounts.firstOrNull { it.id == accountId }, accounts,
+            { it.title + " • " + toman(accountBalance(it.id, it.openingToman, txs)) }, { accountId = it.id })
+        TextEntry("مبلغ (تومان)", amountStr, { amountStr = it }, number = true)
+        TextEntry("توضیح", note, { note = it })
+        if (unresolvedChange) Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = confirmUnlinked, onCheckedChange = { confirmUnlinked = it })
+            Text("طلب/بدهی مرتبط پیدا نشد؛ فقط تراکنش و موجودی حساب اصلاح شود.", fontSize = 11.sp)
+        }
+        Text("پرداخت قبلی جایگزین می‌شود؛ مبلغ دوباره کسر نمی‌شود.", fontSize = 11.sp, color = jessiReadableText(muted))
     }
 }
 
