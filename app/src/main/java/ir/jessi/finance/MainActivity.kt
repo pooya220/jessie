@@ -1012,7 +1012,10 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
                         )
                     }
                 }
-                Tab.TXS -> TransactionsPage(periodTransactions, accounts,
+                Tab.TXS -> TransactionsPage(periodTransactions, accounts, debts,
+                    onAssign = { ids, debtId, callback ->
+                        vm.assignWithdrawalsToDebt(ids, debtId, callback)
+                    },
                     onEdit = { editor = if (it.kind in listOf("DEBT_IN", "DEBT_OUT")) Editor.DebtPaymentForm(it) else Editor.TxForm(it) },
                     onDelete = { row ->
                         val debtLinked = row.kind in listOf("DEBT_IN", "DEBT_OUT")
@@ -2401,10 +2404,66 @@ private fun AccountsPage(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun TransactionsPage(
-    txs: List<Transaction>, accounts: List<Account>,
+    txs: List<Transaction>, accounts: List<Account>, debts: List<Debt>,
+    onAssign: (List<Long>, Long, (Boolean) -> Unit) -> Unit,
     onEdit: (Transaction) -> Unit, onDelete: (Transaction) -> Unit
 ) {
+    var selecting by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf(emptySet<Long>()) }
+    var showAssignment by remember { mutableStateOf(false) }
+    var debtId by remember { mutableStateOf<Long?>(null) }
+    var savingAssignment by remember { mutableStateOf(false) }
+    var assignmentError by remember { mutableStateOf(false) }
+    val selectedRows = txs.filter { it.id in selectedIds && it.kind == "OUT" && it.groupId == null }
+    val selectedTotal = selectedRows.sumOf { it.amountToman }
+    val availableDebts = debts.filter { it.direction == "I_OWE" && it.paymentPeriodRemaining() > 0L }
+    val target = availableDebts.firstOrNull { it.id == debtId }
+    BackHandler(enabled = selecting && !showAssignment) { selecting = false; selectedIds = emptySet() }
+    if (showAssignment) AlertDialog(
+        onDismissRequest = { if (!savingAssignment) showAssignment = false },
+        title = { Text("ثبت پرداخت تجمیعی") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(digitsFa(selectedRows.size.toString()) + " برداشت • " + toman(selectedTotal))
+                SelectItem("بدهی یا قسط", target, availableDebts,
+                    { it.person + " • " + toman(it.paymentPeriodRemaining()) },
+                    { debtId = it.id; assignmentError = false })
+                target?.let {
+                    if (it.installmentMonths > 0) Text(
+                        "قسط بعدی: " + (Installments.nextDate(it)?.toString() ?: "") +
+                            " • مانده این دوره: " + toman(it.paymentPeriodRemaining()))
+                    if (selectedTotal > it.paymentPeriodRemaining())
+                        Text("مجموع برداشت‌ها از مانده قابل پرداخت این دوره بیشتر است.",
+                            color = MaterialTheme.colorScheme.error)
+                }
+                Text("برداشت‌ها با حساب و تاریخ اصلی حفظ می‌شوند و دوباره از موجودی کم نمی‌شوند.", fontSize = 11.sp)
+                if (assignmentError) Text("ثبت انجام نشد؛ مبلغ یا وضعیت تراکنش‌ها تغییر کرده است.",
+                    color = MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = {
+            Button(enabled = !savingAssignment && target != null && selectedTotal > 0 &&
+                selectedTotal <= target.paymentPeriodRemaining() && selectedRows.size == selectedIds.size,
+                onClick = {
+                    val id = debtId ?: return@Button
+                    savingAssignment = true
+                    onAssign(selectedRows.map { it.id }, id) { ok ->
+                        savingAssignment = false
+                        if (ok) {
+                            showAssignment = false
+                            selecting = false
+                            selectedIds = emptySet()
+                        } else assignmentError = true
+                    }
+                }) { Text("ثبت پرداخت") }
+        },
+        dismissButton = {
+            TextButton(enabled = !savingAssignment, onClick = { showAssignment = false }) { Text("انصراف") }
+        }
+    )
     var search by rememberSaveable { mutableStateOf("") }
     var type by rememberSaveable { mutableStateOf(TransactionSearch.ALL) }
     var selectedAccountId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -2581,17 +2640,44 @@ private fun TransactionsPage(
             color = jessiReadableText(danger), maxLines = 1,
             modifier = Modifier.weight(1f))
     }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        TextButton(onClick = {
+            selecting = !selecting
+            if (!selecting) selectedIds = emptySet()
+        }) { Text(if (selecting) "لغو انتخاب" else "انتخاب برداشت‌ها") }
+        if (selecting) {
+            Text(toman(selectedTotal), modifier = Modifier.weight(1f), fontSize = 11.sp)
+            Button(enabled = selectedRows.isNotEmpty() && availableDebts.isNotEmpty(), onClick = {
+                debtId = availableDebts.firstOrNull()?.id
+                assignmentError = false
+                showAssignment = true
+            }) { Text("ثبت پرداخت") }
+        }
+    }
     if (visible.isEmpty()) EmptyNote(
         if (txs.isEmpty()) "برای ثبت اولین تراکنش روی + بزن."
         else "تراکنشی با این جست‌وجو و فیلتر پیدا نشد."
     )
     visible.forEach { row ->
-        TransactionTile(
-            row, accounts, txs,
-            if (row.kind in listOf("IN", "OUT", "DEBT_IN", "DEBT_OUT")) ({ onEdit(row) }) else null,
-            if (row.kind in listOf("GOAL_IN", "GOAL_OUT"))
-                null else ({ onDelete(row) })
-        )
+        val eligible = row.kind == "OUT" && row.groupId == null
+        val toggle = {
+            selectedIds = if (row.id in selectedIds) selectedIds - row.id else selectedIds + row.id
+        }
+        Row(Modifier.fillMaxWidth().then(if (eligible) Modifier.combinedClickable(
+            onClick = { if (selecting) toggle() else onEdit(row) },
+            onLongClick = { selecting = true; selectedIds = selectedIds + row.id }
+        ) else Modifier), verticalAlignment = Alignment.CenterVertically) {
+            if (selecting && eligible) Checkbox(checked = row.id in selectedIds, onCheckedChange = { toggle() })
+            Box(Modifier.weight(1f)) {
+                TransactionTile(
+                    row, accounts, txs,
+                    if (!selecting && row.kind in listOf("IN", "OUT", "DEBT_IN", "DEBT_OUT")) ({ onEdit(row) }) else null,
+                    if (selecting || row.kind in listOf("GOAL_IN", "GOAL_OUT"))
+                        null else ({ onDelete(row) })
+                )
+            }
+        }
     }
 }
 
@@ -2687,18 +2773,17 @@ private fun DebtsPage(
         Icons.Filled.EventNote, toman(totalOwed), "بدهی باقی‌مانده",
         accent = financePurple
     )
-    val completed = debts.filter { it.installmentMonths > 0 && it.paidToman >= it.totalToman }
-    val active = debts.filter { it.paidToman < it.totalToman || it.installmentMonths <= 0 }
-    // Completed installment plans are visible only after opening History.
-    val installmentIds = debts.filter { it.installmentMonths > 0 }.map { "DEBT_REF:${it.id}" }.toSet()
-    val payments = txs.filter { it.kind in listOf("DEBT_OUT", "DEBT_IN") && it.groupId in installmentIds }
+    val completed = debts.filter { it.paidToman >= it.totalToman }
+    val active = debts.filter { it.paidToman < it.totalToman }
+    val debtIds = debts.map { it.id }.toSet()
+    val payments = txs.filter { it.kind in listOf("DEBT_OUT", "DEBT_IN") && it.debtReferenceId() in debtIds }
         .sortedByDescending { it.createdAt }
     var history by rememberSaveable { mutableStateOf(false) }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         FilterChip(selected = !history, onClick = { history = false }, label = { Text("فعال") })
-        FilterChip(selected = history, onClick = { history = true }, label = { Text("تاریخچه اقساط (${digitsFa(completed.size.toString())})") })
+        FilterChip(selected = history, onClick = { history = true }, label = { Text("تاریخچه بدهی و اقساط (${digitsFa(completed.size.toString())})") })
     }
-    if (history && completed.isEmpty() && payments.isEmpty()) EmptyNote("هنوز سابقه پرداخت قسطی ثبت نشده.")
+    if (history && completed.isEmpty() && payments.isEmpty()) EmptyNote("هنوز سابقه پرداخت یا وصول ثبت نشده.")
     if (!history && active.isEmpty()) EmptyNote("فعلاً بدهی یا طلب فعالی ثبت نشده.")
     (if (history) completed else active).forEach { row ->
         val remaining = (row.totalToman - row.paidToman).coerceAtLeast(0)
@@ -2816,9 +2901,17 @@ private fun DebtsPage(
         }
     }
     if (history && payments.isNotEmpty()) {
-        Text("سوابق پرداخت اقساط", fontWeight = FontWeight.Bold, color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
-        payments.forEach { payment ->
-            val parent = debts.firstOrNull { payment.groupId == "DEBT_REF:${it.id}" }
+        Text("سوابق پرداخت بدهی و اقساط", fontWeight = FontWeight.Bold, color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
+        val batches = payments.groupBy {
+            it.groupId?.takeIf { group -> group.startsWith("DEBT_REF:") && group.count { c -> c == ':' } == 2 }
+                ?: "SINGLE:${it.id}"
+        }
+        batches.values.forEach { batch ->
+            if (batch.size > 1) Text(
+                "پرداخت تجمیعی • " + digitsFa(batch.size.toString()) + " برداشت • " + toman(batch.sumOf { it.amountToman }),
+                fontWeight = FontWeight.Bold, fontSize = 12.sp, color = jessiReadableText(financePurple))
+            batch.forEach { payment ->
+            val parent = debts.firstOrNull { payment.debtReferenceId() == it.id }
             Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = .87f)) {
                 Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -2831,6 +2924,7 @@ private fun DebtsPage(
                         Icon(Icons.Outlined.Edit, contentDescription = "ویرایش پرداخت قسط", modifier = Modifier.size(17.dp))
                     }
                 }
+            }
             }
         }
     }
@@ -3203,7 +3297,7 @@ private fun DebtPaymentEditDialog(
     var amountStr by remember(payment) { mutableStateOf(payment.amountToman.toString()) }
     var note by remember(payment) { mutableStateOf(payment.note) }
     var confirmUnlinked by remember(payment) { mutableStateOf(false) }
-    val parentId = payment.groupId?.takeIf { it.startsWith("DEBT_REF:") }?.removePrefix("DEBT_REF:")?.toLongOrNull()
+    val parentId = payment.debtReferenceId()
     val parent = debts.firstOrNull { it.id == parentId }
     val amount = readToman(amountStr)
     val maxAmount = parent?.let { it.totalToman - it.paidToman + payment.amountToman }
@@ -3323,8 +3417,16 @@ private fun ReviewDialog(
                     }
                     if (asCollection) {
                         SelectItem(if (row.kind == "IN") "طلب مرتبط" else "بدهی یا قسط مرتبط", selectedReceivable, activeReceivables,
-                            { it.person + " • مانده " + toman(it.totalToman - it.paidToman) },
+                            { it.person + " • " + toman(if (row.kind == "OUT") it.paymentPeriodRemaining() else it.totalToman - it.paidToman) },
                             { receivableId = it.id })
+                        if (row.kind == "OUT" && (selectedReceivable?.installmentMonths ?: 0) > 0) {
+                            selectedReceivable?.let {
+                                Text("قسط بعدی: " + (Installments.nextDate(it)?.toString() ?: "") +
+                                    " • مانده این دوره: " + toman(it.paymentPeriodRemaining()), fontSize = 11.sp)
+                                if (selectedAmount > it.paymentPeriodRemaining()) Text("مبلغ از مانده این قسط بیشتر است.",
+                                    color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
+                            }
+                        }
                         Text(if (row.kind == "IN") "موجودی حساب فقط یک‌بار افزایش پیدا می‌کند و مانده طلب کم می‌شود." else "موجودی حساب فقط یک‌بار کم می‌شود و مبلغ از مانده بدهی یا قسط کسر می‌شود.",
                             fontSize = 10.sp, color = jessiReadableText(muted))
                     }
@@ -3360,8 +3462,8 @@ private fun ReviewDialog(
                 },
                 enabled = accountId != null && selectedAmount > 0L &&
                     (!asCollection || (selectedReceivable != null &&
-                        selectedAmount <= selectedReceivable.totalToman -
-                            selectedReceivable.paidToman)) &&
+                        selectedAmount <= (if (row.kind == "OUT") selectedReceivable.paymentPeriodRemaining()
+                            else selectedReceivable.totalToman - selectedReceivable.paidToman))) &&
                     (!isSimulation || testRegistrationConsent)
             ) {
                 Text(if (isSimulation) "ثبت آزمایشی در آمار" else "ثبت تراکنش", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))

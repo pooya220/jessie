@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import ir.jessi.finance.data.Account
 import ir.jessi.finance.data.Debt
+import ir.jessi.finance.data.paymentPeriodRemaining
+import ir.jessi.finance.ui.Installments
 import ir.jessi.finance.notifications.FinanceReminderScheduler
 import ir.jessi.finance.widgets.JessiWidgetUpdater
 import ir.jessi.finance.data.FinanceDatabase
@@ -270,8 +272,14 @@ private fun PopupReviewForm(
         if (linkDebt) {
             PopupChoice(if (isIncome) "طلب مرتبط" else "بدهی یا قسط مرتبط",
                 selectedDebt?.person ?: "انتخاب", eligibleDebts.map { it.id.toString() to
-                    (it.person + " • مانده " + toman(it.totalToman - it.paidToman)) },
+                    (it.person + " • " + toman(if (isIncome) it.totalToman - it.paidToman else it.paymentPeriodRemaining())) },
                 onSelected = { debtId = it.toLongOrNull() })
+            if (!isIncome && (selectedDebt?.installmentMonths ?: 0) > 0) selectedDebt?.let {
+                Text("قسط بعدی: " + (Installments.nextDate(it)?.toString() ?: "") +
+                    " • مانده این دوره: " + toman(it.paymentPeriodRemaining()), fontSize = 11.sp)
+                if (amount > it.paymentPeriodRemaining()) Text("مبلغ از مانده این قسط بیشتر است.",
+                    color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
+            }
             Text("مبلغ فقط یک‌بار در حساب ثبت و از مانده بدهی/طلب کم می‌شود.", fontSize = 11.sp)
         }
     }
@@ -349,7 +357,7 @@ private fun PopupReviewForm(
                 }
             },
             enabled = !saving && accountId != null && amount > 0L &&
-                (!linkDebt || (selectedDebt != null && amount <= selectedDebt.totalToman - selectedDebt.paidToman)) &&
+                (!linkDebt || (selectedDebt != null && amount <= (if (isIncome) selectedDebt.totalToman - selectedDebt.paidToman else selectedDebt.paymentPeriodRemaining()))) &&
                 (!isSimulation || testConsent),
             shape = RoundedCornerShape(12.dp)
         ) {

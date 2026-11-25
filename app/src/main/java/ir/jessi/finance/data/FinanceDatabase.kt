@@ -42,6 +42,14 @@ data class Debt(
     @ColumnInfo(defaultValue = "''") val firstInstallmentJalali: String = ""
 )
 
+/** A debt reference may also carry a unique batch ID; old records remain valid. */
+fun Transaction.debtReferenceId(): Long? = groupId?.takeIf { it.startsWith("DEBT_REF:") }
+    ?.removePrefix("DEBT_REF:")?.substringBefore(':')?.toLongOrNull()
+
+fun Debt.paymentPeriodRemaining(): Long =
+    if (installmentMonths > 0) ir.jessi.finance.ui.Installments.nextAmount(this)
+    else (totalToman - paidToman).coerceAtLeast(0L)
+
 @Entity(tableName = "budgets", indices = [Index(value = ["category"], unique = true)])
 data class Budget(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -247,6 +255,29 @@ interface FinanceDao {
         return true
     }
 
+    /** Reclassify existing withdrawals as one payment batch. No new ledger rows,
+     * no duplicate account deduction, and all changes commit together. */
+    @androidx.room.Transaction suspend fun assignWithdrawalsToDebt(
+        transactionIds: List<Long>, debtId: Long
+    ): Boolean {
+        if (transactionIds.isEmpty() || transactionIds.distinct().size != transactionIds.size) return false
+        val debt = findDebt(debtId) ?: return false
+        if (debt.direction != "I_OWE") return false
+        val limit = debt.paymentPeriodRemaining()
+        val rows = transactionIds.map { findTransaction(it) ?: return false }
+        var total = 0L
+        for (tx in rows) {
+            if (tx.kind != "OUT" || tx.groupId != null || tx.amountToman <= 0 ||
+                tx.amountToman > limit - total || countGoalMovementsForTransaction(tx.id) > 0) return false
+            total += tx.amountToman
+        }
+        val batch = "DEBT_REF:$debtId:" + java.util.UUID.randomUUID().toString()
+        for (tx in rows) updateTransaction(tx.copy(kind = "DEBT_OUT",
+            category = "بازپرداخت بدهی", groupId = batch))
+        updateDebt(debt.copy(paidToman = debt.paidToman + total))
+        return true
+    }
+
     /** Edit one payment in place, keeping its identity, source, and date.
      * Account balances are derived from the ledger, so moving a payment to
      * another account automatically reverses its effect on the old account.
@@ -261,8 +292,7 @@ interface FinanceDao {
             amount !in 1L..100_000_000_000L ||
             getAccounts().none { it.id == accountId }) return false
         val direction = if (tx.kind == "DEBT_IN") "OWED_TO_ME" else "I_OWE"
-        val link = tx.groupId?.takeIf { it.startsWith("DEBT_REF:") }
-            ?.removePrefix("DEBT_REF:")?.toLongOrNull()
+        val link = tx.debtReferenceId()
         val parent = link?.let { findDebt(it) }
         if (parent != null) {
             if (parent.direction != direction || parent.paidToman < tx.amountToman) return false
@@ -293,8 +323,7 @@ interface FinanceDao {
         if (tx.kind in listOf("GOAL_IN", "GOAL_OUT")) return false
         if (tx.kind == "DEBT_IN" || tx.kind == "DEBT_OUT") {
             val expectedDirection = if (tx.kind == "DEBT_IN") "OWED_TO_ME" else "I_OWE"
-            val link = tx.groupId?.takeIf { it.startsWith("DEBT_REF:") }
-                ?.removePrefix("DEBT_REF:")?.toLongOrNull()
+            val link = tx.debtReferenceId()
             val candidates = if (link != null) {
                 listOfNotNull(findDebt(link))
             } else {
@@ -362,7 +391,8 @@ interface FinanceDao {
             val active = findDebt(receivableDebtId) ?: return false
             val direction = if (row.kind == "IN") "OWED_TO_ME" else "I_OWE"
             if (active.direction != direction ||
-                amount > active.totalToman - active.paidToman) return false
+                amount > (if (row.kind == "OUT") active.paymentPeriodRemaining()
+                    else active.totalToman - active.paidToman)) return false
             active
         } else null
         val saved = insertTransaction(Transaction(
