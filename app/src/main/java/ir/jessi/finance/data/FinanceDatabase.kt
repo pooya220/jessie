@@ -361,7 +361,7 @@ interface FinanceDao {
             if (row.kind !in listOf("IN", "OUT")) return false
             val active = findDebt(receivableDebtId) ?: return false
             val direction = if (row.kind == "IN") "OWED_TO_ME" else "I_OWE"
-            if (active.direction != direction || (row.kind == "OUT" && active.installmentMonths <= 0) ||
+            if (active.direction != direction ||
                 amount > active.totalToman - active.paidToman) return false
             active
         } else null
