@@ -323,21 +323,22 @@ interface FinanceDao {
         val raw = row.amountRaw.takeIf { it > 0L } ?: row.amountToman
         val amount = when (unit) {
             "TOMAN" -> raw
-            "RIAL" -> if (raw % 10L == 0L) raw / 10L else return false
+            "RIAL" -> ir.jessi.finance.sms.BankSmsParser.rialToToman(raw)
             else -> return false
         }
-        if (amount <= 0L || amount > 100_000_000_000L) return false
+        if (amount <= 0L || amount > 100_000_000_000L || getAccounts().none { it.id == accountId }) return false
         val debt = if (receivableDebtId != null) {
-            if (row.kind != "IN") return false
+            if (row.kind !in listOf("IN", "OUT")) return false
             val active = findDebt(receivableDebtId) ?: return false
-            if (active.direction != "OWED_TO_ME" ||
+            val direction = if (row.kind == "IN") "OWED_TO_ME" else "I_OWE"
+            if (active.direction != direction || (row.kind == "OUT" && active.installmentMonths <= 0) ||
                 amount > active.totalToman - active.paidToman) return false
             active
         } else null
         val saved = insertTransaction(Transaction(
             accountId = accountId, amountToman = amount,
-            kind = if (debt != null) "DEBT_IN" else row.kind,
-            category = if (debt != null) "دریافت طلب" else category,
+            kind = if (debt != null) (if (row.kind == "IN") "DEBT_IN" else "DEBT_OUT") else row.kind,
+            category = if (debt != null) (if (row.kind == "IN") "دریافت طلب" else "بازپرداخت بدهی") else category,
             note = if (debt != null) note.ifBlank { debt.person }
                 else SmsReviewPolicy.noteFor(row.fingerprint, note, row.sender),
             createdAt = row.receivedAt,
