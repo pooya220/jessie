@@ -3254,7 +3254,7 @@ private fun ReviewDialog(
     val activeReceivables = debts.filter {
         it.totalToman > it.paidToman &&
             if (row.kind == "IN") it.direction == "OWED_TO_ME"
-            else row.kind == "OUT" && it.direction == "I_OWE" && it.installmentMonths > 0
+            else row.kind == "OUT" && it.direction == "I_OWE"
     }
     val selectedReceivable = activeReceivables.firstOrNull { it.id == receivableId }
     val needsUnit = row.amountUnit == "UNKNOWN"
@@ -3317,15 +3317,15 @@ private fun ReviewDialog(
                             if (yes && receivableId == null)
                                 receivableId = activeReceivables.firstOrNull()?.id
                         })
-                        Text(if (row.kind == "IN") "این واریزی، وصول طلب است" else "این برداشت، پرداخت قسط است",
+                        Text(if (row.kind == "IN") "این واریزی، وصول طلب است" else "این برداشت، پرداخت بدهی / قسط است",
                             fontSize = 12.sp,
                             color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
                     }
                     if (asCollection) {
-                        SelectItem(if (row.kind == "IN") "طلب مرتبط" else "قسط مرتبط", selectedReceivable, activeReceivables,
+                        SelectItem(if (row.kind == "IN") "طلب مرتبط" else "بدهی یا قسط مرتبط", selectedReceivable, activeReceivables,
                             { it.person + " • مانده " + toman(it.totalToman - it.paidToman) },
                             { receivableId = it.id })
-                        Text(if (row.kind == "IN") "موجودی حساب فقط یک‌بار افزایش پیدا می‌کند و مانده طلب کم می‌شود." else "موجودی حساب فقط یک‌بار کم می‌شود و مبلغ از مانده اقساط کسر می‌شود.",
+                        Text(if (row.kind == "IN") "موجودی حساب فقط یک‌بار افزایش پیدا می‌کند و مانده طلب کم می‌شود." else "موجودی حساب فقط یک‌بار کم می‌شود و مبلغ از مانده بدهی یا قسط کسر می‌شود.",
                             fontSize = 10.sp, color = jessiReadableText(muted))
                     }
                 }
