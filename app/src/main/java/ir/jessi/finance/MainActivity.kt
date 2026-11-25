@@ -2400,6 +2400,47 @@ private fun AccountsPage(
     }
 }
 
+private fun paymentLinkRemaining(debt: Debt, kind: String): Long =
+    when (kind) {
+        "OUT" -> debt.paymentPeriodRemaining()
+        "IN" -> (debt.totalToman - debt.paidToman).coerceAtLeast(0L)
+        else -> 0L
+    }
+
+private fun paymentLinkTargets(debts: List<Debt>, kind: String): List<Debt> =
+    debts.filter {
+        ((kind == "OUT" && it.direction == "I_OWE") ||
+            (kind == "IN" && it.direction == "OWED_TO_ME")) &&
+            paymentLinkRemaining(it, kind) > 0L
+    }
+
+@Composable
+private fun PaymentLinkPicker(
+    kind: String, targets: List<Debt>, selected: Debt?, amount: Long?,
+    onSelect: (Debt) -> Unit
+) {
+    SelectItem(if (kind == "OUT") "بدهی یا قسط مرتبط" else "طلب مرتبط",
+        selected, targets,
+        { it.person + " • " + toman(paymentLinkRemaining(it, kind)) },
+        onSelect)
+    if (targets.isEmpty()) {
+        Text("مورد فعالی برای اتصال وجود ندارد.", fontSize = 11.sp,
+            color = jessiReadableText(muted))
+    }
+    selected?.let {
+        val remaining = paymentLinkRemaining(it, kind)
+        Text("مانده قابل پرداخت: " + toman(remaining), fontSize = 11.sp,
+            color = jessiReadableText(financeAqua))
+        if (kind == "OUT" && it.installmentMonths > 0) {
+            Text("قسط بعدی: " + (Installments.nextDate(it)?.toString() ?: "") +
+                " • فقط مانده این دوره", fontSize = 11.sp, color = jessiReadableText(muted))
+        }
+        if (amount != null && amount > remaining)
+            Text("مبلغ از مانده قابل پرداخت بیشتر است.", fontSize = 11.sp,
+                color = jessiReadableText(danger))
+    }
+}
+
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 private fun TransactionsPage(
@@ -2415,7 +2456,7 @@ private fun TransactionsPage(
     var assignmentError by remember { mutableStateOf(false) }
     val selectedRows = txs.filter { it.id in selectedIds && it.kind == "OUT" && it.groupId == null }
     val selectedTotal = selectedRows.sumOf { it.amountToman }
-    val availableDebts = debts.filter { it.direction == "I_OWE" && it.paymentPeriodRemaining() > 0L }
+    val availableDebts = paymentLinkTargets(debts, "OUT")
     val target = availableDebts.firstOrNull { it.id == debtId }
     BackHandler(enabled = selecting && !showAssignment) { selecting = false; selectedIds = emptySet() }
     if (showAssignment) AlertDialog(
@@ -2425,16 +2466,8 @@ private fun TransactionsPage(
             Column(Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(digitsFa(selectedRows.size.toString()) + " برداشت • " + toman(selectedTotal))
-                SelectItem("بدهی یا قسط", target, availableDebts,
-                    { it.person + " • " + toman(it.paymentPeriodRemaining()) },
-                    { debtId = it.id; assignmentError = false })
-                target?.let {
-                    if (it.installmentMonths > 0) Text(
-                        "قسط بعدی: " + (Installments.nextDate(it)?.toString() ?: "") +
-                            " • مانده این دوره: " + toman(it.paymentPeriodRemaining()))
-                    if (selectedTotal > it.paymentPeriodRemaining())
-                        Text("مجموع برداشت‌ها از مانده قابل پرداخت این دوره بیشتر است.",
-                            color = MaterialTheme.colorScheme.error)
+                PaymentLinkPicker("OUT", availableDebts, target, selectedTotal) {
+                    debtId = it.id; assignmentError = false
                 }
                 Text("برداشت‌ها با حساب و تاریخ اصلی حفظ می‌شوند و دوباره از موجودی کم نمی‌شوند.", fontSize = 11.sp)
                 if (assignmentError) Text("ثبت انجام نشد؛ مبلغ یا وضعیت تراکنش‌ها تغییر کرده است.",
@@ -2443,7 +2476,7 @@ private fun TransactionsPage(
         },
         confirmButton = {
             Button(enabled = !savingAssignment && target != null && selectedTotal > 0 &&
-                selectedTotal <= target.paymentPeriodRemaining() && selectedRows.size == selectedIds.size,
+                selectedTotal <= paymentLinkRemaining(target, "OUT") && selectedRows.size == selectedIds.size,
                 onClick = {
                     val id = debtId ?: return@Button
                     savingAssignment = true
@@ -3100,19 +3133,11 @@ private fun TransactionDialog(
     var note by remember(initial) { mutableStateOf(initial?.note.orEmpty()) }
     var asCollection by remember(initial) { mutableStateOf(false) }
     var receivableId by remember(initial) { mutableStateOf<Long?>(null) }
-    val receivables = remember(debts, type) {
-        debts.filter {
-            it.totalToman > it.paidToman &&
-                (if (type == "IN") it.direction == "OWED_TO_ME"
-                else type == "OUT" && it.direction == "I_OWE" && it.paymentPeriodRemaining() > 0L)
-        }
-    }
+    val receivables = paymentLinkTargets(debts, type)
     val selectedReceivable = receivables.firstOrNull { it.id == receivableId }
     val amount = readToman(amountStr)
     val transfer = type == "TRANSFER_OUT"
-    val limit = selectedReceivable?.let {
-        if (type == "OUT") it.paymentPeriodRemaining() else it.totalToman - it.paidToman
-    } ?: 0L
+    val limit = selectedReceivable?.let { paymentLinkRemaining(it, type) } ?: 0L
     val valid = !savingLink && amount != null && amount in 1L..100_000_000_000L && accountId != null &&
         (!transfer || (targetAccountId != null && targetAccountId != accountId)) &&
         (!asCollection || (type in listOf("IN", "OUT") && selectedReceivable != null &&
@@ -3180,20 +3205,8 @@ private fun TransactionDialog(
                 }
             }
             if (asCollection) {
-                SelectItem(if (type == "OUT") "بدهی یا قسط مرتبط" else "طلب مربوط",
-                    selectedReceivable, receivables,
-                    { it.person + " • " + toman(if (type == "OUT") it.paymentPeriodRemaining()
-                        else it.totalToman - it.paidToman) },
-                    { receivableId = it.id })
-                if (selectedReceivable != null) {
-                    Text("مانده قابل پرداخت: " + toman(limit), fontSize = 11.sp,
-                        color = jessiReadableText(financeAqua))
-                    if (type == "OUT" && selectedReceivable.installmentMonths > 0) {
-                        Text("قسط بعدی: " + (Installments.nextDate(selectedReceivable)?.toString() ?: "") +
-                            " • فقط مانده این دوره", fontSize = 11.sp, color = jessiReadableText(muted))
-                    }
-                    if (amount != null && amount > limit) Text("مبلغ بیشتر از مانده قابل پرداخت است.",
-                        fontSize = 11.sp, color = jessiReadableText(danger))
+                PaymentLinkPicker(type, receivables, selectedReceivable, amount) {
+                    receivableId = it.id
                 }
             } else if (type == "OUT") {
                 SelectItem("دسته‌بندی", category, categories, { it }, { category = it })
@@ -3368,11 +3381,7 @@ private fun ReviewDialog(
     var note by remember(row.id) { mutableStateOf("") }
     var asCollection by remember(row.id) { mutableStateOf(false) }
     var receivableId by remember(row.id) { mutableStateOf<Long?>(null) }
-    val activeReceivables = debts.filter {
-        it.totalToman > it.paidToman &&
-            if (row.kind == "IN") it.direction == "OWED_TO_ME"
-            else row.kind == "OUT" && it.direction == "I_OWE"
-    }
+    val activeReceivables = paymentLinkTargets(debts, row.kind)
     val selectedReceivable = activeReceivables.firstOrNull { it.id == receivableId }
     val needsUnit = row.amountUnit == "UNKNOWN"
     var selectedUnit by remember(row.id) { mutableStateOf(if (needsUnit) "" else row.amountUnit) }
@@ -3439,16 +3448,8 @@ private fun ReviewDialog(
                             color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
                     }
                     if (asCollection) {
-                        SelectItem(if (row.kind == "IN") "طلب مرتبط" else "بدهی یا قسط مرتبط", selectedReceivable, activeReceivables,
-                            { it.person + " • " + toman(if (row.kind == "OUT") it.paymentPeriodRemaining() else it.totalToman - it.paidToman) },
-                            { receivableId = it.id })
-                        if (row.kind == "OUT" && (selectedReceivable?.installmentMonths ?: 0) > 0) {
-                            selectedReceivable?.let {
-                                Text("قسط بعدی: " + (Installments.nextDate(it)?.toString() ?: "") +
-                                    " • مانده این دوره: " + toman(it.paymentPeriodRemaining()), fontSize = 11.sp)
-                                if (selectedAmount > it.paymentPeriodRemaining()) Text("مبلغ از مانده این قسط بیشتر است.",
-                                    color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
-                            }
+                        PaymentLinkPicker(row.kind, activeReceivables, selectedReceivable, selectedAmount) {
+                            receivableId = it.id
                         }
                         Text(if (row.kind == "IN") "موجودی حساب فقط یک‌بار افزایش پیدا می‌کند و مانده طلب کم می‌شود." else "موجودی حساب فقط یک‌بار کم می‌شود و مبلغ از مانده بدهی یا قسط کسر می‌شود.",
                             fontSize = 10.sp, color = jessiReadableText(muted))
@@ -3485,8 +3486,7 @@ private fun ReviewDialog(
                 },
                 enabled = accountId != null && selectedAmount > 0L &&
                     (!asCollection || (selectedReceivable != null &&
-                        selectedAmount <= (if (row.kind == "OUT") selectedReceivable.paymentPeriodRemaining()
-                            else selectedReceivable.totalToman - selectedReceivable.paidToman))) &&
+                        selectedAmount <= paymentLinkRemaining(selectedReceivable, row.kind))) &&
                     (!isSimulation || testRegistrationConsent)
             ) {
                 Text(if (isSimulation) "ثبت آزمایشی در آمار" else "ثبت تراکنش", color = jessiReadableText(androidx.compose.material3.LocalContentColor.current))
