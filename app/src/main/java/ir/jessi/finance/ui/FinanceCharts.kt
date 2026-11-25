@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -48,7 +49,8 @@ fun FinancialTrendChart(periods: List<FinancePeriod>, selectedIndex: Int, transa
                 val column = size.width / shown.size
                 val plotHeight = size.height - 4.dp.toPx()
                 for (i in shown.indices) {
-                    val baseX = i * column + column * .19f
+                    val visualIndex = if (layoutDirection == LayoutDirection.Rtl) shown.lastIndex - i else i
+                    val baseX = visualIndex * column + column * .215f
                     val bar = column * .25f
                     val inHeight = plotHeight * (incomes[i].toFloat() / maximum)
                     val outHeight = plotHeight * (expenses[i].toFloat() / maximum)
@@ -175,7 +177,7 @@ fun InstallmentForecastChart(debts: List<Debt>, now: Long) {
                 upcoming.forEachIndexed { i, amount ->
                     val height = size.height * (amount.toFloat() / max)
                     drawRoundRect(negative,
-                        topLeft = Offset(i * col + col * .2f, size.height - height),
+                        topLeft = Offset((if (layoutDirection == LayoutDirection.Rtl) upcoming.lastIndex - i else i) * col + col * .2f, size.height - height),
                         size = Size(col * .6f, height.coerceAtLeast(0f)),
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(5.dp.toPx()))
                 }
