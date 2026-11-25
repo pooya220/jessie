@@ -1142,17 +1142,14 @@ private fun JessiHome(openReviewId: Long, openReminderTab: String?,
             onTransfer = { a, b, amount, note ->
                 vm.transfer(a,b,amount,note); editor = null
             },
-            onCollect = { debtId, accountId, amount, note, existingTxId ->
-                vm.collectReceivable(debtId, accountId, amount, note, existingTxId) { ok ->
+            onLink = { debtId, accountId, amount, note, existingTxId, kind, done ->
+                vm.saveLinkedDebtTransaction(debtId, accountId, amount, note, existingTxId, kind) { ok ->
+                    done(ok)
                     Toast.makeText(context,
-                        if (ok) "وصول ثبت شد؛ مانده طلب و حساب با هم به‌روز شدند"
-                        else "وصول ثبت نشد؛ مبلغ و طلب انتخاب‌شده را بررسی کن",
+                        if (ok) "پرداخت ثبت شد؛ مانده و حساب به‌روز شدند"
+                        else "ثبت انجام نشد؛ مبلغ و بدهی یا طلب انتخاب‌شده را بررسی کن",
                         Toast.LENGTH_LONG).show()
-                    if (ok) {
-                        editor = null
-                        tabName = Tab.DEBTS.name
-                        showSettings = false
-                    }
+                    if (ok) editor = null
                 }
             }
         )
@@ -3092,8 +3089,9 @@ private fun TransactionDialog(
     dismiss: () -> Unit,
     onSave: (Transaction) -> Unit,
     onTransfer: (Long, Long, Long, String) -> Unit,
-    onCollect: (Long, Long, Long, String, Long) -> Unit
+    onLink: (Long, Long, Long, String, Long, String, (Boolean) -> Unit) -> Unit
 ) {
+    var savingLink by remember(initial) { mutableStateOf(false) }
     var type by remember(initial) { mutableStateOf(initial?.kind ?: "OUT") }
     var accountId by remember(initial) { mutableStateOf(initial?.accountId ?: accounts.firstOrNull()?.id) }
     var targetAccountId by remember(initial) { mutableStateOf(accounts.firstOrNull { it.id != accountId }?.id) }
@@ -3102,21 +3100,31 @@ private fun TransactionDialog(
     var note by remember(initial) { mutableStateOf(initial?.note.orEmpty()) }
     var asCollection by remember(initial) { mutableStateOf(false) }
     var receivableId by remember(initial) { mutableStateOf<Long?>(null) }
-    val receivables = remember(debts) {
-        debts.filter { it.direction == "OWED_TO_ME" && it.totalToman > it.paidToman }
+    val receivables = remember(debts, type) {
+        debts.filter {
+            it.totalToman > it.paidToman &&
+                (if (type == "IN") it.direction == "OWED_TO_ME"
+                else type == "OUT" && it.direction == "I_OWE" && it.paymentPeriodRemaining() > 0L)
+        }
     }
     val selectedReceivable = receivables.firstOrNull { it.id == receivableId }
     val amount = readToman(amountStr)
     val transfer = type == "TRANSFER_OUT"
-    val valid = amount != null && amount > 0 && accountId != null &&
+    val limit = selectedReceivable?.let {
+        if (type == "OUT") it.paymentPeriodRemaining() else it.totalToman - it.paidToman
+    } ?: 0L
+    val valid = !savingLink && amount != null && amount in 1L..100_000_000_000L && accountId != null &&
         (!transfer || (targetAccountId != null && targetAccountId != accountId)) &&
-        (!asCollection || (type == "IN" && selectedReceivable != null &&
-            amount <= selectedReceivable.totalToman - selectedReceivable.paidToman))
+        (!asCollection || (type in listOf("IN", "OUT") && selectedReceivable != null &&
+            amount <= limit))
     EntryDialog(if (initial == null) "ثبت تراکنش" else "ویرایش تراکنش", valid, dismiss, {
         if (transfer) onTransfer(accountId!!, targetAccountId!!, amount!!, note)
-        else if (asCollection) onCollect(
-            receivableId!!, accountId!!, amount!!, note, initial?.id ?: 0L
-        )
+        else if (asCollection) {
+            savingLink = true
+            onLink(receivableId!!, accountId!!, amount!!, note, initial?.id ?: 0L, type) {
+                savingLink = false
+            }
+        }
         else onSave(Transaction(
             id = initial?.id ?: 0, accountId = accountId!!, amountToman = amount!!,
             kind = type, category = if (
@@ -3132,6 +3140,10 @@ private fun TransactionDialog(
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("OUT" to "برداشت", "IN" to "واریز", "TRANSFER_OUT" to "انتقال").forEach { (code, label) ->
                     FilterChip(selected = type == code, onClick = {
+                        if (type != code) {
+                            asCollection = false
+                            receivableId = null
+                        }
                         type = code
                         if (type == "IN" && category !in incomeCategories) category = "درآمد"
                     }, label = { Text(label, fontSize = 11.sp, color = jessiReadableText(androidx.compose.material3.LocalContentColor.current)) })
@@ -3145,8 +3157,7 @@ private fun TransactionDialog(
             Text("انتقال بین حساب‌ها درآمد یا هزینه محسوب نمی‌شود.", fontSize = 11.sp, color = jessiReadableText(muted))
         }
         TextEntry("مبلغ به تومان", amountStr, { amountStr = it }, number = true)
-        if (type == "OUT") SelectItem("دسته‌بندی", category, categories, { it }, { category = it })
-        if (type == "IN") {
+        if (type == "IN" || type == "OUT") {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 Checkbox(
@@ -3159,21 +3170,33 @@ private fun TransactionDialog(
                     }
                 )
                 Column(Modifier.weight(1f)) {
-                    Text("این واریزی مربوط به وصول طلب است",
+                    Text(if (type == "OUT") "این برداشت مربوط به پرداخت بدهی / قسط است"
+                        else "این واریزی مربوط به وصول طلب است",
                         fontSize = 12.sp,
                         color = jessiReadableText(MaterialTheme.colorScheme.onSurface))
-                    Text("وصول از مبلغ طلب کم می‌شود و دوباره به موجودی افزوده نمی‌شود.",
+                    Text(if (initial != null) "همان تراکنش ویرایش می‌شود؛ ثبت دوباره انجام نمی‌شود."
+                        else "مبلغ هم‌زمان در حساب و مانده بدهی یا طلب ثبت می‌شود.",
                         fontSize = 10.sp, color = jessiReadableText(muted))
                 }
             }
             if (asCollection) {
-                SelectItem("طلب مربوط", selectedReceivable, receivables,
-                    { it.person + " • مانده " + toman(it.totalToman - it.paidToman) },
+                SelectItem(if (type == "OUT") "بدهی یا قسط مرتبط" else "طلب مربوط",
+                    selectedReceivable, receivables,
+                    { it.person + " • " + toman(if (type == "OUT") it.paymentPeriodRemaining()
+                        else it.totalToman - it.paidToman) },
                     { receivableId = it.id })
-                if (selectedReceivable != null) Text(
-                    "مانده قابل وصول: " + toman(
-                        selectedReceivable.totalToman - selectedReceivable.paidToman
-                    ), fontSize = 11.sp, color = jessiReadableText(financeAqua))
+                if (selectedReceivable != null) {
+                    Text("مانده قابل پرداخت: " + toman(limit), fontSize = 11.sp,
+                        color = jessiReadableText(financeAqua))
+                    if (type == "OUT" && selectedReceivable.installmentMonths > 0) {
+                        Text("قسط بعدی: " + (Installments.nextDate(selectedReceivable)?.toString() ?: "") +
+                            " • فقط مانده این دوره", fontSize = 11.sp, color = jessiReadableText(muted))
+                    }
+                    if (amount != null && amount > limit) Text("مبلغ بیشتر از مانده قابل پرداخت است.",
+                        fontSize = 11.sp, color = jessiReadableText(danger))
+                }
+            } else if (type == "OUT") {
+                SelectItem("دسته‌بندی", category, categories, { it }, { category = it })
             } else {
                 SelectItem("نوع درآمد", category, incomeCategories, { it }, { category = it })
                 if (category == "حقوق") Text(

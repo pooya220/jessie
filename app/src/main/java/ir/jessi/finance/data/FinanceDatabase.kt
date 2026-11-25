@@ -255,6 +255,40 @@ interface FinanceDao {
         return true
     }
 
+    /** Save a new payment or reclassify an existing ordinary transaction,
+     * including edits to its amount/account. The ledger row and debt progress
+     * are committed together; an existing withdrawal is never inserted twice. */
+    @androidx.room.Transaction suspend fun saveLinkedDebtTransaction(
+        debtId: Long, accountId: Long, amount: Long, note: String,
+        existingId: Long, kind: String
+    ): Boolean {
+        if (kind !in listOf("IN", "OUT") || amount !in 1L..100_000_000_000L ||
+            getAccounts().none { it.id == accountId }) return false
+        val debt = findDebt(debtId) ?: return false
+        val outgoing = kind == "OUT"
+        if (debt.direction != (if (outgoing) "I_OWE" else "OWED_TO_ME")) return false
+        val limit = if (outgoing) debt.paymentPeriodRemaining()
+            else (debt.totalToman - debt.paidToman).coerceAtLeast(0L)
+        if (amount > limit) return false
+        val linkedKind = if (outgoing) "DEBT_OUT" else "DEBT_IN"
+        val linkedCategory = if (outgoing) "بازپرداخت بدهی" else "دریافت طلب"
+        val group = "DEBT_REF:$debtId"
+        val details = note.ifBlank { debt.person }
+        if (existingId > 0L) {
+            val existing = findTransaction(existingId) ?: return false
+            if (existing.kind != kind || existing.groupId != null ||
+                countGoalMovementsForTransaction(existingId) > 0) return false
+            updateTransaction(existing.copy(accountId = accountId, amountToman = amount,
+                kind = linkedKind, category = linkedCategory, note = details, groupId = group))
+        } else {
+            if (insertTransaction(Transaction(accountId = accountId, amountToman = amount,
+                    kind = linkedKind, category = linkedCategory, note = details, groupId = group)) <= 0L)
+                return false
+        }
+        updateDebt(debt.copy(paidToman = debt.paidToman + amount))
+        return true
+    }
+
     /** Reclassify existing withdrawals as one payment batch. No new ledger rows,
      * no duplicate account deduction, and all changes commit together. */
     @androidx.room.Transaction suspend fun assignWithdrawalsToDebt(
