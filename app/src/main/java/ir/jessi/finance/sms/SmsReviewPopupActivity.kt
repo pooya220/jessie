@@ -202,7 +202,7 @@ private fun PopupReviewForm(
     var error by remember(row.id) { mutableStateOf<String?>(null) }
 
     val eligibleDebts = debts.filter { it.totalToman > it.paidToman &&
-        (if (isIncome) it.direction == "OWED_TO_ME" else row.kind == "OUT" && it.direction == "I_OWE" && it.installmentMonths > 0) }
+        (if (isIncome) it.direction == "OWED_TO_ME" else row.kind == "OUT" && it.direction == "I_OWE") }
     var linkDebt by remember(row.id) { mutableStateOf(false) }
     var debtId by remember(row.id) { mutableStateOf<Long?>(null) }
     val selectedDebt = eligibleDebts.firstOrNull { it.id == debtId }
@@ -266,9 +266,9 @@ private fun PopupReviewForm(
         FilterChip(selected = linkDebt, onClick = {
             linkDebt = !linkDebt
             if (linkDebt && debtId == null) debtId = eligibleDebts.firstOrNull()?.id
-        }, label = { Text(if (isIncome) "وصول طلب" else "پرداخت قسط") })
+        }, label = { Text(if (isIncome) "وصول طلب" else "پرداخت بدهی / قسط") })
         if (linkDebt) {
-            PopupChoice(if (isIncome) "طلب مرتبط" else "قسط مرتبط",
+            PopupChoice(if (isIncome) "طلب مرتبط" else "بدهی یا قسط مرتبط",
                 selectedDebt?.person ?: "انتخاب", eligibleDebts.map { it.id.toString() to
                     (it.person + " • مانده " + toman(it.totalToman - it.paidToman)) },
                 onSelected = { debtId = it.toLongOrNull() })
