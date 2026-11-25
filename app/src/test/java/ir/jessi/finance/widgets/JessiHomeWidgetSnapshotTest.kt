@@ -19,7 +19,8 @@ class JessiHomeWidgetSnapshotTest {
             rows, emptyList(), 1000, 2000, "دوره", false)
         assertEquals(1050L, model.balance)
         assertEquals(1000L, model.income)
-        assertEquals(300L, model.expenses)
+        assertEquals(400L, model.expenses)
+        assertEquals(300L, model.expensesByCategory.sumOf { it.second })
     }
 
     @Test fun expenseChartUsesCurrentPeriodOnlyAndIgnoresRepaymentsTransfers() {
